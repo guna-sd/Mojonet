@@ -7,9 +7,7 @@ MojoNet is a state-of-the-art ML/DL framework that empowers developers by integr
 
 With MojoNet, creating efficient, high-performance machine learning models and deep learning architectures becomes an intuitive process, eliminating the traditional complexities associated with ML/DL development.
 
-## Why MojoNet?
 
-MojoNet stands out by combining the simplicity of Python with the efficiency of systems programming, offering a unique platform for ML/DL research and production. Its integration with the Mojo programming language ensures that developers can achieve C-level performance without sacrificing ease of use or development speed.
 
 
 🤝 Contributing
