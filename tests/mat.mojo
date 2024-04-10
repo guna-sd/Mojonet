@@ -35,10 +35,10 @@ struct Matrix[rows: Int, cols: Int]:
         self.store[1](y, x, val)
 
     fn load[nelts: Int](self, y: Int, x: Int) -> SIMD[type, nelts]:
-        return self.data.simd_load[nelts](y * self.cols + x)
+        return self.data.load[width=nelts](y * self.cols + x)
 
     fn store[nelts: Int](self, y: Int, x: Int, val: SIMD[type, nelts]):
-        return self.data.simd_store[nelts](y * self.cols + x, val)
+        return self.data.store[width=nelts](y * self.cols + x, val)
 
 
 fn matmul_tiled_unrolled_parallelized(C: Matrix, A: Matrix, B: Matrix):
@@ -52,7 +52,7 @@ fn matmul_tiled_unrolled_parallelized(C: Matrix, A: Matrix, B: Matrix):
                     C.store(m, n + x, C.load[nelts](m, n + x) + A[m, k] * B.load[nelts](k, n + x))
 
                 alias unroll_factor = tile_x // nelts
-                vectorize[dot, nelts, tile_x, unroll_factor]()
+                vectorize[dot, nelts](unroll_factor)
 
         alias tile_size = 4
         tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
