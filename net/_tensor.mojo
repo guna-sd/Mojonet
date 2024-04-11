@@ -1,8 +1,11 @@
 from net.utils import shape, Tensorprinter, _bytes
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
-from math import pow
+import math
 from random.random import rand
+from net.nn import gelu
+
+
 
 @value
 struct Tensor[type : DType]:
@@ -111,21 +114,28 @@ struct Tensor[type : DType]:
         self.dtype = existing.dtype
     
     fn __getitem__(self, index : Int) -> SIMD[type, 1]:
-        return self.storage[index]
+        return self.storage.load(index)
     
     
     fn __setitem__(self, index : Int, value : SIMD[type, 1]):
         self.storage[index] = value
     
     fn __eq__(self: Self, other: Self) -> Bool:
-        if self.storage == other.storage:
-            return True
-        return False
-    
+        var bool = False
+        for i in range(self.shape.num_elements):
+            if self.storage[i] == other.storage[i]: 
+                bool = True
+            else:
+                bool = False
+        return bool
+
     fn __ne__(self: Self, other: Self) -> Bool:
         if self.storage == other.storage:
             return False
         return True
+    
+    fn __len__(self: Self) -> Int:
+        return self.shape.num_elements
 
     fn __add__(self: Self, other: Self) -> Self:
         if self.shape._rank == other.shape._rank:
@@ -165,8 +175,15 @@ struct Tensor[type : DType]:
     
     fn __pow__(self: Self, exponent: Int) -> Self:
         for i in range(self.shape.num_elements):
-            self.storage[i] = pow(self.storage[i], exponent)
+            self.storage[i] = math.pow(self.storage[i], exponent)
         return self
+
+    fn load[nelts : Int](self, index: Int) -> SIMD[type,nelts]:
+        return self.storage.load[width=nelts](index)
+    
+    fn store[nelts : Int](self, index: Int, value: SIMD[type,nelts]):
+        self.storage.store[width=nelts](index, value)    
+
 
     # fn reshape(inout self: Self, shapes: List[Int]):
     #     self.shape = shape(shapes)
@@ -256,3 +273,25 @@ struct Tensor[type : DType]:
     @always_inline("nodebug")    
     fn itemsize(self: Self) -> Int:
         return _bytes(1,self.dtype)
+    
+    fn __enter__(owned self) -> Self:
+        """The function to call when entering the context."""
+        return self ^
+    
+    fn to(self: Self, device: String):
+        if device == "cpu":
+            print("cpu")
+        elif device == "cuda":
+            print("cuda")
+        else:
+            print("unknown device")
+
+fn main():
+    var x = Tensor[DType.float32](2,2)
+    x[0] = 0.1315377950668335
+    x[1] = 0.458650141954422
+    x[2] = 1.21895918250083923
+    x[3] = 0.67886471748352051
+    print(x)
+    var F = gelu[DType.float32,4,'v'](x)
+    print(F)

@@ -1,1 +1,2 @@
-from ._tensor import Tensor
+from ._tensor import *
+from .nn.modules import *

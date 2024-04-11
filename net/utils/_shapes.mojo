@@ -1,7 +1,5 @@
 from tensor import TensorShape, TensorSpec
 from tensor import Tensor as _Tensor
-from builtin.string import _calc_initial_buffer_size, _vec_fmt
-from builtin.io import _get_dtype_printf_format
 
 @value
 struct shape:

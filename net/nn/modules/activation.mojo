@@ -1,73 +1,519 @@
 from algorithm import parallelize, vectorize
-from net import Tensor
-from math import max, pow, exp
-from algorithm._gpu.reduction import Context
+from net import Tensor, shape
+import math
+# from gpu.host import Context
+from sys.info import num_physical_cores
 
-
-@always_inline
-fn relu[T: DType](inout x: Tensor[T], number_of_cores: Int = 1, size: Int = 0) -> None:
-    var num_elements: Int = x.num_elements() if size == 0 else size
-
-    @parameter
-    fn _row(size: Int):
-        var dt: SIMD[T, 1] = x[size]
-        x[size] = dt if dt > 0 else 0.0
-
-    parallelize[_row](num_elements, number_of_cores)
-
+alias pi : Float64= 3.141592653589793
 
 @always_inline
-fn silu[T: DType](inout x: Tensor[T], number_of_cores: Int = 1, size: Int = 0) -> None:
-    var num_elements: Int = x.num_elements() if size == 0 else size
-
-    @parameter
-    fn _row(size: Int):
-        var dt: SIMD[T, 1] = x[size]
-        x[size] = dt * (1.0 / (1.0 + math.exp(-dt)))
-
-    parallelize[_row](num_elements, number_of_cores)
+fn _relu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.max[type,nelts](value, 0)
 
 @always_inline
-fn sigmoid[T: DType](inout x: Tensor[T], number_of_cores: Int = 1, size: Int = 0) -> None:
-    var num_elements: Int = x.num_elements() if size == 0 else size
+fn _sigmoid[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return 1.0 / (1.0 + math.exp[type,nelts](-value))
+
+@always_inline
+fn _softplus[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.log[type, nelts](1.0 + math.exp[type, nelts](value))
+
+@always_inline
+fn _swish[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return value * _sigmoid[type, nelts](value)
+
+@always_inline
+fn _tanh[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return (2 / (1 + math.exp[type, nelts]((-2 * value)))) - 1
+
+@always_inline
+fn _gelu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return 0.5 * value * (1.0 + math.tanh[type, nelts](math.sqrt[type,nelts](2.0 / pi) * (value + 0.044715 * math.pow[type,nelts](value, 3))))
+
+@always_inline
+fn _squareplus[type : DType, nelts : Int](value: SIMD[type, nelts], beta : SIMD[type,1]) -> SIMD[type, nelts]:
+    return (value + math.sqrt[type, nelts](value**2 + beta)) / 2
+
+fn tanh_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Applies tanh to the input -> Uses Vectorization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+
+    Returns:
+        Input transformed by tanh.
+    """
+    alias nelts = simdwidthof[type]()
+    var num_elements: Int = Input.num_elements()
+    var Output: Tensor[type] = Tensor[type](Input.shape)
 
     @parameter
-    fn _row(size: Int):
-        x[size] = 1.0 / (1.0 + math.exp(-x[size]))
-
-    parallelize[_row](num_elements, number_of_cores)
-
-
-fn relu[T : DType](Inputs : Tensor[T], Outputs : Tensor[T]):
-
-    alias nelts = simdwidthof[T]()
-
-    @parameter
-    fn _row(row : Int):
-        @parameter
-        fn _relu[nelts : Int](value: Int):
-            pass
-
-# @always_inline
-# fn tensor_relu[T: DType, nelts: Int](inout B: Tensor[T], A: Tensor[T]):
-#     @parameter
-#     fn v_relu[nelts: Int](i: Int):
-#         var zeros = SIMD[T, nelts]()
-#         B.simd_store[nelts](
-#             i,
-#             (A.simd_load[nelts](i) > zeros).cast[T]() * A.simd_load[nelts](i),
-#         )
-
-#     vectorize[nelts, v_relu](B.num_elements())
-
+    fn _row[nelts : Int](row : Int):
+        for i in range(num_elements // nelts):
+            var offset : Int = row * num_elements + i * nelts
+            var value = Input.load[nelts](offset)
+            value = math.tanh[type, nelts](value)
+            Output.store[nelts](offset, value)
     
-struct Functional:
-    ...
+    vectorize[_row, nelts](num_elements)
+    return Output
+    
+fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
+    """
+    Applies tanh to the input -> Uses Parallelization algorithm.
 
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+        num_cores : Number of cores to use for Parallelization.
+
+    Returns:
+        Input transformed by tanh.
+    """
+    var num_elements: Int = Input.num_elements()
+    var Output: Tensor[type] = Tensor[type](Input.shape)
+    var cores = num_cores if num_cores <= num_physical_cores() else 1
+
+    @parameter
+    fn _row(size: Int):
+        Output[size] = math.tanh(Input[size])
+
+    parallelize[_row](num_elements, cores)
+    return Output
+
+fn tanh[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Tanh activation function.
+
+    Parameters:
+        type: Data type of the tensor.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+
+    Arguments:
+        Input: Tensor for which tanh activation function is to be applied.
+
+    Returns:
+        Tensor after applying tanh activation function.
+    """
+    if alg == "vectorize" or alg == "parallelize":
+        if Input.num_elements() <= 10000 or num_physical_cores() <= 2 or alg == "vectorize":
+            return tanh_vectorized[type](Input)
+        return tanh_parallelized[type](Input, cores)
+    else:
+        print("Invalid algorithm using default algorithm")
+        return tanh_vectorized[type](Input)
+
+
+fn sigmoid_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Applies sigmoid 1/ (1 + e^-x) to the Input x. -> Uses Vectorization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+
+    Returns:
+        Input transformed by sigmoid.
+    """
+    alias nelts = simdwidthof[type]()
+    var num_elements: Int = Input.num_elements()
+    var Output: Tensor[type] = Tensor[type](Input.shape)
+
+    @parameter
+    fn _row[nelts : Int](row : Int):
+        for i in range(num_elements // nelts):
+            var offset : Int = row * num_elements + i * nelts
+            var value = Input.load[nelts](offset)
+            value = _sigmoid(value)
+            Output.store[nelts](offset, value)
+    
+    vectorize[_row, nelts](num_elements)
+    return Output
+
+
+
+fn sigmoid_parallelized[type : DType = DType.float32](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
+    """
+    Applies sigmoid 1/ (1 + e^-x) to the Input x. -> Uses Parallelization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+        num_cores : Number of cores to use for Parallelization.
+
+    Returns:
+        Input transformed by sigmoid.
+    """
+    var num_elements: Int = Input.num_elements()
+    var Output: Tensor[type] = Tensor[type](Input.shape)
+    var cores = num_cores if num_cores <= num_physical_cores() else 1
+
+    @parameter
+    fn _row(size: Int):
+        Output[size] = _sigmoid(Input[size])
+
+    parallelize[_row](num_elements, cores)
+    return Output
+
+
+fn sigmoid[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Sigmoid activation function 1/ (1 + e^-x).
+
+    Parameters:
+        type: Data type of the tensor.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+
+    Arguments:
+        Input: Tensor for which sigmoid activation function is to be applied.
+
+    Returns:
+        Tensor after applying sigmoid activation function.
+    """
+    if alg == "vectorize" or alg == "parallelize":
+        if Input.num_elements() <= 10000 or num_physical_cores() <= 2 or alg == "vectorize":
+            return sigmoid_vectorized[type](Input)
+        return sigmoid_parallelized[type](Input, cores)
+    else:
+        print("Invalid algorithm using default algorithm")
+        return sigmoid_vectorized[type](Input)
+
+
+fn relu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Applies ReLU to the input -> Uses Vectorization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+
+    Returns:
+        Input transformed by ReLU.
+    """
+    alias nelts = simdwidthof[type]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn _row[nelts : Int](row : Int):
+        for i in range(num_elements // nelts):
+            var offset = row * num_elements + i * nelts
+            var value = Input.load[nelts](offset)
+            value = _relu[type,nelts](value)
+            Output.store[nelts](offset, value)
+
+    vectorize[_row, nelts](num_elements)
+    return Output
+    
+fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
+    """
+    Applies ReLU to the input -> Uses Parallelization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+        num_cores : Number of cores to use for Parallelization.
+
+    Returns:
+        Input transformed by ReLU.
+    """
+    var num_elements: Int = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+    var cores = num_cores if num_cores <= num_physical_cores() else 1
+
+    @parameter
+    fn _row(size: Int):
+        Output[size] = _relu[type, 1](Input[size])
+
+    parallelize[_row](num_elements, cores)
+    return Output
+
+fn relu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+    """
+    ReLU activation function.
+
+    Parameters:
+        type: Data type of the tensor.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+
+    Arguments:
+        Input: Tensor for which relu activation function is to be applied.
+
+    Returns:
+        Tensor after applying relu activation function.
+    """
+    if alg == "vectorize" or alg == "parallelize":
+        if Input.num_elements() <= 10000 or num_physical_cores() <= 2 or alg == "vectorize":
+            return relu_vectorized[type](Input)
+        return relu_parallelized[type](Input, cores)
+    else:
+        print("Invalid algorithm using default algorithm")
+        return relu_vectorized[type](Input)
+
+fn gelu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Applies GELU to the input -> Uses Vectorization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+
+    Returns:
+        Input transformed by GELU.
+    """
+    alias nelts = simdwidthof[type]()
+    var num_elements = Input.num_elements()
+    var Output : Tensor[type] = Tensor[type](Input.shape)
+
+    @parameter
+    fn _row[nelts : Int](row : Int):
+        for i in range(num_elements // nelts):
+            var offset = row * num_elements + i * nelts
+            var value = Input.load[nelts](offset)
+            value = _gelu[type,nelts](value)
+            Output.store[nelts](offset, value)
+
+    vectorize[_row, nelts](num_elements)
+    return Output
+
+fn gelu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
+    """
+    Applies GELU to the input -> Uses Parallelization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+        num_cores : Number of cores to use for Parallelization.
+
+    Returns:
+        Input transformed by GELU.
+    """
+    var num_elements: Int = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+    var cores = num_cores if num_cores <= num_physical_cores() else 1
+
+    @parameter
+    fn _row(size: Int):
+        Output[size] = _gelu(Input[size])
+
+    parallelize[_row](num_elements, cores)
+    return Output
+
+fn gelu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+    """
+    GELU activation function.
+
+    Parameters:
+        type: Data type of the tensor.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+
+    Arguments:
+        Input: Tensor for which GELU activation function is to be applied.
+
+    Returns:
+        Tensor after applying GELU activation function.
+    """
+
+    if alg == "vectorize" or alg == "parallelize":
+        if Input.num_elements() <= 10000 or num_physical_cores() <= 2 or alg == "vectorize":
+            return gelu_vectorized[type](Input)
+        return gelu_parallelized[type](Input, cores)
+    else:
+        print("Invalid algorithm using default algorithm")
+        return gelu_vectorized[type](Input)
+
+
+fn silu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
+    """
+    Applies SiLU to the input -> Uses Parallelization algorithm.
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+        num_cores : Number of cores to use for Parallelization.
+
+    Returns:
+        Input transformed by SiLU.
+    """
+    var num_elements: Int = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+    var cores = num_cores if num_cores <= num_physical_cores() else 1
+
+    @parameter
+    fn _row(size: Int):
+        Output[size] = Input[size] * _sigmoid(Input[size])
+
+    parallelize[_row](num_elements, cores)
+    return Output
+
+fn silu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
+    """
+    Applies SiLU to the input -> Uses Vectorization algorithm.
+    
+
+    Parameters:
+        type : DType of the Input data.
+
+    Args:
+        Input: Tensor[type].
+
+    Returns:
+        Input transformed by SiLU.
+    """
+    alias nelts : Int = simdwidthof[type]()
+    var Output : Tensor[type] = Tensor[type](Input.shape)
+    var num_elements : Int = Input.num_elements()
+
+    @parameter
+    fn _row[nelts : Int](row : Int):
+        for i in range(num_elements // nelts):
+            var offset = row * num_elements + i * nelts
+            var value = Input.load[nelts](offset)
+            value = value * _sigmoid[type,nelts](value)
+            Output.store[nelts](offset, value)
+    vectorize[_row, nelts](num_elements)
+    return Output
+
+fn silu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+    """
+    SiLU (Swish) activation function.
+
+    Parameters:
+        type: Data type of the tensor.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+
+    Arguments:
+        Input: Tensor for which SiLU activation function is to be applied.
+
+    Returns:
+        Tensor after applying SiLU activation function.
+    """
+    if alg == "vectorize" or alg == "parallelize":
+        if Input.num_elements() <= 10000 or num_physical_cores() <= 2 or alg == "vectorize":
+            return silu_vectorized[type](Input)
+        return silu_parallelized[type](Input, cores)
+    else:
+        print("Invalid algorithm using default algorithm")
+        return silu_vectorized[type](Input)
+
+@value
+struct Sigmoid[type : DType]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the sigmoid activation function to the input tensor.
+
+        Formula:
+            Sigmoid(x) =  1 / (1 + exp(-x)).
+
+        Arguments:
+            Input: The input tensor of specified data type `type`.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the sigmoid activation function.
+        """
+        return sigmoid[type](Input)
+
+@value
+struct GELU[type : DType]:
+    fn forward[cores : Int=4,alg : String = "vectorize"](self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
+
+        Formula:
+            GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2))).
+
+        Arguments:
+            Input: The input tensor of specified data type `type`.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the GELU activation function.
+        """
+        return gelu[type,cores,alg](Input)
+
+
+@value
+struct ReLU[type : DType]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
+
+        Formula:
+            ReLU(x) = max(0, x).
+
+        Arguments:
+            Input: The input tensor of specified data type `type`.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the ReLU activation function.
+        """
+        return relu[type](Input)
+
+@value
+struct Tanh[type : DType]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
+
+        Formula:
+            Tanh(x) = (exp(2 * x) - 1) / (exp(2 * x) + 1).
+
+        Arguments:
+            Input: The input tensor of specified data type `type`.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the tanh activation function.
+        """
+        return tanh[type](Input)
+
+@value
+struct SiLU[type : DType]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
+
+        Formula:
+            SiLU(x) = x * sigmoid(x).
+
+        Arguments:
+            Input: The input tensor of specified data type `type`.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the SiLU activation function.
+        """
+        return silu[type](Input)
 
 
 fn main():
-    from builtin.hash import _hash_simd
-    var vector = SIMD[DType.int64, 4](1, 2, 3, 4)
-    var hash = _hash_simd(vector)
-    print(vector)
+    var x = Tensor[DType.float32](2,2)
+    var F = GELU[DType.float32]()
+    x[0] = 0.1315377950668335
+    x[1] = 0.458650141954422
+    x[2] = 1.21895918250083923
+    x[3] = 0.67886471748352051
+    print(x)
+    print(F.forward[4,'v'](x))

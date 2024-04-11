@@ -62,7 +62,7 @@ struct S3:
         out.data.store(self.data.load() * x) 
         return out
 
-fn main() raises:
+fn test() raises:
     seed(37)
 
     var ts = TensorShape(dim)
