@@ -83,13 +83,14 @@ fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     Returns:
         Input transformed by tanh.
     """
+    alias nelts = simdwidthof[type]()
     var num_elements: Int = Input.num_elements()
     var Output: Tensor[type] = Tensor[type](Input.shape)
     var cores = num_cores if num_cores <= num_physical_cores() else 1
 
     @parameter
     fn _row(size: Int):
-        Output[size] = math.tanh(Input[size])
+        Output[size] = math.tanh[type,nelts](Input[size])
 
     parallelize[_row](num_elements, cores)
     return Output

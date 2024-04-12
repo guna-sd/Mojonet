@@ -14,10 +14,10 @@ fn max[type : DType](value : Tensor[type]) -> SIMD[type,1]:
         print("list is empty")
         return 0
     if value.num_elements() == 1:
-        return value[0]
-    var j = value[0]
+        return value.load[1](0)
+    var j = value.load[1](0)
     for i in range(value.num_elements()):
-        if abs[type](value[i]) > abs[type](j):
+        if abs[type](value.load[1](i)) > abs[type](j):
             j = value[i]
     return j
 
@@ -29,12 +29,12 @@ fn min[type : DType](value : Tensor[type]) -> SIMD[type,1]:
         print("list is empty")
         return 0
     if value.num_elements() == 1:
-        return value[0]
+        return value.load[1](0)
 
-    var j = value[0]
+    var j = value.load[1](0)
     for i in range(value.num_elements()):
-        if abs(value[i]) < abs(j):
-            j = value[i]
+        if abs(value.load[1](i)) < abs(j):
+            j = value.load[1](i)
     return j
 
 fn add[type : DType](owned first: SIMD[type,1], owned second: SIMD[type,1]) -> SIMD[type,1]:
@@ -52,7 +52,7 @@ fn add[type : DType](owned first: Tensor[type], owned second: Tensor[type]) -> T
     var out : Tensor[type] = Tensor[type](first.shape)
     if first.shape._rank == second.shape._rank:
         for i in range(first.shape.num_elements):
-            out[i] = add[type](first[i], second[i])
+            out.__setitem__(i,add[type](first.load[1](i), second.load[1](i)))
         return out
     else:
         print("adding two different tensors is not supported")

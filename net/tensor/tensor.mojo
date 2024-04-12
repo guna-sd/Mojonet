@@ -117,11 +117,11 @@ struct Tensor[type : DType]:
         self.dtype = existing.dtype
     
     fn __getitem__(self, index : Int) -> Self:
-        return Self(self.storage.load(index))
+        return self.storage[index]
     
     
     fn __setitem__(self, index : Int, value : SIMD[type, 1]):
-        self.storage[index] = value
+        self.storage.store[width=1](index, value) 
     
     fn __eq__(self: Self, other: Self) -> Bool:
         var bool = False
