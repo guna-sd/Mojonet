@@ -1,40 +1,44 @@
 from algorithm import parallelize, vectorize
-from net import Tensor, shape
-import math
-# from gpu.host import Context
 from sys.info import num_physical_cores
-
-# alias pi : Float64= 3.141592653589793
-alias pi    : FloatLiteral = 3.1415926535_8979323846_2643383279_5028841971_6939937510_5820974944_5923078164_0628620899_8628034825_3421170679
+from net.tensor import Tensor
+from net.kernel import pi
+import math
 
 
 @always_inline
 fn _relu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return math.max[type,nelts](value, 0)
 
+
 @always_inline
 fn _sigmoid[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return 1.0 / (1.0 + math.exp[type,nelts](-value))
+
 
 @always_inline
 fn _softplus[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return math.log[type, nelts](1.0 + math.exp[type, nelts](value))
 
+
 @always_inline
 fn _swish[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return value * _sigmoid[type, nelts](value)
+
 
 @always_inline
 fn _tanh[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return (2 / (1 + math.exp[type, nelts]((-2 * value)))) - 1
 
+
 @always_inline
 fn _gelu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return 0.5 * value * (1.0 + math.tanh[type, nelts](math.sqrt[type,nelts](2.0 / pi) * (value + 0.044715 * math.pow[type,nelts](value, 3))))
 
+
 @always_inline
 fn _squareplus[type : DType, nelts : Int](value: SIMD[type, nelts], beta : SIMD[type,1]) -> SIMD[type, nelts]:
     return (value + math.sqrt[type, nelts](value**2 + beta)) / 2
+
 
 fn tanh_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     """
@@ -63,6 +67,7 @@ fn tanh_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     
     vectorize[_row, nelts](num_elements)
     return Output
+
     
 fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
     """
@@ -88,6 +93,7 @@ fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
 
     parallelize[_row](num_elements, cores)
     return Output
+
 
 fn tanh[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
@@ -140,7 +146,6 @@ fn sigmoid_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     
     vectorize[_row, nelts](num_elements)
     return Output
-
 
 
 fn sigmoid_parallelized[type : DType = DType.float32](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
@@ -220,6 +225,7 @@ fn relu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
 
     vectorize[_row, nelts](num_elements)
     return Output
+
     
 fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
     """
@@ -246,6 +252,7 @@ fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     parallelize[_row](num_elements, cores)
     return Output
 
+
 fn relu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     ReLU activation function.
@@ -268,6 +275,7 @@ fn relu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vec
     else:
         print("Invalid algorithm using default algorithm")
         return relu_vectorized[type](Input)
+
 
 fn gelu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     """
@@ -297,6 +305,7 @@ fn gelu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     vectorize[_row, nelts](num_elements)
     return Output
 
+
 fn gelu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
     """
     Applies GELU to the input -> Uses Parallelization algorithm.
@@ -321,6 +330,7 @@ fn gelu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
 
     parallelize[_row](num_elements, cores)
     return Output
+
 
 fn gelu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
@@ -372,6 +382,7 @@ fn silu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     parallelize[_row](num_elements, cores)
     return Output
 
+
 fn silu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     """
     Applies SiLU to the input -> Uses Vectorization algorithm.
@@ -400,6 +411,7 @@ fn silu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     vectorize[_row, nelts](num_elements)
     return Output
 
+
 fn silu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     SiLU (Swish) activation function.
@@ -423,6 +435,7 @@ fn silu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vec
         print("Invalid algorithm using default algorithm")
         return silu_vectorized[type](Input)
 
+
 @value
 struct Sigmoid[type : DType]:
 
@@ -443,8 +456,9 @@ struct Sigmoid[type : DType]:
         """
         return sigmoid[type](Input,core,alg)
 
+
 @value
-struct GELU[type : DType]:
+struct GeLU[type : DType]:
 
     fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
@@ -484,6 +498,7 @@ struct ReLU[type : DType]:
         """
         return relu[type](Input,core,alg)
 
+
 @value
 struct Tanh[type : DType]:
 
@@ -503,6 +518,7 @@ struct Tanh[type : DType]:
             Tensor[type]: The input tensor after applying the tanh activation function.
         """
         return tanh[type](Input,core,alg)
+
 
 @value
 struct SiLU[type : DType]:
@@ -524,27 +540,19 @@ struct SiLU[type : DType]:
         """
         return silu[type](Input,core,alg)
 
+
 @value
 struct Fuctional[type : DType]:
 
-    fn Gelu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn GeLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         return gelu[type](Input,cores,alg)
-    fn Relu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn ReLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         return relu[type](Input,cores,alg)
     fn Sigmoid(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         return sigmoid[type](Input,cores,alg)
-    fn Silu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn SiLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         return silu[type](Input,cores,alg)
     fn TanH(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         return tanh[type](Input,cores,alg)
 
-fn main():
-    var x = Tensor[DType.float32](2,2)
-    x[0] = 0.1315377950668335
-    x[1] = 0.458650141954422
-    x[2] = 1.21895918250083923
-    x[3] = 0.67886471748352051
-    print(x)
-    var F = GELU[DType.float32]()
-    
-    print(F.forward(x))
+

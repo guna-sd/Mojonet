@@ -1,9 +1,8 @@
-from net.utils import shape, Tensorprinter, _bytes
+from .tutils import shape, Tensorprinter, _bytes
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
 from random.random import rand
-
 
 
 @value
@@ -16,6 +15,11 @@ struct Tensor[type : DType]:
         self.storage = DTypePointer[type]()
         self.shape = shape()
         self.dtype = type
+
+    fn __init__(inout self, data : SIMD[type,1]):
+        self.storage = DTypePointer[type]().alloc(1)
+        self.dtype = type
+        self.shape = shape(True)
 
     fn __init__(inout self, *shapes : Int):
         self.shape = shape(shapes)
@@ -112,8 +116,8 @@ struct Tensor[type : DType]:
         self.storage = existing.storage
         self.dtype = existing.dtype
     
-    fn __getitem__(self, index : Int) -> SIMD[type, 1]:
-        return self.storage.load(index)
+    fn __getitem__(self, index : Int) -> Self:
+        return Self(self.storage.load(index))
     
     
     fn __setitem__(self, index : Int, value : SIMD[type, 1]):
@@ -184,8 +188,8 @@ struct Tensor[type : DType]:
         self.storage.store[width=nelts](index, value)    
 
 
-    # fn reshape(inout self: Self, shapes: List[Int]):
-    #     self.shape = shape(shapes)
+    fn reshape(inout self: Self, shapes: List[Int]):
+        self.shape = shape(shapes)
 
     fn __str__(self: Self) -> String:
         return Tensorprinter(self.storage, self.shape)
@@ -284,11 +288,3 @@ struct Tensor[type : DType]:
             print("cuda")
         else:
             print("unknown device")
-
-fn main():
-    var x = Tensor[DType.float32](2,2)
-    x[0] = 0.1315377950668335
-    x[1] = 0.458650141954422
-    x[2] = 1.21895918250083923
-    x[3] = 0.67886471748352051
-    print(x)
