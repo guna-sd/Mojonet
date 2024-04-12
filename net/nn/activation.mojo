@@ -90,7 +90,7 @@ fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
 
     @parameter
     fn _row(size: Int):
-        Output[size] = math.tanh[type,nelts](Input[size])
+        Output[size] = math.tanh(Input[size])
 
     parallelize[_row](num_elements, cores)
     return Output

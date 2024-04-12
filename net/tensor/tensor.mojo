@@ -116,12 +116,11 @@ struct Tensor[type : DType]:
         self.storage = existing.storage
         self.dtype = existing.dtype
     
-    fn __getitem__(self, index : Int) -> Self:
+    fn __getitem__(self, index : Int) -> SIMD[type,1]:
         return self.storage[index]
     
-    
     fn __setitem__(self, index : Int, value : SIMD[type, 1]):
-        self.storage.store[width=1](index, value) 
+        self.storage[index] = value
     
     fn __eq__(self: Self, other: Self) -> Bool:
         var bool = False
