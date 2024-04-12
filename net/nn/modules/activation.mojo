@@ -4,7 +4,9 @@ import math
 # from gpu.host import Context
 from sys.info import num_physical_cores
 
-alias pi : Float64= 3.141592653589793
+# alias pi : Float64= 3.141592653589793
+alias pi    : FloatLiteral = 3.1415926535_8979323846_2643383279_5028841971_6939937510_5820974944_5923078164_0628620899_8628034825_3421170679
+
 
 @always_inline
 fn _relu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
@@ -87,17 +89,17 @@ fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     parallelize[_row](num_elements, cores)
     return Output
 
-fn tanh[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+fn tanh[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     Tanh activation function.
 
     Parameters:
         type: Data type of the tensor.
-        cores: Number of cores to use in parallelized implementation (default is 4).
-        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Arguments:
         Input: Tensor for which tanh activation function is to be applied.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Returns:
         Tensor after applying tanh activation function.
@@ -167,17 +169,17 @@ fn sigmoid_parallelized[type : DType = DType.float32](Input : Tensor[type], num_
     return Output
 
 
-fn sigmoid[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+fn sigmoid[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     Sigmoid activation function 1/ (1 + e^-x).
 
     Parameters:
         type: Data type of the tensor.
-        cores: Number of cores to use in parallelized implementation (default is 4).
-        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Arguments:
-        Input: Tensor for which sigmoid activation function is to be applied.
+        Input: Tensor for which Sigmoid activation function is to be applied.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Returns:
         Tensor after applying sigmoid activation function.
@@ -244,18 +246,18 @@ fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     parallelize[_row](num_elements, cores)
     return Output
 
-fn relu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+fn relu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     ReLU activation function.
 
     Parameters:
         type: Data type of the tensor.
-        cores: Number of cores to use in parallelized implementation (default is 4).
-        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Arguments:
-        Input: Tensor for which relu activation function is to be applied.
-
+        Input: Tensor for which ReLU activation function is to be applied.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
+        
     Returns:
         Tensor after applying relu activation function.
     """
@@ -320,17 +322,17 @@ fn gelu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     parallelize[_row](num_elements, cores)
     return Output
 
-fn gelu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+fn gelu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     GELU activation function.
 
     Parameters:
         type: Data type of the tensor.
-        cores: Number of cores to use in parallelized implementation (default is 4).
-        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Arguments:
         Input: Tensor for which GELU activation function is to be applied.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Returns:
         Tensor after applying GELU activation function.
@@ -398,17 +400,17 @@ fn silu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     vectorize[_row, nelts](num_elements)
     return Output
 
-fn silu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tensor[type]) -> Tensor[type]:
+fn silu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     SiLU (Swish) activation function.
 
     Parameters:
         type: Data type of the tensor.
-        cores: Number of cores to use in parallelized implementation (default is 4).
-        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Arguments:
         Input: Tensor for which SiLU activation function is to be applied.
+        cores: Number of cores to use in parallelized implementation (default is 4).
+        alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
     Returns:
         Tensor after applying SiLU activation function.
@@ -423,7 +425,8 @@ fn silu[type : DType, cores : Int = 4, alg : String = "vectorize"](Input : Tenso
 
 @value
 struct Sigmoid[type : DType]:
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+
+    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the sigmoid activation function to the input tensor.
 
@@ -431,16 +434,19 @@ struct Sigmoid[type : DType]:
             Sigmoid(x) =  1 / (1 + exp(-x)).
 
         Arguments:
-            Input: The input tensor of specified data type `type`.
+            Input: Tensor for which Sigmoid activation function is to be applied.
+            cores: Number of cores to use in parallelized implementation (default is 4).
+            alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
         Returns:
             Tensor[type]: The input tensor after applying the sigmoid activation function.
         """
-        return sigmoid[type](Input)
+        return sigmoid[type](Input,core,alg)
 
 @value
 struct GELU[type : DType]:
-    fn forward[cores : Int=4,alg : String = "vectorize"](self, Input : Tensor[type]) -> Tensor[type]:
+
+    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
 
@@ -448,17 +454,20 @@ struct GELU[type : DType]:
             GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2))).
 
         Arguments:
-            Input: The input tensor of specified data type `type`.
+            Input: Tensor for which GELU activation function is to be applied.
+            cores: Number of cores to use in parallelized implementation (default is 4).
+            alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
         Returns:
             Tensor[type]: The input tensor after applying the GELU activation function.
         """
-        return gelu[type,cores,alg](Input)
+        return gelu[type](Input,core,alg)
 
 
 @value
 struct ReLU[type : DType]:
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+
+    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
 
@@ -466,16 +475,19 @@ struct ReLU[type : DType]:
             ReLU(x) = max(0, x).
 
         Arguments:
-            Input: The input tensor of specified data type `type`.
+            Input: Tensor for which ReLU activation function is to be applied.
+            cores: Number of cores to use in parallelized implementation (default is 4).
+            alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
         Returns:
             Tensor[type]: The input tensor after applying the ReLU activation function.
         """
-        return relu[type](Input)
+        return relu[type](Input,core,alg)
 
 @value
 struct Tanh[type : DType]:
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+
+    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
 
@@ -483,16 +495,19 @@ struct Tanh[type : DType]:
             Tanh(x) = (exp(2 * x) - 1) / (exp(2 * x) + 1).
 
         Arguments:
-            Input: The input tensor of specified data type `type`.
+            Input: Tensor for which tanh activation function is to be applied.
+            cores: Number of cores to use in parallelized implementation (default is 4).
+            alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
         Returns:
             Tensor[type]: The input tensor after applying the tanh activation function.
         """
-        return tanh[type](Input)
+        return tanh[type](Input,core,alg)
 
 @value
 struct SiLU[type : DType]:
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+
+    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
 
@@ -500,20 +515,36 @@ struct SiLU[type : DType]:
             SiLU(x) = x * sigmoid(x).
 
         Arguments:
-            Input: The input tensor of specified data type `type`.
+            Input: Tensor for which SiLU activation function is to be applied.
+            cores: Number of cores to use in parallelized implementation (default is 4).
+            alg: Algorithm type ("vectorize" or "parallelize") to choose from (default is "vectorize").
 
         Returns:
             Tensor[type]: The input tensor after applying the SiLU activation function.
         """
-        return silu[type](Input)
+        return silu[type](Input,core,alg)
 
+@value
+struct Fuctional[type : DType]:
+
+    fn Gelu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        return gelu[type](Input,cores,alg)
+    fn Relu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        return relu[type](Input,cores,alg)
+    fn Sigmoid(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        return sigmoid[type](Input,cores,alg)
+    fn Silu(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        return silu[type](Input,cores,alg)
+    fn TanH(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        return tanh[type](Input,cores,alg)
 
 fn main():
     var x = Tensor[DType.float32](2,2)
-    var F = GELU[DType.float32]()
     x[0] = 0.1315377950668335
     x[1] = 0.458650141954422
     x[2] = 1.21895918250083923
     x[3] = 0.67886471748352051
     print(x)
-    print(F.forward[4,'v'](x))
+    var F = GELU[DType.float32]()
+    
+    print(F.forward(x))

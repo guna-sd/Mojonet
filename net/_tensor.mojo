@@ -3,7 +3,6 @@ from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
 from random.random import rand
-from net.nn import gelu
 
 
 
@@ -293,5 +292,3 @@ fn main():
     x[2] = 1.21895918250083923
     x[3] = 0.67886471748352051
     print(x)
-    var F = gelu[DType.float32,4,'v'](x)
-    print(F)
