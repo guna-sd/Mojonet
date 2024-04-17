@@ -1,4 +1,4 @@
-from .tutils import shape, Tensorprinter, _bytes
+from .tutils import shape, Tensorprinter, _bytes, get_stride
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
@@ -12,14 +12,9 @@ struct Tensor[type : DType]:
     var storage : DTypePointer[type]
 
     fn __init__(inout self):
-        self.storage = DTypePointer[type]()
+        self.storage = DTypePointer[type]().alloc(0)
         self.shape = shape()
         self.dtype = type
-
-    fn __init__(inout self, data : SIMD[type,1]):
-        self.storage = DTypePointer[type]().alloc(1)
-        self.dtype = type
-        self.shape = shape(True)
 
     fn __init__(inout self, *shapes : Int):
         self.shape = shape(shapes)
@@ -117,7 +112,17 @@ struct Tensor[type : DType]:
         self.dtype = existing.dtype
     
     fn __getitem__(self, index : Int) -> SIMD[type,1]:
-        return self.storage[index]
+        return self.storage.load(index)
+    
+    fn __getitem__(self, indices : List[Int]) -> SIMD[type,1]:
+        if len(indices) != len(self.shape._shapelist):
+            print(Error("Invalid number of indices for tensor access"))
+        var offset = 0
+        var dim_size : Int
+        var index : Int
+        for i in range(len(indices)):
+            offset += indices[i] * get_stride(self.shape,i)
+        return self.storage[offset]
     
     fn __setitem__(self, index : Int, value : SIMD[type, 1]):
         self.storage[index] = value
@@ -200,14 +205,19 @@ struct Tensor[type : DType]:
             self.storage[i] = self.storage[i] ** pow
 
     @always_inline("nodebug")
-    fn sum(self : Self, x : Tensor[type]):
+    fn add(self : Self, x : Tensor[type]):
         for i in range(self.num_elements()):
             self.storage[i] = self.storage[i] + x.storage[i]
     
     @always_inline("nodebug")
-    fn sum(self : Self, x : SIMD[type,1]):
+    fn add(self : Self, x : SIMD[type,1]):
         for i in range(self.num_elements()):
             self.storage[i] = self.storage[i] + x
+            
+    fn sum(self : Self, other : Self) -> Self:
+        if self.shape != other.shape:
+            print(Error("Shape mismatch"))
+        return self.__add__(other)
 
     @always_inline("nodebug")
     fn sub(self : Self, x : SIMD[type,1]):

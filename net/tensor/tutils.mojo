@@ -134,13 +134,7 @@ struct shape:
     self.num_elements = 0
     self._rank = 0
     self._shapelist = List[Int]()
-
-  fn __init__(inout self : Self, data : Bool):
-    self.shape = Pointer[Int]().alloc(1)
-    self.num_elements = 1
-    self._rank = 1
-    self._shapelist = List[Int](1)
-
+    
   fn __init__(inout self :Self, shape : VariadicList[Int]):
     self.shape = Pointer[Int].alloc(shape.__len__())
     self._shapelist = List[Int]()
@@ -234,17 +228,17 @@ struct shape:
   fn count_elements(self : Self) -> Int:
     return self.num_elements
   
-  fn __eq__(self : Self, other : TensorShape) -> Bool:
+  fn __eq__(self : Self, other : Self) -> Bool:
     if self.rank() != other.rank():
       return False
-    if self.num_elements != other.num_elements():
+    if self.num_elements != other.num_elements:
       return False
     for i in range(self.rank()):
       if self.shape[i] != other[i]:
         return False
     return True
   
-  fn __ne__(self : Self, other : TensorShape) -> Bool:
+  fn __ne__(self : Self, other : Self) -> Bool:
     return not self.__eq__(other)
   
   fn __str__(self : Self) -> String:
@@ -338,13 +332,29 @@ fn calculate_strides(shape: List[Int], type : DType) -> List[Int]:
 
   return strides
 
+fn get_stride(Shape : shape, dim: Int) -> Int:
+    """ Method `get_stride`: calculate stride for a specific dimension.
+
+    Args:
+      Shape : Shape of the Tensor.
+      dim: Index of the dimension to calculate stride.
+
+    Returns:
+      Int: Stride value for the specified dimension.
+    """
+
+    var stride = 1
+    for i in range(dim + 1, len(Shape._shapelist)):
+      stride *= Shape._shapelist[i]
+    return stride
+
 fn _bytes(num_elements : Int, type : DType) -> Int:
   """
   Calculates the total number of bytes required to store the elements of an array.
 
   Args:
       num_elements: The number of elements in the array.
-      type : DType of the array elements.
+      type : DType of the elements.
   Returns:
       The total number of bytes required to store the elements as an integer.
   """

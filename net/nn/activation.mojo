@@ -1,7 +1,7 @@
 from algorithm import parallelize, vectorize
 from sys.info import num_physical_cores
 from net.tensor import Tensor
-from net.kernel import pi
+from net.kernel.constant import pi
 import math
 
 
@@ -96,7 +96,33 @@ fn tanh_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     return Output
 
 
-fn tanh[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
+fn tanh[type : DType](Input: Tensor[type]) -> Tensor[type]:
+    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+    Args:
+        Input: Input Tensor.
+    Returns:
+        Tensor
+    """
+
+    alias nelts = simdwidthof[DType.float32]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn calc_row(m: Int):
+
+        @parameter
+        fn tanh_[nelts: Int](n: Int):
+            Output.store[nelts](n,math.tanh(Input[n]))
+
+        vectorize[tanh_,nelts](num_elements)
+
+    parallelize[calc_row](num_elements, 4)
+    return Output
+
+
+fn tanh2[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     Tanh activation function.
 
@@ -175,7 +201,33 @@ fn sigmoid_parallelized[type : DType = DType.float32](Input : Tensor[type], num_
     return Output
 
 
-fn sigmoid[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
+fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
+    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+    Args:
+        Input: Input Tensor.
+    Returns:
+        Tensor
+    """
+
+    alias nelts = simdwidthof[DType.float32]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn calc_row(m: Int):
+
+        @parameter
+        fn sigmoid_[nelts: Int](n: Int):
+            Output.store[nelts](n,_sigmoid[type](Input[n]))
+
+        vectorize[sigmoid_,nelts](num_elements)
+
+    parallelize[calc_row](num_elements, 4)
+    return Output
+
+
+fn sigmoid2[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     Sigmoid activation function 1/ (1 + e^-x).
 
@@ -227,7 +279,7 @@ fn relu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     vectorize[_row, nelts](num_elements)
     return Output
 
-    
+
 fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) -> Tensor[type]:
     """
     Applies ReLU to the input -> Uses Parallelization algorithm.
@@ -254,7 +306,33 @@ fn relu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     return Output
 
 
-fn relu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
+fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+    Args:
+        Input: Input Tensor.
+    Returns:
+        Tensor
+    """
+
+    alias nelts = simdwidthof[DType.float32]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn calc_row(m: Int):
+
+        @parameter
+        fn relu_[nelts: Int](n: Int):
+            Output.store[nelts](n,_relu[type](Input[n]))
+
+        vectorize[relu_,nelts](num_elements)
+
+    parallelize[calc_row](num_elements, 4)
+    return Output
+
+
+fn relu2[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     ReLU activation function.
 
@@ -333,7 +411,33 @@ fn gelu_parallelized[type : DType](Input : Tensor[type], num_cores : Int = 1) ->
     return Output
 
 
-fn gelu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
+fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+    Args:
+        Input: Input Tensor.
+    Returns:
+        Tensor
+    """
+
+    alias nelts = simdwidthof[DType.float32]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn calc_row(m: Int):
+
+        @parameter
+        fn gelu_[nelts: Int](n: Int):
+            Output.store[nelts](n,_gelu[type](Input[n]))
+
+        vectorize[gelu_,nelts](num_elements)
+
+    parallelize[calc_row](num_elements, 4)
+    return Output
+
+
+fn gelu2[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     GELU activation function.
 
@@ -413,7 +517,33 @@ fn silu_vectorized[type : DType](Input : Tensor[type]) -> Tensor[type]:
     return Output
 
 
-fn silu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
+fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+    Args:
+        Input: Input Tensor.
+    Returns:
+        Tensor
+    """
+
+    alias nelts = simdwidthof[DType.float32]()
+    var num_elements = Input.num_elements()
+    var Output = Tensor[type](Input.shape)
+
+    @parameter
+    fn calc_row(m: Int):
+
+        @parameter
+        fn silu_[nelts: Int](n: Int):
+            Output.store[nelts](n,(Input[n] * _sigmoid[type,nelts](Input[n])))
+
+        vectorize[silu_,nelts](num_elements)
+
+    parallelize[calc_row](num_elements, 4)
+    return Output
+
+
+fn silu2[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vectorize") -> Tensor[type]:
     """
     SiLU (Swish) activation function.
 
@@ -440,7 +570,22 @@ fn silu[type : DType](Input : Tensor[type], cores : Int = 4, alg : String = "vec
 @value
 struct Sigmoid[type : DType]:
 
-    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the sigmoid activation function to the input tensor.
+
+        Formula:
+            Sigmoid(x) =  1 / (1 + exp(-x)).
+
+        Arguments:
+            Input: Tensor for which Sigmoid activation function is to be applied.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the sigmoid activation function.
+        """
+        return sigmoid[type](Input)
+
+    fn forward2(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the sigmoid activation function to the input tensor.
 
@@ -455,13 +600,28 @@ struct Sigmoid[type : DType]:
         Returns:
             Tensor[type]: The input tensor after applying the sigmoid activation function.
         """
-        return sigmoid[type](Input,core,alg)
+        return sigmoid[type](Input)
 
 
 @value
 struct GeLU[type : DType]:
 
-    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
+
+        Formula:
+            GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2))).
+
+        Arguments:
+            Input: Tensor for which GELU activation function is to be applied.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the GELU activation function.
+        """
+        return gelu[type](Input)
+
+    fn forward2(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
 
@@ -476,13 +636,27 @@ struct GeLU[type : DType]:
         Returns:
             Tensor[type]: The input tensor after applying the GELU activation function.
         """
-        return gelu[type](Input,core,alg)
-
+        return gelu2[type](Input,core,alg)
 
 @value
 struct ReLU[type : DType]:
 
-    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
+
+        Formula:
+            ReLU(x) = max(0, x).
+
+        Arguments:
+            Input: Tensor for which GELU activation function is to be applied.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the GELU activation function.
+        """
+        return relu[type](Input)
+
+    fn forward2(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
 
@@ -497,13 +671,28 @@ struct ReLU[type : DType]:
         Returns:
             Tensor[type]: The input tensor after applying the ReLU activation function.
         """
-        return relu[type](Input,core,alg)
+        return relu2[type](Input,core,alg)
 
 
 @value
 struct Tanh[type : DType]:
 
-    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
+
+        Formula:
+            Tanh(x) = (exp(2 * x) - 1) / (exp(2 * x) + 1).
+
+        Arguments:
+            Input: Tensor for which GELU activation function is to be applied.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the GELU activation function.
+        """
+        return tanh[type](Input)
+
+    fn forward2(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
 
@@ -518,13 +707,28 @@ struct Tanh[type : DType]:
         Returns:
             Tensor[type]: The input tensor after applying the tanh activation function.
         """
-        return tanh[type](Input,core,alg)
+        return tanh2[type](Input,core,alg)
 
 
 @value
 struct SiLU[type : DType]:
 
-    fn forward(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
+
+        Formula:
+            SiLU(x) = x * sigmoid(x).
+
+        Arguments:
+            Input: Tensor for which GELU activation function is to be applied.
+
+        Returns:
+            Tensor[type]: The input tensor after applying the GELU activation function.
+        """
+        return silu[type](Input)
+
+    fn forward2(inout self, Input : Tensor[type], core : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
         """
         Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
 
@@ -539,21 +743,71 @@ struct SiLU[type : DType]:
         Returns:
             Tensor[type]: The input tensor after applying the SiLU activation function.
         """
-        return silu[type](Input,core,alg)
+        return silu2[type](Input,core,alg)
 
 
 @value
 struct Fuctional[type : DType]:
 
-    fn GeLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
-        return gelu[type](Input,cores,alg)
-    fn ReLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
-        return relu[type](Input,cores,alg)
-    fn Sigmoid(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
-        return sigmoid[type](Input,cores,alg)
-    fn SiLU(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
-        return silu[type](Input,cores,alg)
-    fn TanH(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
-        return tanh[type](Input,cores,alg)
+    fn GeLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
+        """
+        return gelu[type](Input)
+
+    fn GeLU2(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        """
+        Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
+        """
+        return gelu2[type](Input,cores,alg)
+
+    fn ReLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
+        """
+        return relu[type](Input)
+
+    fn ReLU2(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        """
+        Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
+        """
+        return relu2[type](Input,cores,alg)
+
+    fn SiLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
+        """
+        return silu[type](Input)
+
+    fn SiLU2(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        """
+        Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
+        """
+        return silu2[type](Input,cores,alg)
+
+    fn TanH(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
+        """
+        return tanh[type](Input)
+
+    fn TanH2(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        """
+        Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
+        """
+        return tanh2[type](Input,cores,alg)
+
+    fn Sigmoid(inout self, Input : Tensor[type]) -> Tensor[type]:
+        """
+        Apply the sigmoid activation function to the input tensor.
+        """
+        return sigmoid[type](Input)
+
+    fn Sigmoid2(inout self, Input : Tensor[type], cores : Int = 4, alg : String = 'vectorize') -> Tensor[type]:
+        """
+        Apply the sigmoid activation function to the input tensor.
+        """
+        return sigmoid2[type](Input,cores,alg)
 
 
+    

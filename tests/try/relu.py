@@ -18,11 +18,14 @@ import torch
 # 1.0831307172775269
 # 0.5100910067558289
 
-class Module:
+# class Module:
 
-    def zero_grad(self):
-        for p in self.parameters():
-            p.grad = 0
+#     def zero_grad(self):
+#         for p in self.parameters():
+#             p.grad = 0
 
-    def parameters(self):
-        return []
+#     def parameters(self):
+#         return []
+
+inputs = Tensor([[0.1315377950668335, 0.458650141954422],[0.21895918250083923, 0.67886471748352051]])
+print(torch.sigmoid(inputs))
