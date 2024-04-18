@@ -1,5 +1,4 @@
 from tensor import TensorShape, TensorSpec
-from tensor import Tensor as _Tensor
 
 
 alias TensorStart = "Tensor("
@@ -134,6 +133,16 @@ struct shape:
     self.num_elements = 0
     self._rank = 0
     self._shapelist = List[Int]()
+
+  fn __init__(inout self :Self, *dims : Int):
+    self.shape = Pointer[Int].alloc(dims.__len__())
+    self._shapelist = List[Int]()
+    for i in range(dims.__len__()):
+      self.shape.store(i, dims[i])
+      self._shapelist.append(dims[i])
+
+    self._rank = dims.__len__()
+    self.num_elements = num_elements(dims)
     
   fn __init__(inout self :Self, shape : VariadicList[Int]):
     self.shape = Pointer[Int].alloc(shape.__len__())
@@ -165,16 +174,6 @@ struct shape:
     self._rank = shape.__len__()
     self.num_elements = shape.flattened_length()
 
-  fn __init__(inout self :Self, *dims : Int):
-    self.shape = Pointer[Int].alloc(dims.__len__())
-    self._shapelist = List[Int]()
-    for i in range(dims.__len__()):
-      self.shape.store(i, dims[i])
-      self._shapelist.append(dims[i])
-
-    self._rank = dims.__len__()
-    self.num_elements = num_elements(dims)
-
   fn __init__(inout self : Self, shape : TensorShape):
     self.shape = Pointer[Int].alloc(shape.rank())
     self._shapelist = List[Int]()
@@ -194,15 +193,6 @@ struct shape:
 
     self._rank = shape.rank()
     self.num_elements = shape.num_elements()
-  
-  fn __init__(inout self : Self, data : _Tensor):
-    self.shape = Pointer[Int].alloc(data.rank())
-    self._shapelist = List[Int]()
-    for i in range(data.rank()):
-      self._shapelist.append(data.shape().__getitem__(i))
-
-    self._rank = data.rank()
-    self.num_elements = data.num_elements()
 
   fn __copyinit__(inout self: Self, old: Self):
     self.shape = old.shape
@@ -216,22 +206,17 @@ struct shape:
     self.num_elements = existing.num_elements
     self._shapelist = existing._shapelist
 
-  fn __getitem__(self : Self, index : Int) -> Int:
+  fn __getitem__(self : Self, inout index : Int) -> Int:
     return self.shape[index if index>=0 else self._rank + index]
 
   fn __setitem__(self : Self, index : Int, value : Int):
     self.shape[index if index>=0 else self._rank + index] = value
   
-  fn rank(self : Self) -> Int:
+  fn __len__(self: Self) -> Int:
     return self._rank
-  
-  fn count_elements(self : Self) -> Int:
-    return self.num_elements
   
   fn __eq__(self : Self, other : Self) -> Bool:
     if self.rank() != other.rank():
-      return False
-    if self.num_elements != other.num_elements:
       return False
     for i in range(self.rank()):
       if self.shape[i] != other[i]:
@@ -253,6 +238,70 @@ struct shape:
     buf += str(self._shapelist[0])
     return buf
 
+  fn rank(self : Self) -> Int:
+    return self._rank
+  
+  fn count_elements(self : Self) -> Int:
+    return self.num_elements
+
+  fn position(self : Self, indices : List[Int]) -> Int:
+    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
+
+  fn position(self : Self, indices : VariadicList[Int]) -> Int:
+    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
+  
+  fn position(self : Self, *indices : Int) -> Int:
+    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
+
+
+fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
+    var pos = 0
+    var dim = 1
+
+    for i in range(rank-1,0,-1):
+      dim *= Shapes[i]
+      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
+      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
+    var valid = pos >= 0 and pos < size
+    if not valid:
+      print("Invalid position")
+    return pos
+
+
+fn __get_position(*indices : Int, rank : Int, Shapes : List[Int], size : Int) ->Int:
+    var pos = 0
+    var dim = 1
+
+    for i in range(rank-1,0,-1):
+      dim *= Shapes[i]
+      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
+      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
+    var valid = pos >= 0 and pos < size
+    if not valid:
+      print("Invalid position")
+    return pos
+
+
+fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
+    var pos = 0
+    var dim = 1
+
+    for i in range(rank-1,0,-1):
+      dim *= Shapes[i]
+      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
+      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
+    var valid = pos >= 0 and pos < size
+    if not valid:
+      print("Invalid position")
+    return pos
+
+
+fn covert_positon(index: Int, size: Int) -> Int:
+    if index < 0:
+        return size + index
+    return index
+
+
 fn num_elements(shape : VariadicList[Int]) -> Int:
     """
     Total number of elements in the given shape.
@@ -264,11 +313,10 @@ fn num_elements(shape : VariadicList[Int]) -> Int:
       An integer representing the total number of elements in the array.
     """
     var elements : Int = 1
-    var dim : Int
     for i in range(len(shape)):
-        dim = shape[i]
-        elements = elements * dim
+        elements *=  shape[i]
     return elements
+
 
 fn num_elements[size : Int](shape : StaticIntTuple[size]) -> Int:
     """
@@ -284,11 +332,10 @@ fn num_elements[size : Int](shape : StaticIntTuple[size]) -> Int:
       return shape.flattened_length()
     else:
       var elements : Int = 1
-      var dim : Int
       for i in range(len(shape)):
-          dim = shape[i]
-          elements = elements * dim
+          elements *=  shape[i]
       return elements
+
 
 fn num_elements(shape : List[Int]) -> Int:
     """
@@ -301,52 +348,10 @@ fn num_elements(shape : List[Int]) -> Int:
       An integer representing the total number of elements in the array.
     """
     var elements : Int = 1
-    var dim : Int
     for i in range(len(shape)):
-        dim = shape[i]
-        elements = elements * dim
+        elements *=  shape[i]
     return elements
 
-fn calculate_strides(shape: List[Int], type : DType) -> List[Int]:
-  """
-  Calculates the strides for each dimension of an array given its shape and element size.
-
-  Args:
-      shape: A list of integers representing the dimensions of the array.
-      type : DType of the array elements.
-
-  Returns:
-      A list of integers representing the strides for each dimension.
-  """
-
-  var strides : List[Int] = List[Int]()
-  var typesize : Int = type.sizeof()
-  var p = 1
-
-  for i in range(len(shape)-1,-1,-1):
-    strides.append(p)
-    p = p * shape[i]
-  strides.reverse()
-  for i in range(len(strides)):
-    strides[i] = strides[i] * typesize
-
-  return strides
-
-fn get_stride(Shape : shape, dim: Int) -> Int:
-    """ Method `get_stride`: calculate stride for a specific dimension.
-
-    Args:
-      Shape : Shape of the Tensor.
-      dim: Index of the dimension to calculate stride.
-
-    Returns:
-      Int: Stride value for the specified dimension.
-    """
-
-    var stride = 1
-    for i in range(dim + 1, len(Shape._shapelist)):
-      stride *= Shape._shapelist[i]
-    return stride
 
 fn _bytes(num_elements : Int, type : DType) -> Int:
   """
