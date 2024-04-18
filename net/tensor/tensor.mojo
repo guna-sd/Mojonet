@@ -6,6 +6,7 @@ from random.random import rand
 from algorithm import vectorize, parallelize
 from sys.info import num_physical_cores
 
+
 @always_inline("nodebug")
 fn bin_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[type, simd_width]](
     Input1 : Tensor[dtype], Input2 : Tensor[dtype]) -> Tensor[dtype]:
@@ -28,6 +29,7 @@ fn bin_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, 
     
     return Output
 
+
 @always_inline("nodebug")
 fn bin_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[type, simd_width]](
     Input : Tensor[dtype], value : SIMD[dtype,1]) -> Tensor[dtype]:
@@ -45,6 +47,7 @@ fn bin_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, 
     parallelize[calc](Input.num_elements(), num_cores)
     
     return Output
+
 
 @value
 struct Tensor[type : DType]:
@@ -68,14 +71,12 @@ struct Tensor[type : DType]:
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
-
     
     fn __init__(inout self, shapes : List[Int]):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
-
     
     fn __init__[size : Int](inout self, shapes : StaticIntTuple[size]):
         self.shape = shape(shapes)
@@ -83,13 +84,11 @@ struct Tensor[type : DType]:
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
 
-
     fn __init__(inout self : Self, shapes : shape):
         self.shape = shapes
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
-
 
     fn __init__(inout self : Self, shapes : TensorShape):
         self.shape = shape(shapes)
@@ -97,13 +96,11 @@ struct Tensor[type : DType]:
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
 
-
     fn __init__(inout self : Self, shapes : TensorSpec):
         self.shape = shape(shapes)
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
-
     
     fn __init__(inout self : Self, data : _Tensor[type]):
         self.shape = shape(data.shape())
@@ -140,6 +137,7 @@ struct Tensor[type : DType]:
 
     fn __del__(owned self):
         self.storage.free()
+        self.shape.shape.free()
 
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
@@ -238,13 +236,12 @@ struct Tensor[type : DType]:
             self.storage[i] = math.pow(self.storage[i], exponent)
         return self
 
-    fn reshape(inout self: Self, shapes: List[Int]):
+    fn reshape(inout self: Self, *shapes: Int):
         self.shape = shape(shapes)
 
     fn __str__(self: Self) -> String:
         return Tensorprinter(self.storage, self.shape)
-    
-    
+   
     @always_inline("nodebug")
     fn pow(self: Self, pow: Int):    
         for i in range(self.num_elements()):
@@ -299,6 +296,11 @@ struct Tensor[type : DType]:
         rand(self.storage, self.num_elements())
 
     @always_inline("nodebug")
+    fn random(inout self) -> Self:
+        rand(self.storage, self.num_elements())
+        return self
+
+    @always_inline("nodebug")
     fn rank(self: Self) -> Int:
         return self.shape.rank()
 
@@ -317,6 +319,7 @@ struct Tensor[type : DType]:
     @always_inline("nodebug")
     fn transpose(inout self):
         ...
+        
     @always_inline("nodebug")    
     fn num_bytes(self: Self) -> Int:
         return _bytes(self.num_elements(), self.dtype)
