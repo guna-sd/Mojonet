@@ -27,5 +27,11 @@ import torch
 #     def parameters(self):
 #         return []
 
-inputs = Tensor([[0.1315377950668335, 0.458650141954422],[0.21895918250083923, 0.67886471748352051]])
-print(torch.sigmoid(inputs))
+inputs = Tensor([[0.1318359375, 0.458984375, 0.21875],
+[0.6796875, 0.93359375, 0.51953125]],)
+
+ten = torch.rand(2,3,2,4,5)
+# print(ten.shape)
+# tes = ten.transpose(-2,1)
+# print(tes.shape)
+print(ten.broadcast_to)

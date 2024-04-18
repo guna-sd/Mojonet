@@ -255,51 +255,109 @@ struct shape:
 
 
 fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
+    """
+    Convert a set of multidimensional indices into a linear index based on the tensor's shape.
+
+    Args:
+        indices : (List[Int]) The multidimensional indices to convert.
+        rank : (Int) The rank (number of dimensions) of the tensor.
+        Shapes : (List[Int]) The shape of the tensor (list of dimensions).
+        size : (Int) The total number of elements in the tensor.
+
+    Returns:
+        Int: The linear index corresponding to the given multidimensional indices.
+    """
     var pos = 0
     var dim = 1
-
-    for i in range(rank-1,0,-1):
-      dim *= Shapes[i]
-      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
-      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
-    var valid = pos >= 0 and pos < size
-    if not valid:
-      print("Invalid position")
+    
+    for i in range(rank - 1, -1, -1):
+        var index = convert_position(indices[i], Shapes[i])        
+        pos += index * dim        
+        dim *= Shapes[i]
+    if not (0 <= pos < size):
+        print(Error("Calculated position is out of bounds."))
+    
     return pos
 
 
 fn __get_position(*indices : Int, rank : Int, Shapes : List[Int], size : Int) ->Int:
+    """
+    Convert a set of multidimensional indices into a linear index based on the tensor's shape.
+
+    Args:
+        indices : (VariadicList[Int]) The multidimensional indices to convert.
+        rank : (Int) The rank (number of dimensions) of the tensor.
+        Shapes : (List[Int]) The shape of the tensor (list of dimensions).
+        size : (Int) The total number of elements in the tensor.
+
+    Returns:
+        Int: The linear index corresponding to the given multidimensional indices.
+    """
     var pos = 0
     var dim = 1
-
-    for i in range(rank-1,0,-1):
-      dim *= Shapes[i]
-      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
-      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
-    var valid = pos >= 0 and pos < size
-    if not valid:
-      print("Invalid position")
+    
+    for i in range(rank - 1, -1, -1):
+        var index = convert_position(indices[i], Shapes[i])        
+        pos += index * dim        
+        dim *= Shapes[i]
+    if not (0 <= pos < size):
+        print(Error("Calculated position is out of bounds."))
+    
     return pos
 
 
 fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
+    """
+    Convert a set of multidimensional indices into a linear index based on the tensor's shape.
+
+    Args:
+        indices : (VariadicList[Int]) The multidimensional indices to convert.
+        rank : (Int) The rank (number of dimensions) of the tensor.
+        Shapes : (List[Int]) The shape of the tensor (list of dimensions).
+        size : (Int) The total number of elements in the tensor.
+
+    Returns:
+        Int: The linear index corresponding to the given multidimensional indices.
+    """
     var pos = 0
     var dim = 1
-
-    for i in range(rank-1,0,-1):
-      dim *= Shapes[i]
-      pos += (covert_positon(indices[i-1], Shapes[i-1]) * dim)
-      pos += (covert_positon(indices[rank-1], Shapes[rank-1]))
-    var valid = pos >= 0 and pos < size
-    if not valid:
-      print("Invalid position")
+    
+    for i in range(rank - 1, -1, -1):
+        var index = convert_position(indices[i], Shapes[i])        
+        pos += index * dim        
+        dim *= Shapes[i]
+    if not (0 <= pos < size):
+        print(Error("Calculated position is out of bounds."))
+    
     return pos
 
 
-fn covert_positon(index: Int, size: Int) -> Int:
+fn convert_position(index: Int, size: Int) -> Int:
+    """
+    Convert a negative index to a positive one within the given size.
+
+    Args:
+        index : The index to convert.
+        size : The size of the dimension.
+
+    Returns:
+        Int: The positive index within the dimension.
+    """
     if index < 0:
         return size + index
     return index
+
+
+fn indices(shape: List[Int], owned linear_index: Int) -> List[Int]:
+    var multidim_indices = List[Int]()
+    var num_dims = len(shape)
+    for i in range(num_dims - 1, -1, -1):
+        var dim_size = shape[i]
+        var dim_index = linear_index % dim_size        
+        multidim_indices.append(dim_index)        
+        linear_index //= dim_size
+    multidim_indices.reverse()
+    return multidim_indices
 
 
 fn num_elements(shape : VariadicList[Int]) -> Int:

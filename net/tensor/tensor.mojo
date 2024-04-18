@@ -1,4 +1,4 @@
-from .tutils import shape, Tensorprinter, _bytes
+from .tutils import shape, Tensorprinter, _bytes, indices
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
@@ -235,12 +235,16 @@ struct Tensor[type : DType]:
         for i in range(self.shape.num_elements):
             self.storage[i] = math.pow(self.storage[i], exponent)
         return self
-
-    fn reshape(inout self: Self, *shapes: Int):
-        self.shape = shape(shapes)
+    
+    fn __enter__(owned self) -> Self:
+        """The function to call when entering the context."""
+        return self ^
 
     fn __str__(self: Self) -> String:
         return Tensorprinter(self.storage, self.shape)
+
+    fn reshape(inout self: Self, *shapes: Int):
+        self.shape = shape(shapes)
    
     @always_inline("nodebug")
     fn pow(self: Self, pow: Int):    
@@ -301,6 +305,51 @@ struct Tensor[type : DType]:
         return self
 
     @always_inline("nodebug")
+    fn transposed(inout self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
+
+        var _shape = self.shape._shapelist        
+        
+        if dim1 >= self.rank() or dim2 >= self.rank():
+            print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
+
+        var tshape = _shape
+        
+        tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
+        
+        var ttensor = Tensor[type](tshape)
+        
+        for index in range(self.num_elements()):
+            var _indices = indices(_shape, index)
+            var tindices = _indices
+            tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
+            var tindex = ttensor.shape.position(tindices)
+            ttensor[tindex] = self[index]
+        
+        return ttensor
+        
+    @always_inline("nodebug")
+    fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
+        var _shape = self.shape._shapelist        
+        
+        if dim1 >= self.rank() or dim2 >= self.rank():
+            print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
+
+        var tshape = _shape
+        
+        tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
+        
+        var ttensor = Tensor[type](tshape)
+        
+        for index in range(self.num_elements()):
+            var _indices = indices(_shape, index)
+            var tindices = _indices
+            tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
+            var tindex = ttensor.shape.position(tindices)
+            ttensor[tindex] = self[index]
+        
+        self = ttensor
+
+    @always_inline("nodebug")
     fn rank(self: Self) -> Int:
         return self.shape.rank()
 
@@ -315,11 +364,7 @@ struct Tensor[type : DType]:
     @always_inline("nodebug")
     fn num_elements(self: Self) -> Int:
         return self.shape.count_elements()
-    
-    @always_inline("nodebug")
-    fn transpose(inout self):
-        ...
-        
+
     @always_inline("nodebug")    
     fn num_bytes(self: Self) -> Int:
         return _bytes(self.num_elements(), self.dtype)
@@ -327,7 +372,3 @@ struct Tensor[type : DType]:
     @always_inline("nodebug")    
     fn itemsize(self: Self) -> Int:
         return _bytes(1,self.dtype)
-    
-    fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
-        return self ^
