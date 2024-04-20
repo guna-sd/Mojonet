@@ -16,16 +16,45 @@ alias Max_Elem_Per_Side = Max_Elem_To_Print // 2
 
 @always_inline
 fn _max(a: Int, b: Int) -> Int:
+  """Calculates the maximum of two integers.
+  
+  Args:
+    a: The first integer.
+    b: The second integer.
+  
+  Returns:
+    The maximum value between `a` and `b`.
+  """
     return a if a > b else b
 
 
 @always_inline
 fn _rank0(type : DType, shape : shape) -> String:
+  """
+  Generates a string representation for a rank-0 tensor (scalar).
+  
+  Args:
+    type: The data type of the tensor.
+    shape: The shape of the tensor.
+  
+  Returns:
+    A string representation of a rank-0 tensor including its type and shape.
+  """
     return TensorStart+SquareBracketL+SquareBracketR+Comma+Strdtype+str(type)+Comma+Strshape+shape.__str__()+TensorEnd
 
 
 @always_inline
 fn complete(ptr : DTypePointer, len : Int) -> String:
+  """
+  Concatenates the elements of a tensor into a string, separated by commas.
+  
+  Args:
+    ptr: A pointer to the data of the tensor elements.
+    len: The number of elements to include in the string.
+  
+  Returns:
+    A string representation of the tensor elements.
+"""
     var buf = String("")
     if len == 0:
         return buf
@@ -38,6 +67,16 @@ fn complete(ptr : DTypePointer, len : Int) -> String:
 
 @always_inline
 fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
+  """
+  Serializes the elements of a tensor into a string representation, including square brackets.
+  
+  Args:
+    ptr: A pointer to the data type of the tensor elements.
+    len: The number of elements to serialize.
+  
+  Returns:
+    A string representation of the tensor elements, enclosed in square brackets.
+  """
     var buf = String("")
 
     if len == 0:
@@ -50,7 +89,20 @@ fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
 
 @always_inline
 fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = True](ptr : DTypePointer[type], shape : shape) -> String:
+  """Generates a string representation of a tensor, including its data type and shape if specified.
 
+  Parameters:
+      type: The data type of the tensor.
+      print_dtype: A boolean indicating whether to include the data type in the string representation.
+      print_shape: A boolean indicating whether to include the shape in the string representation.
+  
+  Args:
+    ptr: A pointer to the data type of the tensor elements.
+    shape: The shape of the tensor.
+  
+  Returns:
+    A string representation of the tensor.
+  """
     var buffer = String()
     var rank = shape._rank
 
@@ -109,11 +161,15 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
 
 @value
 struct shape:
-  """"""
+  """Represents the shape of a tensor, encapsulating information about its dimensions."""
   var _ptr : Pointer[Int]
+  """_ptr: A pointer to an array of integers, each representing the size of a dimension in the tensor."""
   var num_elements : Int
+  """Num_elements: The total number of elements that the tensor can hold, calculated as the product of its dimensions."""
   var _rank : Int
+  """_rank: The number of dimensions in the tensor, also known as its rank."""
   var _shapelist : List[Int]
+  """_shapelist: A list of integers, each representing the size of a dimension in the tensor, providing an alternative to _ptr for accessing dimension sizes."""
 
   fn __init__(inout self : Self):
     """Initializes an empty shape."""
@@ -122,49 +178,57 @@ struct shape:
     self._rank = 0
     self._shapelist = List[Int]()
 
-  fn __init__(inout self :Self, *dims : Int):
-    """Initializes a shape with given dimensions.
-    Args:
-      *dims: A variadic list of integers representing the dimensions of the shape.
+  fn __init__(inout self :Self, *dim : Int):
     """
-    self._ptr = Pointer[Int].alloc(dims.__len__())
-    self._shapelist = List[Int]()
-    for i in range(dims.__len__()):
-      self._ptr.store(i, dims[i])
-      self._shapelist.append(dims[i])
+    Initializes a shape with given dimensions.
 
-    self._rank = dims.__len__()
-    self.num_elements = num_elements(dims)
-  
-  fn __init__(inout self :Self, dims : List[Int]):
-    """Initializes a shape with given dimensions.
     Args:
-      *dims: A list of integers representing the dimensions of the shape.
+      dim: A variadic list of integers representing the dimensions of the shape.
     """
-    self._ptr = Pointer[Int].alloc(dims.__len__())
+    self._ptr = Pointer[Int].alloc(dim.__len__())
     self._shapelist = List[Int]()
-    for i in range(dims.__len__()):
-      self._ptr.store(i, dims[i])
-      self._shapelist.append(shape[i])
-    self._rank = dims.__len__()
-    self.num_elements = num_elements(dims)
-  
-  fn __init__[size : Int](inout self :Self, dims : StaticIntTuple[size]):
-    """Initializes a shape with given dimensions.
-    Args:
-      *dims: A tuple of integers representing the dimensions of the shape.
-    """
-    self._ptr = Pointer[Int].alloc(dims.__len__())
-    self._shapelist = List[Int]()
-    for i in range(dims.__len__()):
-      self._ptr.store(i, dims[i])
-      self._shapelist.append(dims[i])
+    for i in range(dim.__len__()):
+      self._ptr.store(i, dim[i])
+      self._shapelist.append(dim[i])
 
-    self._rank = dims.__len__()
-    self.num_elements = dims.flattened_length()
+    self._rank = dim.__len__()
+    self.num_elements = num_elements(dim)
+  
+  fn __init__(inout self :Self, dim : List[Int]):
+    """
+    Initializes a shape with given dimensions.
+    
+    Args:
+      dim: A list of integers representing the dimensions of the shape.
+    """
+    self._ptr = Pointer[Int].alloc(dim.__len__())
+    self._shapelist = List[Int]()
+    for i in range(dim.__len__()):
+      self._ptr.store(i, dim[i])
+      self._shapelist.append(dim[i])
+    self._rank = dim.__len__()
+    self.num_elements = num_elements(dim)
+  
+  fn __init__[size : Int](inout self :Self, dim : StaticIntTuple[size]):
+    """
+    Initializes a shape with given dimensions.
+    
+    Args:
+      dim: A tuple of integers representing the dimensions of the shape.
+    """
+    self._ptr = Pointer[Int].alloc(dim.__len__())
+    self._shapelist = List[Int]()
+    for i in range(dim.__len__()):
+      self._ptr.store(i, dim[i])
+      self._shapelist.append(dim[i])
+
+    self._rank = dim.__len__()
+    self.num_elements = dim.flattened_length()
 
   fn __init__(inout self : Self, shape : TensorShape):
-    """Initializes a shape from a TensorSpec.
+    """
+    Initializes a shape from a TensorSpec.
+    
     Args:
       shape: A TensorShape object.
     """
@@ -178,7 +242,9 @@ struct shape:
     self.num_elements = shape.num_elements()
   
   fn __init__(inout self : Self, shape : TensorSpec):
-    """Initializes a shape from a TensorSpec.
+    """
+    Initializes a shape from a TensorSpec.
+    
     Args:
       shape: A TensorSpec object.
     """
@@ -249,9 +315,12 @@ struct shape:
 
   @always_inline
   fn broadcast_shapes(inout self, _shape: shape) -> shape:
-    """Broadcasts two shapes to a common shape.
+    """
+    Broadcasts two shapes to a common shape.
+    
     Args:
       _shape: The shape to broadcast with.
+    
     Returns:
       The broadcasted shape.
     """
@@ -277,7 +346,7 @@ struct shape:
           elif a == 1 or b == 1:
               res[i] = a * b
           else:
-              var message: String = "[ERROR] Shapes " + self.__str__() + " and " + str(_shape) + " cannot be broadcasted."
+              var message: String = "Shapes " + self.__str__() + " and " + str(_shape) + " cannot be broadcasted."
               print(message)
       for i in range(diff - 1, -1, -1):
           res[i] = big_shape[i]
@@ -291,8 +360,10 @@ struct shape:
   @always_inline
   fn offset(self : Self, indices : List[Int]) ->Int:
     """Calculates the flat index for a list of multi-dimensional indices.
+    
     Args:
       indices: The multi-dimensional indices.
+    
     Returns:
       The flat index corresponding to the multi-dimensional indices.
     """
@@ -301,8 +372,10 @@ struct shape:
   @always_inline
   fn offset(self : Self, indices : VariadicList[Int]) ->Int:
     """Calculates the flat index for a variadic list of multi-dimensional indices.
+    
     Args:
       indices: The multi-dimensional indices.
+    
     Returns:
       The flat index corresponding to the multi-dimensional indices.
     """
@@ -311,8 +384,10 @@ struct shape:
   @always_inline
   fn position(self : Self, indices : List[Int]) -> Int:
     """Calculates the flat index for a variadic list of multi-dimensional indices.
+    
     Args:
       indices: The multi-dimensional indices.
+    
     Returns:
       The flat index corresponding to the multi-dimensional indices.
     """
@@ -321,15 +396,14 @@ struct shape:
   @always_inline
   fn indices(self : Self, index : Int) -> List[Int]:
     """
-    Converts a linear index into its corresponding multi-dimensional indices based on the given shape.
-    This function is useful for determining the multi-dimensional indices of an element in a tensor or array,
-    given its linear index (i.e., its position in a flattened version of the tensor or array) and the shape of the tensor or array.
+    Converts a linear index into its corresponding multi-dimensional indices based on the given shape. (i.e., its position in a flattened version of the tensor or array).
+
     Args:
-    - shape: A List[Int] representing the dimensions of the tensor or array.
-    - index: An Int representing the linear index of an element in the flattened tensor or array.
-    Returns: 
-    - A List[Int] containing the multi-dimensional indices corresponding to the given linear index.
-  """
+        index: An Int representing the linear index of an element in the flattened tensor or array.
+    
+    Returns:
+        List[Int] containing the multi-dimensional indices corresponding to the given linear index.
+    """
     return indices(self._shapelist, index)
 
 
@@ -488,6 +562,7 @@ fn _bytes(num_elements : Int, type : DType) -> Int:
   Args:
       num_elements: The number of elements in the Tensor.
       type : DType of the elements.
+  
   Returns:
       The total number of bytes required to store the elements as an integer.
   """
