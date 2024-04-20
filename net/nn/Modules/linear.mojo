@@ -24,7 +24,7 @@ struct Linear[dtype : DType]:
         self.Weights.rand()
         self.biases.rand()
     
-    fn forward(inout self, Inputs : Tensor[dtype], use_bias : Bool = True) -> Tensor[dtype]:
+    fn forward(inout self, inout Inputs : Tensor[dtype], use_bias : Bool = True) -> Tensor[dtype]:
         """
         Applies the linear transformation to the input tensor.
 
@@ -41,5 +41,5 @@ struct Linear[dtype : DType]:
         var weights_transposed = self.Weights.transposed()
         var y = Inputs.matmul(weights_transposed)
         if use_bias:
-            y.add(self.bias)
+            y.add(self.biases)
         return y

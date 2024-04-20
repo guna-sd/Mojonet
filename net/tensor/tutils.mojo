@@ -1,4 +1,5 @@
 from tensor import TensorShape, TensorSpec
+import math
 
 
 alias TensorStart = "Tensor("
@@ -206,7 +207,7 @@ struct shape:
     self.num_elements = existing.num_elements
     self._shapelist = existing._shapelist
 
-  fn __getitem__(self : Self, inout index : Int) -> Int:
+  fn __getitem__(self : Self, index : Int) -> Int:
     return self.shape[index if index>=0 else self._rank + index]
 
   fn __setitem__(self : Self, index : Int, value : Int):
@@ -240,20 +241,54 @@ struct shape:
 
   fn rank(self : Self) -> Int:
     return self._rank
+
+  @always_inline
+  fn broadcast_shapes(inout self, broadcast_shape: shape) -> shape:
+      var ndim = math.max(self.rank(), broadcast_shape.rank())
+      var diff = math.abs(self.rank() - broadcast_shape.rank())
+
+      var big_shape: shape
+      var small_shape: shape
+      if self.rank() > broadcast_shape.rank():
+          big_shape = self
+          small_shape = broadcast_shape
+      else:
+          big_shape = broadcast_shape
+          small_shape = self
+
+      var res = self._shapelist
+
+      for i in range(ndim - 1, diff - 1, -1):
+          var a = big_shape[i]
+          var b = small_shape[i - diff]
+          if b == a:
+              res[i] = a
+          elif a == 1 or b == 1:
+              res[i] = a * b
+          else:
+              var message: String = "[ERROR] Shapes " + self.__str__() + " and " + str(broadcast_shape) + " cannot be broadcasted."
+              print(message)
+      for i in range(diff - 1, -1, -1):
+          res[i] = big_shape[i]
+
+      return shape(res)
   
   fn count_elements(self : Self) -> Int:
     return self.num_elements
 
+  @always_inline
   fn position(self : Self, indices : List[Int]) -> Int:
     return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
 
+  @always_inline
   fn position(self : Self, indices : VariadicList[Int]) -> Int:
     return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
   
+  @always_inline
   fn position(self : Self, *indices : Int) -> Int:
     return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
 
-
+@always_inline
 fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
     """
     Convert a set of multidimensional indices into a linear index based on the tensor's shape.
@@ -279,7 +314,7 @@ fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : In
     
     return pos
 
-
+@always_inline
 fn __get_position(*indices : Int, rank : Int, Shapes : List[Int], size : Int) ->Int:
     """
     Convert a set of multidimensional indices into a linear index based on the tensor's shape.
@@ -305,7 +340,7 @@ fn __get_position(*indices : Int, rank : Int, Shapes : List[Int], size : Int) ->
     
     return pos
 
-
+@always_inline
 fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
     """
     Convert a set of multidimensional indices into a linear index based on the tensor's shape.
@@ -331,7 +366,7 @@ fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], s
     
     return pos
 
-
+@always_inline
 fn convert_position(index: Int, size: Int) -> Int:
     """
     Convert a negative index to a positive one within the given size.
@@ -347,19 +382,19 @@ fn convert_position(index: Int, size: Int) -> Int:
         return size + index
     return index
 
-
+@always_inline
 fn indices(shape: List[Int], owned linear_index: Int) -> List[Int]:
     var multidim_indices = List[Int]()
     var num_dims = len(shape)
     for i in range(num_dims - 1, -1, -1):
         var dim_size = shape[i]
-        var dim_index = linear_index % dim_size        
-        multidim_indices.append(dim_index)        
+        var dim_index = linear_index % dim_size
+        multidim_indices.append(dim_index)       
         linear_index //= dim_size
     multidim_indices.reverse()
     return multidim_indices
 
-
+@always_inline
 fn num_elements(shape : VariadicList[Int]) -> Int:
     """
     Total number of elements in the given shape.
@@ -375,7 +410,7 @@ fn num_elements(shape : VariadicList[Int]) -> Int:
         elements *=  shape[i]
     return elements
 
-
+@always_inline
 fn num_elements[size : Int](shape : StaticIntTuple[size]) -> Int:
     """
     Total number of elements in the given shape.
@@ -394,7 +429,7 @@ fn num_elements[size : Int](shape : StaticIntTuple[size]) -> Int:
           elements *=  shape[i]
       return elements
 
-
+@always_inline
 fn num_elements(shape : List[Int]) -> Int:
     """
     Total number of elements in the given shape.
@@ -410,7 +445,7 @@ fn num_elements(shape : List[Int]) -> Int:
         elements *=  shape[i]
     return elements
 
-
+@always_inline
 fn _bytes(num_elements : Int, type : DType) -> Int:
   """
   Calculates the total number of bytes required to store the elements of an array.
