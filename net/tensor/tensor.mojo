@@ -4,13 +4,8 @@ from tensor import TensorShape, TensorSpec
 import math
 from random.random import rand as _rand
 from algorithm import vectorize, parallelize
-from algorithm import Static2DTileUnitFunc as Tile2DFunc
 from sys.info import num_physical_cores
 
-fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
-    for y in range(0, end_y, tile_y):
-        for x in range(0, end_x, tile_x):
-            tiled_fn[tile_x, tile_y](x, y)
 
 @always_inline
 fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
@@ -55,7 +50,7 @@ fn scalar_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[typ
 
 @always_inline
 fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-    """Matrix multiplication of two tensors A and B.
+    """Matrix multiplication of two tensors A and B 2D.
     A should be of shape (m, k) and B should be of shape (k, n).
     The result will be a tensor of shape (m, n).
     """
@@ -81,27 +76,6 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
         vectorize[index, nelts](n)
     parallelize[multiply_and_sum](m)
     return result
-
-fn matmul_tiled_unrolled_parallelized[dtype : DType](C: Tensor[dtype], A: Tensor[dtype], B: Tensor[dtype]):
-    alias nelts = simdwidthof[dtype]()
-    @parameter
-    fn calc_row(m: Int):
-        @parameter
-        fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
-            for k in range(y, y + tile_y):
-                @parameter
-                fn dot[nelts: Int](n: Int):
-                    C.__setitem__(List[Int](m, n + x), C.__getitem__(m, n + x) + A.__getitem__(m, k) * B.__getitem__(k, n + x))
-
-                # Vectorize by nelts and unroll by tile_x/nelts
-                # Here unroll factor is 4
-                alias unroll_factor = tile_x // nelts
-                vectorize[dot, nelts, size=tile_x, unroll_factor=unroll_factor]()
-
-        alias tile_size = 4
-        tile[calc_tile, nelts * tile_size, tile_size](A.cols, C.cols)
-
-    parallelize[calc_row](C.rows, C.rows)
 
 @value
 struct Tensor[type : DType]:
@@ -487,7 +461,7 @@ struct Tensor[type : DType]:
             self.storage[i] = value
 
     @always_inline
-    fn transposed(inout self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
+    fn transposed(self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
 
         var _shape = self.shape._shapelist        
         
@@ -499,16 +473,13 @@ struct Tensor[type : DType]:
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
         
         var ttensor = Tensor[type](tshape)
-
-        @parameter
-        fn indexing(index : Int):
+        
+        for index in range(self.num_elements()):
             var _indices = indices(_shape, index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
             var tindex = ttensor.shape.position(tindices)
             ttensor[tindex] = self[index]
-        
-        parallelize[indexing](self.num_elements(),num_physical_cores())
         
         return ttensor
         
@@ -525,15 +496,12 @@ struct Tensor[type : DType]:
         
         var ttensor = Tensor[type](tshape)
         
-        @parameter
-        fn indexing(index : Int):
+        for index in range(self.num_elements()):
             var _indices = indices(_shape, index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
             var tindex = ttensor.shape.position(tindices)
             ttensor[tindex] = self[index]
-        
-        parallelize[indexing](self.num_elements(),num_physical_cores())
         
         self = ttensor
 

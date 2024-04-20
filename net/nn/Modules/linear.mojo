@@ -22,9 +22,9 @@ struct Linear[dtype : DType]:
         self.biases = Tensor[dtype](self.Output_dim)
 
         self.Weights.rand()
-        self.biases.rand()
+        self.biases.zeros()
     
-    fn forward(inout self, inout Inputs : Tensor[dtype], use_bias : Bool = True) -> Tensor[dtype]:
+    fn forward(inout self, Inputs : Tensor[dtype], bias : Bool = True) -> Tensor[dtype]:
         """
         Applies the linear transformation to the input tensor.
 
@@ -33,13 +33,15 @@ struct Linear[dtype : DType]:
 
         Args:
             Inputs   : (Tensor[dtype]) The input tensor of shape (batch_size, input_features).
-            use_bias : (Bool)  Whether to add the bias term or not.
+            bias : (Bool)  Whether to add the bias term or not.
 
         Returns:
             Tensor[dtype]: The output tensor of shape (batch_size, output_features).
         """
-        var weights_transposed = self.Weights.transposed()
-        var y = Inputs.matmul(weights_transposed)
-        if use_bias:
-            y.add(self.biases)
+        if Inputs.shape[1] != self.Input_dim:
+            print("Inputs must have the same shape as self.Input_dim (batch_size, input_features).")
+
+        var y = Inputs @ (self.Weights.transposed())
+        if bias:
+            return y.add(self.biases)
         return y
