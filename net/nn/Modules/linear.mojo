@@ -14,12 +14,14 @@ struct Linear[dtype : DType]:
     var biases : Tensor[dtype]
     var Input_dim : Int
     var Output_dim : Int
+    var Inputs : Tensor[dtype]
 
     fn __init__(inout self, Input_dim : Int, Output_dim : Int):
         self.Input_dim = Input_dim
         self.Output_dim = Output_dim
         self.Weights = Tensor[dtype](self.Output_dim,self.Input_dim)
         self.biases = Tensor[dtype](self.Output_dim)
+        self.Inputs = Tensor[dtype]()
 
         self.Weights.rand()
         self.biases.zeros()
@@ -40,8 +42,23 @@ struct Linear[dtype : DType]:
         """
         if Inputs.shape[1] != self.Input_dim:
             print("Inputs must have the same shape as self.Input_dim (batch_size, input_features).")
-
+        self.Inputs = Inputs
         var y = Inputs @ (self.Weights.transposed())
         if bias:
             return y.add(self.biases)
         return y
+    
+    fn backward(inout self, Outputs : Tensor[dtype]) -> Tensor[dtype]:
+        """
+        Backward pass for a linear layer.
+
+        Args:
+            Outputs : (Tensor[dtype]) Gradient of the loss with respect to the output of the layer (dL/dy).
+
+        Returns:
+            Tensor[dtype]: Gradient of the loss with respect to the input of the layer (dL/dx).
+        """
+        var dWeights = self.Inputs.transposed() @ Outputs
+        #Gradient of the loss with respect to the input (dL/dx)
+        var dInput = Outputs @ self.Weights
+        return dInput

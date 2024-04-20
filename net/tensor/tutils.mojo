@@ -9,7 +9,7 @@ alias SquareBracketR = "]"
 alias Truncation = "...,"
 alias Strdtype = ", dtype="
 alias Strshape = ", shape="
-alias Comma = ","
+alias Comma = ", "
 alias Max_Elem_To_Print = 7
 alias Max_Elem_Per_Side = Max_Elem_To_Print // 2
 
@@ -31,26 +31,19 @@ fn complete(ptr : DTypePointer, len : Int) -> String:
         return buf
     buf += ptr.load()
     for i in range(1, len):
-        buf += ", "
+        buf += Comma
         buf += str(ptr.load(i))
     return buf
 
 
 @always_inline
 fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
-    var buf : String = String("")
+    var buf = String("")
 
     if len == 0:
         return String("")
     buf += SquareBracketL
-    if len < Max_Elem_To_Print:
-        buf += complete(ptr, len)
-        buf += SquareBracketR
-        return buf
-    buf += complete(ptr, Max_Elem_Per_Side)
-    buf += ", "
-    buf += Truncation
-    buf += complete(ptr + len - Max_Elem_Per_Side, Max_Elem_Per_Side)
+    buf += complete(ptr, len)
     buf += SquareBracketR
     return buf
 
@@ -58,8 +51,8 @@ fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
 @always_inline
 fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = True](ptr : DTypePointer[type], shape : shape) -> String:
 
-    var buffer : String = String()
-    var rank : Int = shape._rank
+    var buffer = String()
+    var rank = shape._rank
 
     if rank == 0:
         return _rank0(type, shape)
@@ -97,17 +90,9 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
             if row_idx != row_elem_count:
                 buffer+=","
             
-            if (row_elem_count >= Max_Elem_To_Print and row_idx == Max_Elem_Per_Side):
-                buffer+="\n"
-                buffer+=Truncation
-                row_idx = row_elem_count = Max_Elem_Per_Side
         buffer+=SquareBracketR
         matrix_idx+=1
 
-        if(num_matrices >= Max_Elem_To_Print and matrix_idx == Max_Elem_Per_Side):
-            buffer+="\n"
-            buffer+=Truncation
-            matrix_idx = num_matrices = Max_Elem_Per_Side
     for i in range(2,rank):
         buffer+=SquareBracketR
     
@@ -124,94 +109,94 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
 
 @value
 struct shape:
-  var shape : Pointer[Int]
+  var _ptr : Pointer[Int]
   var num_elements : Int
   var _rank : Int
   var _shapelist : List[Int]
 
   fn __init__(inout self : Self):
-    self.shape = Pointer[Int]().alloc(0)
+    self._ptr = Pointer[Int]().alloc(0)
     self.num_elements = 0
     self._rank = 0
     self._shapelist = List[Int]()
 
   fn __init__(inout self :Self, *dims : Int):
-    self.shape = Pointer[Int].alloc(dims.__len__())
+    self._ptr = Pointer[Int].alloc(dims.__len__())
     self._shapelist = List[Int]()
     for i in range(dims.__len__()):
-      self.shape.store(i, dims[i])
+      self._ptr.store(i, dims[i])
       self._shapelist.append(dims[i])
 
     self._rank = dims.__len__()
     self.num_elements = num_elements(dims)
     
   fn __init__(inout self :Self, shape : VariadicList[Int]):
-    self.shape = Pointer[Int].alloc(shape.__len__())
+    self._ptr = Pointer[Int].alloc(shape.__len__())
     self._shapelist = List[Int]()
 
     for i in range(shape.__len__()):
-      self.shape.store(i, shape[i])
+      self._ptr.store(i, shape[i])
       self._shapelist.append(shape[i])
 
     self._rank = shape.__len__()
     self.num_elements = num_elements(shape)
   
   fn __init__(inout self :Self, shape : List[Int]):
-    self.shape = Pointer[Int].alloc(shape.__len__())
+    self._ptr = Pointer[Int].alloc(shape.__len__())
     self._shapelist = List[Int]()
     for i in range(shape.__len__()):
-      self.shape.store(i, shape[i])
+      self._ptr.store(i, shape[i])
       self._shapelist.append(shape[i])
     self._rank = shape.__len__()
     self.num_elements = num_elements(shape)
   
   fn __init__[size : Int](inout self :Self, shape : StaticIntTuple[size]):
-    self.shape = Pointer[Int].alloc(shape.__len__())
+    self._ptr = Pointer[Int].alloc(shape.__len__())
     self._shapelist = List[Int]()
     for i in range(shape.__len__()):
-      self.shape.store(i, shape[i])
+      self._ptr.store(i, shape[i])
       self._shapelist.append(shape[i])
 
     self._rank = shape.__len__()
     self.num_elements = shape.flattened_length()
 
   fn __init__(inout self : Self, shape : TensorShape):
-    self.shape = Pointer[Int].alloc(shape.rank())
+    self._ptr = Pointer[Int].alloc(shape.rank())
     self._shapelist = List[Int]()
     for i in range(shape.rank()):
-      self.shape.store(i, shape[i])
+      self._ptr.store(i, shape[i])
       self._shapelist.append(shape[i])
 
     self._rank = shape.rank()
     self.num_elements = shape.num_elements()
   
   fn __init__(inout self : Self, shape : TensorSpec):
-    self.shape = Pointer[Int].alloc(shape.rank())
+    self._ptr = Pointer[Int].alloc(shape.rank())
     self._shapelist = List[Int]()
     for i in range(shape.rank()):
-      self.shape.store(i, shape[i])
+      self._ptr.store(i, shape[i])
       self._shapelist.append(shape[i])
 
     self._rank = shape.rank()
     self.num_elements = shape.num_elements()
 
   fn __copyinit__(inout self: Self, old: Self):
-    self.shape = old.shape
+    self._ptr = old._ptr
     self._rank = old._rank
     self.num_elements = old.num_elements
     self._shapelist = old._shapelist
   
   fn __moveinit__(inout self: Self, owned existing: Self):
-    self.shape = existing.shape
+    self._ptr = existing._ptr
     self._rank = existing._rank
     self.num_elements = existing.num_elements
     self._shapelist = existing._shapelist
 
   fn __getitem__(self : Self, index : Int) -> Int:
-    return self.shape[index if index>=0 else self._rank + index]
+    return self._ptr[index if index>=0 else self._rank + index]
 
   fn __setitem__(self : Self, index : Int, value : Int):
-    self.shape[index if index>=0 else self._rank + index] = value
+    self._ptr[index if index>=0 else self._rank + index] = value
   
   fn __len__(self: Self) -> Int:
     return self._rank
@@ -220,7 +205,7 @@ struct shape:
     if self.rank() != other.rank():
       return False
     for i in range(self.rank()):
-      if self.shape[i] != other[i]:
+      if self._ptr[i] != other[i]:
         return False
     return True
   
@@ -275,6 +260,14 @@ struct shape:
   
   fn count_elements(self : Self) -> Int:
     return self.num_elements
+  
+  @always_inline
+  fn offset(self : Self, indices : List[Int]) ->Int:
+    return flatten_index(self, indices)
+
+  @always_inline
+  fn offset(self : Self, indices : VariadicList[Int]) ->Int:
+    return flatten_index(self, indices)
 
   @always_inline
   fn position(self : Self, indices : List[Int]) -> Int:
@@ -383,16 +376,57 @@ fn convert_position(index: Int, size: Int) -> Int:
     return index
 
 @always_inline
-fn indices(shape: List[Int], owned linear_index: Int) -> List[Int]:
-    var multidim_indices = List[Int]()
+fn indices(shape: List[Int], linearindex: Int) -> List[Int]:
+    var dim_indices = List[Int]()
     var num_dims = len(shape)
+    var linear_index = linearindex
     for i in range(num_dims - 1, -1, -1):
         var dim_size = shape[i]
         var dim_index = linear_index % dim_size
-        multidim_indices.append(dim_index)       
+        dim_indices.append(dim_index)       
         linear_index //= dim_size
-    multidim_indices.reverse()
-    return multidim_indices
+    dim_indices.reverse()
+    return dim_indices
+
+@always_inline
+fn flatten_index(shape: shape, indices: List[Int]) -> Int:
+    """
+    Converts a list of multi-dimensional indices into a flat index based on the provided shape.
+
+    Args:
+        shape: The shape of the tensor.
+        indices: The list of multi-dimensional indices.
+
+    Returns:
+        An integer representing the flat index that corresponds to the given multi-dimensional indices.
+    """
+
+    var flat_index = 0
+    var stride = 1
+    for i in range(shape.rank() - 1, -1, -1):
+        flat_index += indices[i] * stride
+        stride *= shape[i]
+    return flat_index
+
+@always_inline
+fn flatten_index(shape: shape, indices: VariadicList[Int]) -> Int:
+    """
+    Converts a list of multi-dimensional indices into a flat index based on the provided shape.
+
+    Args:
+        shape: The shape of the tensor.
+        indices: The list of multi-dimensional indices.
+
+    Returns:
+        An integer representing the flat index that corresponds to the given multi-dimensional indices.
+    """
+
+    var flat_index = 0
+    var stride = 1
+    for i in range(shape.rank() - 1, -1, -1):
+        flat_index += indices[i] * stride
+        stride *= shape[i]
+    return flat_index
 
 @always_inline
 fn num_elements(shape : VariadicList[Int]) -> Int:
@@ -448,10 +482,10 @@ fn num_elements(shape : List[Int]) -> Int:
 @always_inline
 fn _bytes(num_elements : Int, type : DType) -> Int:
   """
-  Calculates the total number of bytes required to store the elements of an array.
+  Calculates the total number of bytes required to store the elements of an Tensor.
 
   Args:
-      num_elements: The number of elements in the array.
+      num_elements: The number of elements in the Tensor.
       type : DType of the elements.
   Returns:
       The total number of bytes required to store the elements as an integer.

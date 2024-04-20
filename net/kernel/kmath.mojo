@@ -11,7 +11,7 @@ fn max[type : DType](value : Tensor[type]) -> SIMD[type,1]:
     Find the maximum value in the Tensor.
     """
     if value.num_elements() == 0:
-        print("list is empty")
+        print("is empty")
         return 0
     if value.num_elements() == 1:
         return value[0]
@@ -21,12 +21,13 @@ fn max[type : DType](value : Tensor[type]) -> SIMD[type,1]:
             j = value[i]
     return j
 
+
 fn min[type : DType](value : Tensor[type]) -> SIMD[type,1]:
     """
     Find the minimum value in the list.
     """
     if value.num_elements() == 0:
-        print("list is empty")
+        print("is empty")
         return 0
     if value.num_elements() == 1:
         return value[0]
@@ -87,3 +88,4 @@ fn multiply[type : DType](owned a: SIMD[type,1], owned b: SIMD[type,1]) -> SIMD[
         b >>= 1
 
     return res
+

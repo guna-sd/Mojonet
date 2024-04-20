@@ -1,81 +1,10 @@
-from .tutils import shape, Tensorprinter, _bytes, indices
+from .tutils import shape, Tensorprinter, _bytes, indices, flatten_index, __get_position
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
 from random.random import rand as _rand
-from algorithm import vectorize, parallelize
-from sys.info import num_physical_cores
+from net.kernel import scalar_op, tensor_op, vectorize, matmul
 
-
-@always_inline
-fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
-        x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts],
-](t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
-    """Element-wise operation on two tensors of equal shape."""
-    var shape = t1.shape == t2.shape
-    var elm = t1.num_elements() == t2.num_elements()
-    if shape != elm: 
-        print(Error("Both inputs must be the same shape"))
-    alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()
-    var res = Tensor[dtype](t1.shape)
-    @parameter
-    fn calc(i : Int):
-        @parameter
-        fn vecmath[nelts: Int](idx: Int):
-            res.store[nelts](
-                idx, func[dtype, nelts](t1.load[nelts](idx), t2.load[nelts](idx))
-            )
-        vectorize[vecmath, nelts](t1.num_elements())
-    parallelize[calc](t1.num_elements(), num_cores)
-    return res
-
-@always_inline
-fn scalar_ops[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[type, simd_width]](
-    Input : Tensor[dtype], value : SIMD[dtype,1]) -> Tensor[dtype]:
-    alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()
-    var Output = Tensor[dtype](Input.shape)
-
-    @parameter
-    fn calc(i : Int):
-
-        @parameter
-        fn operation[nelts : Int](j : Int):
-            Output.store(j, func[dtype,nelts](Input[j], value))
-        vectorize[operation, nelts](Input.num_elements())
-    parallelize[calc](Input.num_elements(), num_cores)
-    
-    return Output
-
-@always_inline
-fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-    """Matrix multiplication of two tensors A and B 2D.
-    A should be of shape (m, k) and B should be of shape (k, n).
-    The result will be a tensor of shape (m, n).
-    """
-    var m = A.shape[0]  
-    var k = A.shape[1]  
-    var n = B.shape[1] 
-    alias nelts = simdwidthof[dtype]()
-
-    if k != B.shape[0]:
-        print("Incompatible shapes for matrix multiplication: A.shape[1] must equal B.shape[0]")
-        return A
-    
-    var result = Tensor[dtype](List[Int](m, n))
-
-    @parameter
-    fn multiply_and_sum(i: Int):
-        @parameter
-        fn index[nelts : Int](j: Int):
-            var sum: SIMD[dtype,1] = 0
-            for p in range(k):
-                sum += A[i, p] * B[p, j]
-            result.__setitem__(List[Int](i, j), sum)
-        vectorize[index, nelts](n)
-    parallelize[multiply_and_sum](m)
-    return result
 
 @value
 struct Tensor[type : DType]:
@@ -135,38 +64,6 @@ struct Tensor[type : DType]:
         self.storage = data._ptr
         self.dtype = type
 
-    fn __init__(inout self : Self, shapes : shape, *data : SIMD[type,1]):
-        self.shape = shapes
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        for i in range(data.__len__()):
-            self.storage[i] = data[i]
-        self.dtype = type
-
-    fn __init__(inout self : Self, shapes : List[Int], data : List[SIMD[type, 1]]):
-        self.shape = shape(shapes)
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        for i in range(len(data)):
-            self.storage[i] = data[i]
-        self.dtype = type
-
-    fn __init__[size : Int](inout self : Self, shapes : StaticIntTuple[size], data : StaticIntTuple[size]):
-        self.shape = shape(shapes)
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        for i in range(len(data)):
-            self.storage[i] = data[i]
-        self.dtype = type
-
-    fn __init__(inout self : Self, shapes : VariadicList[Int], data : VariadicList[SIMD[type, 1]]):
-        self.shape = shape(shapes)
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        for i in range(len(data)):
-            self.storage[i] = data[i]
-        self.dtype = type
-
-    fn __del__(owned self):
-        self.storage.free()
-        self.shape.shape.free()
-
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
@@ -189,33 +86,27 @@ struct Tensor[type : DType]:
         self.storage.store[width=nelts](index, value)
 
     fn __getitem__(self, owned offset : Int) -> SIMD[type,1]:
-        return self.load[1](offset)
+        var pos = self.shape.offset(indices(self.shape._shapelist,offset))
+        return self.load[1](pos)
     
     fn __getitem__(self, *indices : Int) -> SIMD[type,1]:
-        var pos = self.shape.position(indices)
+        var pos = self.shape.offset(indices)
         return self.load[1](pos)
     
     fn __getitem__(self: Self, indices: VariadicList[Int]) -> SIMD[type, 1]:
-        var pos = self.shape.position(indices)
-        return self.load[1](pos)
-    
-    fn __getitem__(self: Self, indices : List[Int]) -> SIMD[type,1]:
-        var pos = self.shape.position(indices)
+        var pos = self.shape.offset(indices)
         return self.load[1](pos)
     
     fn __setitem__(self, owned offset : Int, value : SIMD[type,1]):
-        self.store(offset, value)
+        var pos = self.shape.offset(indices(self.shape._shapelist,offset))
+        self.store(pos, value)
     
     fn __setitem__(self: Self, indices: VariadicList[Int], val: SIMD[type, 1]):
-        var pos = self.shape.position(indices)
+        var pos = self.shape.offset(indices)
         self.store(pos, val)
     
     fn __setitem__(self: Self, *indices: Int, val: SIMD[type,1]):
-        var pos = self.shape.position(indices)
-        self.store(pos, val)
-    
-    fn __setitem__(self: Self, indices : List[Int], val: SIMD[type,1]):
-        var pos = self.shape.position(indices)
+        var pos = self.shape.offset(indices)
         self.store(pos, val)
     
     fn __eq__(self: Self, other: Self) -> Bool:
@@ -286,13 +177,11 @@ struct Tensor[type : DType]:
     
     @always_inline
     fn add(inout self : Self, x : SIMD[type,1]):
-        self = scalar_ops[type,math.add](self,x)
+        self = scalar_op[type,math.add](self,x)
 
     @always_inline
     fn add(inout self: Self, inout other: Tensor[type]) -> Self:
-        """
-        Performs element-wise addition of two tensors with compatible broadcasted shapes.
-        """
+
         if self.shape == other.shape:
             return self.__add__(other)
 
@@ -306,31 +195,28 @@ struct Tensor[type : DType]:
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)
             var other_indices  = indices(other.shape._shapelist, idx)
-            var self_indices = result_indices
 
             for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    self_indices[j] = 0
+                if result.shape[j] == 1:
+                    result_indices[j] = 0
 
             for j in range(other.shape.rank()):
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = self.flatten_index(self.shape, self_indices)
-            var other_idx = self.flatten_index(other.shape, other_indices)
+            var self_idx = flatten_index(self.shape, result_indices)
+            var other_idx = flatten_index(other.shape, other_indices)
 
-            result[idx] = math.add(self[self_idx],other[other_idx])
+            result[idx] = self[self_idx] + other[other_idx]
         return result
 
     @always_inline
     fn sub(inout self : Self, x : SIMD[type,1]):
-        self = scalar_ops[type,math.sub](self,x)
+        self = scalar_op[type,math.sub](self,x)
 
     @always_inline
     fn sub(inout self: Self, inout other: Tensor[type]) -> Self:
-        """
-        Performs element-wise addition of two tensors with compatible broadcasted shapes.
-        """
+
         if self.shape == other.shape:
             return self.__sub__(other)
 
@@ -344,31 +230,28 @@ struct Tensor[type : DType]:
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)
             var other_indices  = indices(other.shape._shapelist, idx)
-            var self_indices = result_indices
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
-                    self_indices[j] = 0
+                    result_indices[j] = 0
 
             for j in range(other.shape.rank()):
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = self.flatten_index(self.shape, self_indices)
-            var other_idx = self.flatten_index(other.shape, other_indices)
+            var self_idx = flatten_index(self.shape, result_indices)
+            var other_idx = flatten_index(other.shape, other_indices)
 
             result[idx] = math.sub(self[self_idx],other[other_idx])
         return result
 
     @always_inline
     fn multiply(inout self : Self, x : SIMD[type,1]):
-        self = scalar_ops[type,math.mul](self,x)
+        self = scalar_op[type,math.mul](self,x)
 
     @always_inline
     fn multiply(inout self: Self, inout other: Tensor[type]) -> Self:
-        """
-        Performs element-wise addition of two tensors with compatible broadcasted shapes.
-        """
+
         if self.shape.num_elements == other.shape.num_elements:
             return self.__mul__(other)
 
@@ -382,31 +265,27 @@ struct Tensor[type : DType]:
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)
             var other_indices  = indices(other.shape._shapelist, idx)
-            var self_indices = result_indices
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
-                    self_indices[j] = 0
+                    result_indices[j] = 0
 
             for j in range(other.shape.rank()):
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = self.flatten_index(self.shape, self_indices)
-            var other_idx = self.flatten_index(other.shape, other_indices)
+            var self_idx = flatten_index(self.shape, result_indices)
+            var other_idx = flatten_index(other.shape, other_indices)
 
             result[idx] = math.mul(self[self_idx],other[other_idx])
         return result
 
     @always_inline
     fn div(inout self : Self, x : SIMD[type,1]):
-        self = scalar_ops[type,math.div](self,x) 
+        self = scalar_op[type,math.div](self,x) 
 
     @always_inline
     fn div(inout self: Self, inout other: Tensor[type]) -> Self:
-        """
-        Performs element-wise addition of two tensors with compatible broadcasted shapes.
-        """
 
         if self.shape == other.shape:
             return self.__truediv__(other)
@@ -421,18 +300,17 @@ struct Tensor[type : DType]:
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)
             var other_indices  = indices(other.shape._shapelist, idx)
-            var self_indices = result_indices
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
-                    self_indices[j] = 0
+                    result_indices[j] = 0
 
             for j in range(other.shape.rank()):
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = self.flatten_index(self.shape, self_indices)
-            var other_idx = self.flatten_index(other.shape, other_indices)
+            var self_idx = flatten_index(self.shape, result_indices)
+            var other_idx = flatten_index(other.shape, other_indices)
 
             result[idx] = math.div(self[self_idx],other[other_idx])
         return result
@@ -512,9 +390,6 @@ struct Tensor[type : DType]:
         
         Args:
             shapes: The target shape for broadcasting.
-
-        Returns:
-            A new Tensor with the broadcasted shape.
         """
         var broadcasted_shape = self.shape.broadcast_shapes(shapes)
         
@@ -525,20 +400,18 @@ struct Tensor[type : DType]:
 
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)            
-            var original_indices = result_indices
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
-                    original_indices[j] = 0
+                    result_indices[j] = 0
 
-            var original_idx = self.flatten_index(self.shape, original_indices)
+            var _idx = self.shape.offset(result_indices)
 
-            result[idx] = self[original_idx]
         return result
 
     @always_inline
     fn broadcast_to(inout self: Self, shapes: shape):
         """
-        Broadcasts the tensor to a specified shape and returns a new tensor with the broadcasted shape.
+        Broadcasts the tensor to a specified shape.
         
         Args:
             shapes: The target shape for broadcasting.
@@ -552,35 +425,14 @@ struct Tensor[type : DType]:
 
         for idx in range(result.num_elements()):
             var result_indices = indices(broadcasted_shape._shapelist, idx)            
-            var original_indices = result_indices
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
-                    original_indices[j] = 0
+                    result_indices[j] = 0
 
-            var original_idx = self.flatten_index(self.shape, original_indices)
+            var _idx = self.shape.offset(result_indices)
 
-            result[idx] = self[original_idx]
+            result[idx] = self[_idx]
         self = result
-
-    @always_inline
-    fn flatten_index(self, shape: shape, indices: List[Int]) -> Int:
-        """
-        Converts a list of multi-dimensional indices into a flat index based on the provided shape.
-
-        Args:
-            shape: The shape of the tensor.
-            indices: The list of multi-dimensional indices.
-
-        Returns:
-            An integer representing the flat index that corresponds to the given multi-dimensional indices.
-        """
-
-        var flat_index = 0
-        var stride = 1
-        for i in range(shape.rank() - 1, -1, -1):
-            flat_index += indices[i] * stride
-            stride *= shape[i]
-        return flat_index
 
     @always_inline
     fn reshape(inout self: Self, new_shapes: List[Int]):
@@ -589,7 +441,7 @@ struct Tensor[type : DType]:
         for i in range(new_shapes.__len__()):
             total *= i
         if not total == self.num_elements():
-            print("New shape must contain the same number of elements.")
+            print("New shape must contain the same number of elements as the original.")
         self.shape = shape(new_shapes)
 
     @always_inline
