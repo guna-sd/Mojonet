@@ -271,15 +271,16 @@ struct shape:
 
   @always_inline
   fn position(self : Self, indices : List[Int]) -> Int:
-    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
+    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)  
 
-  @always_inline
-  fn position(self : Self, indices : VariadicList[Int]) -> Int:
-    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
-  
   @always_inline
   fn position(self : Self, *indices : Int) -> Int:
     return __get_position(indices, self.rank(), self._shapelist, self.num_elements)
+  
+  @always_inline
+  fn indices(self : Self, index : Int) -> List[Int]:
+    return indices(self._shapelist, index)
+
 
 @always_inline
 fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
@@ -307,31 +308,6 @@ fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : In
     
     return pos
 
-@always_inline
-fn __get_position(*indices : Int, rank : Int, Shapes : List[Int], size : Int) ->Int:
-    """
-    Convert a set of multidimensional indices into a linear index based on the tensor's shape.
-
-    Args:
-        indices : (VariadicList[Int]) The multidimensional indices to convert.
-        rank : (Int) The rank (number of dimensions) of the tensor.
-        Shapes : (List[Int]) The shape of the tensor (list of dimensions).
-        size : (Int) The total number of elements in the tensor.
-
-    Returns:
-        Int: The linear index corresponding to the given multidimensional indices.
-    """
-    var pos = 0
-    var dim = 1
-    
-    for i in range(rank - 1, -1, -1):
-        var index = convert_position(indices[i], Shapes[i])        
-        pos += index * dim        
-        dim *= Shapes[i]
-    if not (0 <= pos < size):
-        print(Error("Calculated position is out of bounds."))
-    
-    return pos
 
 @always_inline
 fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
@@ -359,6 +335,7 @@ fn __get_position(indices : VariadicList[Int], rank : Int, Shapes : List[Int], s
     
     return pos
 
+
 @always_inline
 fn convert_position(index: Int, size: Int) -> Int:
     """
@@ -375,11 +352,25 @@ fn convert_position(index: Int, size: Int) -> Int:
         return size + index
     return index
 
+
 @always_inline
-fn indices(shape: List[Int], linearindex: Int) -> List[Int]:
+fn indices(shape: List[Int], index: Int) -> List[Int]:
+    """
+    Converts a linear index into its corresponding multi-dimensional indices based on the given shape.
+
+    This function is useful for determining the multi-dimensional indices of an element in a tensor or array,
+    given its linear index (i.e., its position in a flattened version of the tensor or array) and the shape of the tensor or array.
+
+    Args:
+        shape: A List[Int] representing the dimensions of the tensor or array.
+        index: An Int representing the linear index of an element in the flattened tensor or array.
+
+    Returns:
+        A List[Int] containing the multi-dimensional indices corresponding to the given linear index.
+    """
     var dim_indices = List[Int]()
     var num_dims = len(shape)
-    var linear_index = linearindex
+    var linear_index = index
     for i in range(num_dims - 1, -1, -1):
         var dim_size = shape[i]
         var dim_index = linear_index % dim_size
@@ -387,6 +378,7 @@ fn indices(shape: List[Int], linearindex: Int) -> List[Int]:
         linear_index //= dim_size
     dim_indices.reverse()
     return dim_indices
+
 
 @always_inline
 fn flatten_index(shape: shape, indices: List[Int]) -> Int:
@@ -408,6 +400,7 @@ fn flatten_index(shape: shape, indices: List[Int]) -> Int:
         stride *= shape[i]
     return flat_index
 
+
 @always_inline
 fn flatten_index(shape: shape, indices: VariadicList[Int]) -> Int:
     """
@@ -428,6 +421,7 @@ fn flatten_index(shape: shape, indices: VariadicList[Int]) -> Int:
         stride *= shape[i]
     return flat_index
 
+
 @always_inline
 fn num_elements(shape : VariadicList[Int]) -> Int:
     """
@@ -444,24 +438,6 @@ fn num_elements(shape : VariadicList[Int]) -> Int:
         elements *=  shape[i]
     return elements
 
-@always_inline
-fn num_elements[size : Int](shape : StaticIntTuple[size]) -> Int:
-    """
-    Total number of elements in the given shape.
-    
-    Args:
-      shape: A StaticIntTuple of integers representing the dimensions of the array.
-
-    Returns:
-      An integer representing the total number of elements in the array.
-    """
-    if shape.flattened_length():
-      return shape.flattened_length()
-    else:
-      var elements : Int = 1
-      for i in range(len(shape)):
-          elements *=  shape[i]
-      return elements
 
 @always_inline
 fn num_elements(shape : List[Int]) -> Int:
@@ -478,6 +454,7 @@ fn num_elements(shape : List[Int]) -> Int:
     for i in range(len(shape)):
         elements *=  shape[i]
     return elements
+
 
 @always_inline
 fn _bytes(num_elements : Int, type : DType) -> Int:

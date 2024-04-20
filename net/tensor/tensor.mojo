@@ -1,4 +1,4 @@
-from .tutils import shape, Tensorprinter, _bytes, indices, flatten_index, __get_position
+from .tutils import shape, Tensorprinter, _bytes
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
@@ -86,7 +86,7 @@ struct Tensor[type : DType]:
         self.storage.store[width=nelts](index, value)
 
     fn __getitem__(self, owned offset : Int) -> SIMD[type,1]:
-        var pos = self.shape.offset(indices(self.shape._shapelist,offset))
+        var pos = self.shape.offset(self.shape.indices(offset))
         return self.load[1](pos)
     
     fn __getitem__(self, *indices : Int) -> SIMD[type,1]:
@@ -98,7 +98,7 @@ struct Tensor[type : DType]:
         return self.load[1](pos)
     
     fn __setitem__(self, owned offset : Int, value : SIMD[type,1]):
-        var pos = self.shape.offset(indices(self.shape._shapelist,offset))
+        var pos = self.shape.offset(self.shape.indices(offset))
         self.store(pos, value)
     
     fn __setitem__(self: Self, indices: VariadicList[Int], val: SIMD[type, 1]):
@@ -193,8 +193,8 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)
-            var other_indices  = indices(other.shape._shapelist, idx)
+            var result_indices = result.shape.indices(idx)
+            var other_indices  = other.shape.indices(idx)
 
             for j in range(self.shape.rank()):
                 if result.shape[j] == 1:
@@ -204,8 +204,8 @@ struct Tensor[type : DType]:
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = flatten_index(self.shape, result_indices)
-            var other_idx = flatten_index(other.shape, other_indices)
+            var self_idx = self.shape.offset(result_indices)
+            var other_idx = other.shape.offset(other_indices)
 
             result[idx] = self[self_idx] + other[other_idx]
         return result
@@ -228,8 +228,8 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)
-            var other_indices  = indices(other.shape._shapelist, idx)
+            var result_indices = result.shape.indices(idx)
+            var other_indices  = other.shape.indices(idx)
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
@@ -239,8 +239,8 @@ struct Tensor[type : DType]:
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = flatten_index(self.shape, result_indices)
-            var other_idx = flatten_index(other.shape, other_indices)
+            var self_idx = self.shape.offset(result_indices)
+            var other_idx = other.shape.offset(other_indices)
 
             result[idx] = math.sub(self[self_idx],other[other_idx])
         return result
@@ -263,8 +263,8 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)
-            var other_indices  = indices(other.shape._shapelist, idx)
+            var result_indices = result.shape.indices(idx)
+            var other_indices  = other.shape.indices(idx)
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
@@ -274,8 +274,8 @@ struct Tensor[type : DType]:
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = flatten_index(self.shape, result_indices)
-            var other_idx = flatten_index(other.shape, other_indices)
+            var self_idx = self.shape.offset(result_indices)
+            var other_idx = other.shape.offset(other_indices)
 
             result[idx] = math.mul(self[self_idx],other[other_idx])
         return result
@@ -298,8 +298,8 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)
-            var other_indices  = indices(other.shape._shapelist, idx)
+            var result_indices = result.shape.indices(idx)
+            var other_indices  = other.shape.indices(idx)
 
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
@@ -309,8 +309,8 @@ struct Tensor[type : DType]:
                 if other.shape[j] == 1:
                     other_indices[j] = 0
 
-            var self_idx = flatten_index(self.shape, result_indices)
-            var other_idx = flatten_index(other.shape, other_indices)
+            var self_idx = self.shape.offset(result_indices)
+            var other_idx = other.shape.offset(other_indices)
 
             result[idx] = math.div(self[self_idx],other[other_idx])
         return result
@@ -340,20 +340,18 @@ struct Tensor[type : DType]:
 
     @always_inline
     fn transposed(self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
-
-        var _shape = self.shape._shapelist        
         
         if dim1 >= self.rank() or dim2 >= self.rank():
             print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
 
-        var tshape = _shape
+        var tshape = self.shape._shapelist
         
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
         
         var ttensor = Tensor[type](tshape)
         
         for index in range(self.num_elements()):
-            var _indices = indices(_shape, index)
+            var _indices = self.shape.indices(index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
             var tindex = ttensor.shape.position(tindices)
@@ -363,19 +361,18 @@ struct Tensor[type : DType]:
         
     @always_inline
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
-        var _shape = self.shape._shapelist        
         
         if dim1 >= self.rank() or dim2 >= self.rank():
             print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
 
-        var tshape = _shape
+        var tshape = self.shape._shapelist
         
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
         
         var ttensor = Tensor[type](tshape)
         
         for index in range(self.num_elements()):
-            var _indices = indices(_shape, index)
+            var _indices = self.shape.indices(index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
             var tindex = ttensor.shape.position(tindices)
@@ -399,7 +396,7 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)            
+            var result_indices = result.shape.indices(idx)            
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
                     result_indices[j] = 0
@@ -424,7 +421,7 @@ struct Tensor[type : DType]:
         var result = Tensor[type](broadcasted_shape)
 
         for idx in range(result.num_elements()):
-            var result_indices = indices(broadcasted_shape._shapelist, idx)            
+            var result_indices = result.shape.indices(idx)            
             for j in range(self.shape.rank()):
                 if self.shape[j] == 1:
                     result_indices[j] = 0
