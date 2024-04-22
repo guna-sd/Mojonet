@@ -6,9 +6,21 @@ from net.kernel import scalar_op, tensor_op, vectorize, matmul
 
 @value
 struct Tensor[type : DType]:
+    """
+    A tensor is a multi-dimensional array of elements.
+    """
     var shape : shape
+    """
+    The shape is representing the dimensions of the tensor.
+    """
     var dtype : DType
+    """
+    The data type of the tensor is a type that defines the type of the elements in the tensor.
+    """
     var storage : DTypePointer[type]
+    """
+    The storage is a pointer to a block of memory that holds the elements of the tensor.
+    """
 
     fn __init__(inout self):
         self.storage = DTypePointer[type]().alloc(0)
@@ -79,14 +91,46 @@ struct Tensor[type : DType]:
         self.dtype = existing.dtype
 
     fn load[nelts : Int](self, owned index: Int) -> SIMD[type,nelts]:
+        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor storage at the specified index.
+
+        Parameters:
+            nelts: The number of elements in the SIMD value to load.
+        
+        Args:
+            index : The index in the tensor storage from which to load the SIMD value. If negative, it is interpreted as an index from the end of the storage.
+
+        Returns:
+            The SIMD value loaded from the tensor storage at the specified index.
+        """
         if index < 0:
             index =  self.num_elements() + index
         return self.storage.load[width=nelts](index)
     
     fn store[nelts : Int](self, owned index: Int, value: SIMD[type,nelts]):
+        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor storage at the specified index.
+
+        Parameters:
+            nelts: The number of elements in the SIMD value to store.
+        
+        Args:
+            index : The index in the tensor storage at which to store the SIMD value. If negative, it is interpreted as an index from the end of the storage.
+            value : The SIMD value to store in the tensor storage at the specified index.
+        """
         if index < 0:
             index = self.num_elements() + index
         self.storage.store[width=nelts](index, value)
+    
+    fn load(self, *indices : Int) -> SIMD[type,1]:
+        var pos = self.shape.offset(indices)
+        return self.load[1](pos)
+
+    fn store(self: Self, indices: VariadicList[Int], val: SIMD[type, 1]):
+        var pos = self.shape.offset(indices)
+        self.store(pos, val)
+
+    fn store(self: Self, indices: List[Int], val: SIMD[type, 1]):
+        var pos = self.shape.offset(indices)
+        self.store(pos, val)
 
     fn __getitem__(self, offset : Int) -> SIMD[type,1]:
         var pos = self.shape.offset(self.shape.indices(offset))
