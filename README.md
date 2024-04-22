@@ -4,14 +4,7 @@
   <h4>Introducing MojoNet, the Mojo Framework for Deep Learning and Machine Learning.</h4>
 </div>
 
-MojoNet is a ML/DL framework with the Mojo programming language. It is designed to streamline the development and deployment of machine learning and deep learning models, making high-performance computing accessible and efficient.
-
-With MojoNet, creating efficient, high-performance machine learning models and deep learning architectures becomes an intuitive process, eliminating the traditional complexities associated with ML/DL development.With Similarity to pytorch syntax...
-
-🤝 Contributing
-We welcome contributions of all kinds! Whether you're looking to add new features, fix bugs, or improve documentation, your help is greatly appreciated.
-
-
+Mojonet is a ML/DL framework written in Mojo lang.
 
 
  
