@@ -305,6 +305,9 @@ struct shape:
           buf += "x"
         buf += str(self._shapelist[i])
       return buf
+    if self._shapelist.__len__() == 0 and self.num_elements == 0 and self._rank == 0:
+      buf+= 'none'
+      return buf
     buf += "1x"
     buf += str(self._shapelist[0])
     return buf
