@@ -29,7 +29,7 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
 
 fn mat_mul[type : DType](self: Tensor[type], other: Tensor[type]) -> Tensor[type]:
     if self.shape.rank() == 1 and other.shape.rank() == 1:
-        return Tensor[type]()
+        return self * other
 
     if not check_matmul(self.shape, other.shape):
         print("Error: Dimensions don't conform for a matmul.")

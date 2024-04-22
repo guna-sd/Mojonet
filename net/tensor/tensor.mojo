@@ -88,7 +88,7 @@ struct Tensor[type : DType]:
             index = self.num_elements() + index
         self.storage.store[width=nelts](index, value)
 
-    fn __getitem__(self, owned offset : Int) -> SIMD[type,1]:
+    fn __getitem__(self, offset : Int) -> SIMD[type,1]:
         var pos = self.shape.offset(self.shape.indices(offset))
         return self.load[1](pos)
     
@@ -104,7 +104,7 @@ struct Tensor[type : DType]:
         var pos = self.shape.offset(indices)
         return self.load[1](pos)
     
-    fn __setitem__(self, owned offset : Int, value : SIMD[type,1]):
+    fn __setitem__(self, offset : Int, value : SIMD[type,1]):
         var pos = self.shape.offset(self.shape.indices(offset))
         self.store(pos, value)
     
