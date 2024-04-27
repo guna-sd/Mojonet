@@ -2,7 +2,7 @@ from .tutils import shape, Tensorprinter, _bytes
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
-from net.kernel import scalar_op, tensor_op, vectorize, matmul
+from net.kernel import scalar_op, tensor_op, vectorize,calculate_shapes, matmul, randn
 
 @value
 struct Tensor[type : DType]:
@@ -225,7 +225,7 @@ struct Tensor[type : DType]:
         Implements matrix multiplication for Tensor.
         The operation is defined as self @ other.
         """
-        return matmul[type](self, other)
+        return matmul(self,other)
     
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
@@ -391,6 +391,7 @@ struct Tensor[type : DType]:
     @always_inline
     fn rand(inout self):
         random.randn(self.storage, self.num_elements(),0,self.rank())
+            
     @always_inline
     fn random(inout self) -> Self:
         random.randn(self.storage, self.num_elements(),0,self.rank())

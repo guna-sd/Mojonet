@@ -2,9 +2,14 @@ from net.tensor import Tensor
 
 struct Linear[dtype : DType]:
     """
-    Linear layer.
+    Applies a linear transformation to the incoming data: y = x @ w.T + b.
 
-    Attributes:
+    Parameter:
+
+        dtype : DType.
+
+    Args:
+
         input_features (int): Number of input features.
         output_features (int): Number of output features.
         weights (Tensor): Tensor storing the weights of the layer (output_features, input_features).
@@ -42,8 +47,10 @@ struct Linear[dtype : DType]:
         """
         if Inputs.shape[1] != self.Input_dim:
             print("Inputs must have the same shape as self.Input_dim (batch_size, input_features).")
+
         self.Inputs = Inputs
         var y = Inputs @ (self.Weights.transposed())
+        
         if bias:
             return y.add(self.biases)
         return y
@@ -62,3 +69,4 @@ struct Linear[dtype : DType]:
         #Gradient of the loss with respect to the input (dL/dx)
         var dInput = Outputs @ self.Weights
         return dInput
+

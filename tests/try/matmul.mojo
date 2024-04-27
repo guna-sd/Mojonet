@@ -208,3 +208,85 @@ fn main() raises:
     # matmul_tiled_unrolled_parallelized(C, A, B)
     
     print(mandelbrot_kernel(5))
+
+import time
+from collections.optional import Optional
+
+@value
+struct random:
+    var _seed : Optional[Int]
+
+    fn seed(inout self):
+        """
+        Seeds the random number generator using the current time.
+        """
+        self._seed = time.now()
+    
+    fn seed(inout self, seed : Int):
+        """
+        Seeds the random number generator with a specified seed.
+
+        Args:
+            seed: The seed value to use for the random number generator.
+        """
+        self._seed = seed
+
+    fn uniform_float(self) -> Float:
+        """
+        Generates a random float between 0 and 1.
+        """
+        if self._seed.has_value:
+            # Use the seed value if provided
+            srand(self._seed.get)
+        return rand()
+
+    fn uniform_int(self, low: Int, high: Int) -> Int:
+        """
+        Generates a random integer in the range [low, high].
+        """
+        if self._seed:
+            # Use the seed value if provided
+            srand(self._seed.get)
+        return randint(low, high)
+
+    fn normal(self, mean: Float, std_dev: Float) -> Float:
+        """
+        Generates a random float from a normal distribution with the given mean and standard deviation.
+        """
+        if self._seed.has_value:
+            # Use the seed value if provided
+            srand(self._seed.get)
+        return mean + std_dev * randn()
+
+    fn randn(self) -> Float:
+        """
+        Generates a random float from a standard normal distribution (mean=0, std_dev=1).
+        """
+        return self.normal(0.0, 1.0)
+
+    fn randint(self, low: Int, high: Int) -> Int:
+        """
+        Generates a random integer in the range [low, high].
+        """
+        return self.uniform_int(low, high)
+
+    fn choice(self, choices: List[T]) -> T:
+        """
+        Chooses a random element from the given list of choices.
+        """
+        if self._seed.has_value:
+            # Use the seed value if provided
+            srand(self._seed.get)
+        var index = randint(0, len(choices) - 1)
+        return choices[index]
+
+    fn shuffle(self, array: List[T]) -> List[T]:
+        """
+        Shuffles the elements of the given array in-place and returns the shuffled array.
+        """
+        if self._seed.has_value:
+            # Use the seed value if provided
+            srand(self._seed.get)
+        var shuffled = array.clone()
+        shuffled.shuffle()
+        return shuffled
