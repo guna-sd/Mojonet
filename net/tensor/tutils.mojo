@@ -1,30 +1,14 @@
 from tensor import TensorShape, TensorSpec
 import math
 
-alias TensorStart = "Tensor("
-alias TensorEnd = ")"
+alias TensorStart = "\nTensor("
+alias TensorEnd = ")\n"
 alias SquareBracketL = "["
 alias SquareBracketR = "]"
 alias Truncation = "...,"
-alias Strdtype = ", dtype="
+alias Strdtype = ",  dtype="
 alias Strshape = ", shape="
 alias Comma = ", "
-alias Max_Elem_To_Print = 7
-alias Max_Elem_Per_Side = Max_Elem_To_Print // 2
-
-
-@always_inline
-fn _max(a: Int, b: Int) -> Int:
-  """Calculates the maximum of two integers.
-  
-  Args:
-    a: The first integer.
-    b: The second integer.
-  
-  Returns:
-    The maximum value between `a` and `b`.
-  """
-    return a if a > b else b
 
 
 @always_inline
@@ -45,7 +29,7 @@ fn _rank0(type : DType, shape : shape) -> String:
 @always_inline
 fn complete(ptr : DTypePointer, len : Int) -> String:
   """
-  Concatenates the elements of a tensor into a string, separated by commas.
+  Concatenates the elements of a tensor into a string, separated by commas and padded with spaces.
   
   Args:
     ptr: A pointer to the data of the tensor elements.
@@ -53,7 +37,7 @@ fn complete(ptr : DTypePointer, len : Int) -> String:
   
   Returns:
     A string representation of the tensor elements.
-"""
+  """
     var buf = String("")
     if len == 0:
         return buf
@@ -62,6 +46,7 @@ fn complete(ptr : DTypePointer, len : Int) -> String:
         buf += Comma
         buf += str(ptr.load(i))
     return buf
+
 
 
 @always_inline
@@ -119,27 +104,27 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
     
     var num_matrices = 1
 
-    for i in range(_max(rank -2, 0)):
+    for i in range(math.max(rank -2, 0)):
         num_matrices *= shape._shapelist[i]
     
     var matrix_idx = 0
     while matrix_idx < num_matrices:
         if matrix_idx > 0:
-            buffer+=",\n"
+            buffer+=",\n\n\t"
         buffer+=SquareBracketL
 
         var row_idx = 0
         while row_idx < row_elem_count:
             if row_idx > 0:
-                buffer+="\n"
-            
+                buffer+="\n\t "
+
             buffer += _serialize_elements(
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
             column_elem_count,)
             row_idx += 1
 
             if row_idx != row_elem_count:
-                buffer+=","
+                buffer+=", "
             
         buffer+=SquareBracketR
         matrix_idx+=1

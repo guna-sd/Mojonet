@@ -101,9 +101,7 @@ fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
             for j in range(t2.shape.rank()):
                 if t2.shape[j] == 1:
                     other_indices[j] = 0
-            var self_idx = t1.shape.offset(result_indices)
-            var other_idx = t2.shape.offset(other_indices)
-            result[start_index + index] = func(t1[self_idx], t2[other_idx])
+            result[start_index + index] = func(t1[result_indices], t2[other_indices])
         vectorize[operation, nelts, unroll_factor=4](num_elements - start_index)
     parallelize[calc](num_elements, num_cores)
 

@@ -328,18 +328,15 @@ struct Tensor[type : DType]:
             print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
             abort(external_call["exit", Int](1))
 
-        var tshape = self.shape._shapelist
-        
+        var tshape = self.shape._shapelist  
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
-        
         var ttensor = Tensor[type](tshape)
         
         for index in range(self.num_elements()):
             var _indices = self.shape.indices(index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
-            var tindex = ttensor.shape.offset(tindices)
-            ttensor[tindex] = self[index]
+            ttensor[tindices] = self[index]
         
         return ttensor
         
@@ -372,19 +369,15 @@ struct Tensor[type : DType]:
     @always_inline
     fn reshape(self: Self, other: shape) -> Self:
         """ Reshape the tensor to the new dimensions and returns the reshaped tensor."""
-        if self.shape.rank() != other.rank():
-            print("Error: Cannot reshape tensor with different ranks.")
+        if self.shape._rank != other._rank or self.shape.num_elements != other.num_elements:
+            print("Error: Cannot reshape tensor.")
             abort(external_call["exit", Int](1))
-        if self.num_elements() != other.size():
-            print("Error: Total number of elements must remain the same after reshaping.")
-            abort(external_call["exit", Int](1))
-        var data = Tensor[type](self.num_elements())
-        for idx in range(self.num_elements()):
+
+        var data = Tensor[type](other)
+        for idx in range(self.shape.num_elements):
             var old_indices = self.shape.indices(idx)
             var new_indices = other.indices(idx)
-            var old_idx = self.shape.offset(old_indices)
-            var new_idx = other.offset(new_indices)
-            data.store(new_idx, self[old_idx])
+            data[new_indices] = self[old_indices]
         return Self(data.storage, other)
 
     @always_inline
@@ -394,7 +387,7 @@ struct Tensor[type : DType]:
 
     @always_inline
     fn rank(self: Self) -> Int:
-        return self.shape.rank()
+        return self.shape._rank
 
     @always_inline
     fn _shape(self: Self) ->shape:
@@ -406,12 +399,12 @@ struct Tensor[type : DType]:
     
     @always_inline
     fn num_elements(self: Self) -> Int:
-        return self.shape.size()
+        return self.shape.num_elements
     
     fn astype[dtype : DType](self : Self) -> Tensor[dtype]:
         var casted = Tensor[dtype](self.shape)
         alias nelts = simdwidthof[dtype]()
-        var num_elements = self.num_elements()
+        var num_elements = self.shape.num_elements
 
         @parameter
         fn caster(start_index: Int):
@@ -426,7 +419,7 @@ struct Tensor[type : DType]:
 
     @always_inline   
     fn num_bytes(self: Self) -> Int:
-        return sizeof[type]() * self.shape.size()
+        return sizeof[type]() * self.shape.num_elements
     
     @always_inline  
     fn itemsize(self: Self) -> Int:
