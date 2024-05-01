@@ -22,7 +22,7 @@ fn matmuls[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
             for p in range(k):
                 sum = A[i, p].fma(B[p, j],accumulator=sum)
             result[List[Int](i, j)] = sum
-        vectorize[index, nelts](n)
+        vectorize[index, nelts, unroll_factor=4](n)
     parallelize[multiply_and_sum](m, cores)
     return result
 
@@ -85,7 +85,7 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
             @parameter
             fn process_column[nelts: Int](j : Int):
                 multiply_and_sum(batch_indices, i, j)
-            vectorize[process_column, nelts](n)
+            vectorize[process_column, nelts,unroll_factor=4](n)
         
         parallelize[process_row](m, cores)
 

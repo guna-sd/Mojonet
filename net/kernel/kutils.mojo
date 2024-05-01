@@ -8,8 +8,8 @@ import time.time as time
 
 @always_inline
 fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
-        x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts],
-](t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
+        x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
+            t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
     """
     Performs an element-wise operation on two tensors of equal shape.
 
@@ -27,23 +27,25 @@ fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     var shape = t1.shape == t2.shape
     var elm = t1.num_elements() == t2.num_elements()
     if shape!= elm: 
-        print(Error("Both inputs must be the same shape"))
+        print(Error("Tensors must be in same shape"))
+        abort(external_call["exit", Int](1))
     alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()
+    var num_cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
     var res = Tensor[dtype](t1.shape)
+
     @parameter
     fn calc(i : Int):
         @parameter
-        fn vecmath[nelts: Int](idx: Int):
-            res.store[nelts](
-                idx, func[dtype, nelts](t1.load[nelts](idx), t2.load[nelts](idx))
-            )
-        vectorize[vecmath, nelts](t1.num_elements())
+        fn operation[nelts: Int](idx: Int):
+            res[idx] = func(t1.load(idx), t2.load(idx))
+        vectorize[operation, nelts, unroll_factor=4](t1.num_elements())
     parallelize[calc](t1.num_elements(), num_cores)
+
     return res
 
 @always_inline
-fn scalar_op[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type, simd_width], y: SIMD[type, simd_width]) -> SIMD[type, simd_width]](
+fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
+        x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
     Input : Tensor[dtype], value : SIMD[dtype,1]) -> Tensor[dtype]:
     """
     This function performs a scalar operation on a tensor.
@@ -60,19 +62,52 @@ fn scalar_op[dtype : DType, func : fn[type: DType, simd_width: Int](x: SIMD[type
         Returns Tensor[dtype] output tensor.
     """
     alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()
+    var num_cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
     var Output = Tensor[dtype](Input.shape)
 
     @parameter
     fn calc(i : Int):
-
         @parameter
         fn operation[nelts : Int](j : Int):
-            Output.store(j, func[dtype,nelts](Input[j], value))
-        vectorize[operation, nelts](Input.num_elements())
+            Output[j] = func(Input[j], value)
+        vectorize[operation, nelts, unroll_factor=4](Input.num_elements())
     parallelize[calc](Input.num_elements(), num_cores)
     
     return Output
+
+fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
+        x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
+            t1 : Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
+
+    var broadcasted_shape = t1.shape.broadcast_shapes(t2.shape)
+    if broadcasted_shape.rank() == 0:
+        print(Error("Cannot add tensors with incompatible shapes"))
+        abort(external_call["exit", Int](1))
+
+    var result = Tensor[dtype](broadcasted_shape)
+    alias nelts = simdwidthof[dtype]()
+    var num_elements = result.num_elements()
+    var num_cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
+
+    @parameter
+    fn calc(start_index: Int):
+        @parameter
+        fn operation[nelts : Int](index: Int):
+            var result_indices = result.shape.indices(start_index + index)
+            var other_indices = t2.shape.indices(start_index + index)
+            for j in range(t1.shape.rank()):
+                if t1.shape[j] == 1:
+                    result_indices[j] = 0
+            for j in range(t2.shape.rank()):
+                if t2.shape[j] == 1:
+                    other_indices[j] = 0
+            var self_idx = t1.shape.offset(result_indices)
+            var other_idx = t2.shape.offset(other_indices)
+            result[start_index + index] = func(t1[self_idx], t2[other_idx])
+        vectorize[operation, nelts, unroll_factor=4](num_elements - start_index)
+    parallelize[calc](num_elements, num_cores)
+
+    return result
 
 @always_inline
 fn check_shape(a: shape, b: shape) -> Bool:
@@ -98,9 +133,6 @@ fn check_shape(a: shape, b: shape) -> Bool:
     if b.rank() == 1 and a.rank() > 1:
         return a[a.rank() - 1] == b[0]
     
-    if a.rank() < 2 or b.rank() < 2:
-        return False
-    
     if a[-1] != b[-2]:
         return False
 
@@ -119,7 +151,8 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         The resulting shape of the matrix multiplication operation.
     """
     if not check_shape(shape1, shape2):
-        abort("Error: Tensors cannot be multiplied due to incompatible shapes.")
+        print("Error: Tensors cannot be multiplied due to incompatible shapes.")
+        abort(external_call["exit", Int](1))
 
     var batch_dims = List[Int]()
     var max_batch_rank = math.max(shape1.rank() - 2, shape2.rank() - 2)
@@ -128,7 +161,8 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         var dim2 = shape2[i] if i < shape2.rank() - 2 else 1
         if dim1 != dim2 and dim1 != 1 and dim2 != 1:
             print("Error: Incompatible dimensions at index", i, ":", dim1, "vs", dim2)
-            abort("Error: Batch dimensions do not match and are not broadcastable.")
+            print("Error: Batch dimensions do not match and are not broadcastable.")
+            abort(external_call["exit", Int](1))
 
         batch_dims.append(math.max(dim1, dim2))
 

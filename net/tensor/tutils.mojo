@@ -1,7 +1,6 @@
 from tensor import TensorShape, TensorSpec
 import math
 
-
 alias TensorStart = "Tensor("
 alias TensorEnd = ")"
 alias SquareBracketL = "["
@@ -170,6 +169,7 @@ struct shape:
   """_rank: The number of dimensions in the tensor, also known as its rank."""
   var _shapelist : List[Int]
   """_shapelist: A list of integers, each representing the size of a dimension in the tensor, providing an alternative to _ptr for accessing dimension sizes."""
+  var _strides : List[Int]
 
   fn __init__(inout self : Self):
     """Initializes an empty shape."""
@@ -177,6 +177,7 @@ struct shape:
     self.num_elements = 0
     self._rank = 0
     self._shapelist = List[Int]()
+    self._strides = calculate_strides(List[Int]())
 
   fn __init__(inout self :Self, *dim : Int):
     """
@@ -193,7 +194,8 @@ struct shape:
 
     self._rank = dim.__len__()
     self.num_elements = num_elements(dim)
-  
+    self._strides = calculate_strides(self._shapelist)
+
   fn __init__(inout self :Self, dim : List[Int]):
     """
     Initializes a shape with given dimensions.
@@ -208,6 +210,7 @@ struct shape:
       self._shapelist.append(dim[i])
     self._rank = dim.__len__()
     self.num_elements = num_elements(dim)
+    self._strides = calculate_strides(self._shapelist)
   
   fn __init__[size : Int](inout self :Self, dim : StaticIntTuple[size]):
     """
@@ -224,6 +227,7 @@ struct shape:
 
     self._rank = dim.__len__()
     self.num_elements = dim.flattened_length()
+    self._strides = calculate_strides(self._shapelist)
 
   fn __init__(inout self : Self, shape : TensorShape):
     """
@@ -240,6 +244,7 @@ struct shape:
 
     self._rank = shape.rank()
     self.num_elements = shape.num_elements()
+    self._strides = calculate_strides(self._shapelist)
   
   fn __init__(inout self : Self, shape : TensorSpec):
     """
@@ -256,6 +261,7 @@ struct shape:
 
     self._rank = shape.rank()
     self.num_elements = shape.num_elements()
+    self._strides = calculate_strides(self._shapelist)
 
   fn __copyinit__(inout self: Self, old: Self):
     """Copy initializes a shape from another shape."""
@@ -263,6 +269,7 @@ struct shape:
     self._rank = old._rank
     self.num_elements = old.num_elements
     self._shapelist = old._shapelist
+    self._strides = old._strides
   
   fn __moveinit__(inout self: Self, owned existing: Self):
     """Move initializes a shape, transferring ownership from another shape."""
@@ -270,6 +277,7 @@ struct shape:
     self._rank = existing._rank
     self.num_elements = existing.num_elements
     self._shapelist = existing._shapelist
+    self._strides = existing._strides
 
   fn __getitem__(self : Self, index : Int) -> Int:
     """Retrieves the dimension size at the given index."""
@@ -288,7 +296,16 @@ struct shape:
     if self.rank() != other.rank():
       return False
     for i in range(self.rank()):
-      if self._ptr[i] != other[i]:
+      if self._shapelist[i] != other._shapelist[i]:
+        return False
+    return True
+
+  fn __eq__(self : Self, other : TensorShape) -> Bool:
+    """Checks if two shapes are equal."""
+    if self.rank() != other.rank():
+      return False
+    for i in range(self.rank()):
+      if self._shapelist[i] != other[i]:
         return False
     return True
   
@@ -315,9 +332,12 @@ struct shape:
   fn rank(self : Self) -> Int:
     """Returns the rank (number of dimensions) of the shape."""
     return self._rank
+  
+  fn strides(self : Self) -> List[Int]:
+    return calculate_strides(self._shapelist)
 
   @always_inline
-  fn broadcast_shapes(inout self, _shape: shape) -> shape:
+  fn broadcast_shapes(self, _shape: shape) -> shape:
     """
     Broadcasts two shapes to a common shape.
     
@@ -351,50 +371,70 @@ struct shape:
           else:
               var message: String = "Shapes " + self.__str__() + " and " + str(_shape) + " cannot be broadcasted."
               print(message)
+              abort(external_call["exit", Int](1))
       for i in range(diff - 1, -1, -1):
           res[i] = big_shape[i]
 
       return shape(res)
+    
+  fn transpose(self : Self, *axes : Int) -> shape:
+    """
+    Transposes the shape according to the provided axes.
+
+    Args:
+      axes: Integers representing the permutation of axes.
+    
+    Returns:
+      The transposed shape.
+    """
+    var new_dims = List[Int]()
+    var _strides = self.strides()
+    var new_strides = List[Int]()
+    for i in range(axes.__len__()):
+      new_dims.append(self._ptr[axes[i]])
+      new_strides.append(_strides[axes[i]])
+    return shape(new_dims)
   
-  fn count_elements(self : Self) -> Int:
+  fn size(self : Self) -> Int:
     """Returns the total number of elements based on the given shape."""
     return self.num_elements
   
   @always_inline
-  fn offset(self : Self, indices : List[Int]) ->Int:
-    """Calculates the flat index for a list of multi-dimensional indices.
-    
-    Args:
-      indices: The multi-dimensional indices.
-    
-    Returns:
-      The flat index corresponding to the multi-dimensional indices.
-    """
-    return flatten_index(self, indices)
+  fn offset(self : Self, indices : List[Int]) -> Int:
+    """Calculates the flat index for a variadic list of multi-dimensional indices."""
+      if indices.__len__() > self.rank():
+        print(Error("Number of indices must not exceed tensor dimension"))
+        abort(external_call["exit", Int](1))
+      var offset = 0
+      var _strides = self.strides()
+      for i in range(indices.__len__()):
+        offset += indices[i] * _strides[i]
+      return offset
 
   @always_inline
-  fn offset(self : Self, indices : VariadicList[Int]) ->Int:
-    """Calculates the flat index for a variadic list of multi-dimensional indices.
-    
-    Args:
-      indices: The multi-dimensional indices.
-    
-    Returns:
-      The flat index corresponding to the multi-dimensional indices.
-    """
-    return flatten_index(self, indices)
+  fn offset(self : Self, *indices : Int) -> Int:
+    """Calculates the flat index for a variadic list of multi-dimensional indices."""
+      if indices.__len__() > self.rank():
+        print(Error("Number of indices must not exceed tensor dimension"))
+        abort(external_call["exit", Int](1))
+      var offset = 0
+      var _strides = self.strides()
+      for i in range(indices.__len__()):
+        offset += indices[i] * _strides[i]
+      return offset
 
   @always_inline
-  fn position(self : Self, indices : List[Int]) -> Int:
-    """Calculates the flat index for a variadic list of multi-dimensional indices.
-    
-    Args:
-      indices: The multi-dimensional indices.
-    
-    Returns:
-      The flat index corresponding to the multi-dimensional indices.
-    """
-    return __get_position(indices, self.rank(), self._shapelist, self.num_elements)  
+  fn offset(self : Self, indices : VariadicList[Int]) -> Int:
+    """Calculates the flat index for a variadic list of multi-dimensional indices."""
+      if indices.__len__() > self.rank():
+        print(Error("Number of indices must not exceed tensor dimension"))
+        abort(external_call["exit", Int](1))
+      var offset = 0
+      var _strides = self.strides()
+      for i in range(indices.__len__()):
+        offset += indices[i] * _strides[i]
+      return offset
+
   
   @always_inline
   fn indices(self : Self, index : Int) -> List[Int]:
@@ -410,32 +450,18 @@ struct shape:
     return indices(self._shapelist, index)
 
 
-@always_inline
-fn __get_position(indices : List[Int], rank : Int, Shapes : List[Int], size : Int) ->Int:
-    """
-    Convert a set of multidimensional indices into a linear index based on the tensor's shape.
 
-    Args:
-        indices : (List[Int]) The multidimensional indices to convert.
-        rank : (Int) The rank (number of dimensions) of the tensor.
-        Shapes : (List[Int]) The shape of the tensor (list of dimensions).
-        size : (Int) The total number of elements in the tensor.
+fn calculate_strides(_shapelist : List[Int]) -> List[Int]:
+    var _strides = List[Int]()
+    var _temp =  _shapelist
+    var stride = 1
+    _temp.reverse()
 
-    Returns:
-        Int: The linear index corresponding to the given multidimensional indices.
-    """
-    var pos = 0
-    var dim = 1
-    
-    for i in range(rank - 1, -1, -1):
-        var index = convert_position(indices[i], Shapes[i])        
-        pos += index * dim        
-        dim *= Shapes[i]
-    if not (0 <= pos < size):
-        print(Error("Calculated position is out of bounds."))
-    
-    return pos
-
+    for size in range(_temp.__len__()):
+      _strides.append(stride)
+      stride *= _temp[size]
+    _strides.reverse()
+    return _strides
 
 @always_inline
 fn convert_position(index: Int, size: Int) -> Int:
@@ -500,7 +526,7 @@ fn flatten_index(shape: shape, indices: List[Int]) -> Int:
         flat_index += indices[i] * stride
         stride *= shape[i]
     return flat_index
-
+  
 
 @always_inline
 fn flatten_index(shape: shape, indices: VariadicList[Int]) -> Int:
@@ -521,6 +547,16 @@ fn flatten_index(shape: shape, indices: VariadicList[Int]) -> Int:
         flat_index += indices[i] * stride
         stride *= shape[i]
     return flat_index
+  
+# Helper function to calculate the broadcasted shape
+fn calculate_broadcast_shape(shape1: List[Int], shape2: List[Int]) -> List[Int]:
+  var max_dim = math.max(shape1.__len__(), shape2.__len__())
+  var broadcasted_shape: List[Int] = List[Int]()
+  for i in range(max_dim):
+    var dim1 = shape1[-(i + 1)] if i < shape1.__len__() else 1
+    var dim2 = shape2[-(i + 1)] if i < shape2.__len__() else 1
+    broadcasted_shape.append(math.max(dim1, dim2))
+  return broadcasted_shape
 
 
 @always_inline

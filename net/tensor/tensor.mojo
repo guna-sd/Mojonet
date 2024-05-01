@@ -1,8 +1,9 @@
-from .tutils import shape, Tensorprinter, _bytes
+from .tutils import shape, Tensorprinter
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
-from net.kernel import scalar_op, tensor_op, vectorize,calculate_shapes, matmul, randn
+from collections.optional import Optional, Variant
+from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn
 
 @value
 struct Tensor[type : DType]:
@@ -119,12 +120,18 @@ struct Tensor[type : DType]:
         if index < 0:
             index = self.num_elements() + index
         self.storage.store[width=nelts](index, value)
+
+    fn load(self, index : Int) -> SIMD[type,1]:
+        return self.load[1](index)
     
     fn load(self, *indices : Int) -> SIMD[type,1]:
         var pos = self.shape.offset(indices)
         return self.load[1](pos)
 
-    fn store(self: Self, indices: VariadicList[Int], val: SIMD[type, 1]):
+    fn store(self: Self, index: Int, val: SIMD[type, 1]):
+        self.store[1](index, val)
+
+    fn store(self: Self, *indices: Int, val: SIMD[type, 1]):
         var pos = self.shape.offset(indices)
         self.store(pos, val)
 
@@ -132,9 +139,8 @@ struct Tensor[type : DType]:
         var pos = self.shape.offset(indices)
         self.store(pos, val)
 
-    fn __getitem__(self, offset : Int) -> SIMD[type,1]:
-        var pos = self.shape.offset(self.shape.indices(offset))
-        return self.load[1](pos)
+    fn __getitem__(self: Self, index: Int)-> SIMD[type,1]:
+        return self.load[1](index)
     
     fn __getitem__(self, *indices : Int) -> SIMD[type,1]:
         var pos = self.shape.offset(indices)
@@ -143,38 +149,25 @@ struct Tensor[type : DType]:
     fn __getitem__(self, indices : List[Int]) -> SIMD[type,1]:
         var pos = self.shape.offset(indices)
         return self.load[1](pos)
-    
-    fn __getitem__(self: Self, indices: VariadicList[Int]) -> SIMD[type, 1]:
-        var pos = self.shape.offset(indices)
-        return self.load[1](pos)
-    
-    fn __setitem__(self, offset : Int, value : SIMD[type,1]):
-        var pos = self.shape.offset(self.shape.indices(offset))
-        self.store(pos, value)
-    
-    fn __setitem__(self: Self, indices: VariadicList[Int], val: SIMD[type, 1]):
-        var pos = self.shape.offset(indices)
-        self.store(pos, val)
+
+    fn __setitem__(self: Self, index: Int, val: SIMD[type, 1]):
+        self.store(index, val)
 
     fn __setitem__(self: Self, indices: List[Int], val: SIMD[type, 1]):
         var pos = self.shape.offset(indices)
-        self.store(pos, val)
-    
-    fn __setitem__(self: Self, *indices: Int, val: SIMD[type,1]):
-        var pos = self.shape.offset(indices)
-        self.store(pos, val)
+        self[pos] = val
     
     fn __eq__(self: Self, other: Self) -> Bool:
         var val = False
-        if self.num_elements() == other.num_elements():
+        if self.num_elements() == other.num_elements() and self.shape == other.shape:
             for i in range(self.num_elements()):
-                if self[i] == other[i]:
+                if self.storage[i] == other.storage[i]:
                     val = True
         return val
     
     fn __eq__(self : Self, other: _Tensor[type]) -> Bool:
         var val = False
-        if self.num_elements() == other.num_elements():
+        if self.num_elements() == other.num_elements() and self.shape == other.shape():
             for i in range(self.num_elements()):
                 if self[i] == other[i]:
                     val = True
@@ -195,24 +188,36 @@ struct Tensor[type : DType]:
                 if self.dtype == other.dtype:
                     return tensor_op[type,math.add](self,other)
         return self
+
+    fn __add__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.add](self,other)
             
     fn __sub__(self: Self, other: Self) -> Self:
         if self.shape._rank == other.shape._rank:
                 if self.dtype == other.dtype:
                     return tensor_op[type,math.sub](self,other)
         return self
+
+    fn __sub__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.sub](self,other)
     
     fn __mul__(self: Self, other: Self) -> Self:
         if self.shape._rank == other.shape._rank:
                 if self.dtype == other.dtype:
                     return tensor_op[type,math.mul](self,other)
         return self
+
+    fn __mul__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.mul](self,other)
     
     fn __truediv__(self: Self, other: Self) -> Self:
         if self.shape._rank == other.shape._rank:
                 if self.dtype == other.dtype:
                     return tensor_op[type,math.div](self,other)
         return self
+
+    fn __truediv__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.div](self,other)
     
     fn __pow__(self: Self, exponent: Int) -> Self:
         for i in range(self.shape.num_elements):
@@ -240,164 +245,78 @@ struct Tensor[type : DType]:
             self.storage[i] = self.storage[i] ** pow
     
     @always_inline
-    fn add(inout self : Self, x : SIMD[type,1]):
-        self = scalar_op[type,math.add](self,x)
+    fn add(self : Self, x : SIMD[type,1]) -> Self:
+        return self.__add__(x)
 
     @always_inline
-    fn add(inout self: Self, inout other: Tensor[type]) -> Self:
-
-        if self.shape == other.shape:
-            return self.__add__(other)
-
-        var broadcasted_shape = self.shape.broadcast_shapes(other.shape)
-        if broadcasted_shape.rank() == 0:
-            print(Error("Cannot add tensors with incompatible shapes"))
-            return self
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)
-            var other_indices  = other.shape.indices(idx)
-
-            for j in range(self.shape.rank()):
-                if result.shape[j] == 1:
-                    result_indices[j] = 0
-
-            for j in range(other.shape.rank()):
-                if other.shape[j] == 1:
-                    other_indices[j] = 0
-
-            var self_idx = self.shape.offset(result_indices)
-            var other_idx = other.shape.offset(other_indices)
-
-            result[idx] = self[self_idx] + other[other_idx]
-        return result
-
-    @always_inline
-    fn sub(inout self : Self, x : SIMD[type,1]):
-        self = scalar_op[type,math.sub](self,x)
-
-    @always_inline
-    fn sub(inout self: Self, inout other: Tensor[type]) -> Self:
-
-        if self.shape == other.shape:
-            return self.__sub__(other)
-
-        var broadcasted_shape = self.shape.broadcast_shapes(other.shape)
-        if broadcasted_shape.rank() == 0:
-            print(Error("Cannot add tensors with incompatible shapes"))
-            return self
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)
-            var other_indices  = other.shape.indices(idx)
-
-            for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    result_indices[j] = 0
-
-            for j in range(other.shape.rank()):
-                if other.shape[j] == 1:
-                    other_indices[j] = 0
-
-            var self_idx = self.shape.offset(result_indices)
-            var other_idx = other.shape.offset(other_indices)
-
-            result[idx] = math.sub(self[self_idx],other[other_idx])
-        return result
-
-    @always_inline
-    fn multiply(inout self : Self, x : SIMD[type,1]):
-        self = scalar_op[type,math.mul](self,x)
-
-    @always_inline
-    fn multiply(inout self: Self, other: Tensor[type]) -> Self:
-
-        if self.shape.num_elements == other.shape.num_elements:
-            return self.__mul__(other)
-
-        var broadcasted_shape = self.shape.broadcast_shapes(other.shape)
-        if broadcasted_shape.rank() == 0:
-            print(Error("Cannot add tensors with incompatible shapes"))
-            return self
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)
-            var other_indices  = other.shape.indices(idx)
-
-            for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    result_indices[j] = 0
-
-            for j in range(other.shape.rank()):
-                if other.shape[j] == 1:
-                    other_indices[j] = 0
-
-            var self_idx = self.shape.offset(result_indices)
-            var other_idx = other.shape.offset(other_indices)
-
-            result[idx] = math.mul(self[self_idx],other[other_idx])
-        return result
-
-    @always_inline
-    fn div(inout self : Self, x : SIMD[type,1]):
-        self = scalar_op[type,math.div](self,x) 
-
-    @always_inline
-    fn div(inout self: Self, inout other: Tensor[type]) -> Self:
+    fn add(self: Self, other: Tensor[type]) -> Self:
 
         if self.shape == other.shape:
             return self.__truediv__(other)
 
-        var broadcasted_shape = self.shape.broadcast_shapes(other.shape)
-        if broadcasted_shape.rank() == 0:
-            print(Error("Cannot add tensors with incompatible shapes"))
-            return self
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)
-            var other_indices  = other.shape.indices(idx)
-
-            for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    result_indices[j] = 0
-
-            for j in range(other.shape.rank()):
-                if other.shape[j] == 1:
-                    other_indices[j] = 0
-
-            var self_idx = self.shape.offset(result_indices)
-            var other_idx = other.shape.offset(other_indices)
-
-            result[idx] = math.div(self[self_idx],other[other_idx])
-        return result
+        return Broadcast_op[type,math.add](self,other)
 
     @always_inline
-    fn zeros(inout self : Self):
+    fn sub(self : Self, x : SIMD[type,1]) -> Self:
+        return self.__sub__(x)
+
+    @always_inline
+    fn sub(self: Self, other: Tensor[type]) -> Self:
+
+        if self.shape == other.shape:
+            return self.__sub__(other)
+
+        return Broadcast_op[type,math.sub](self,other)
+
+    @always_inline
+    fn multiply(self : Self, x : SIMD[type,1]) -> Self:
+        return self.__mul__(x)
+
+    @always_inline
+    fn multiply(self: Self, other: Tensor[type]) -> Self:
+
+        if self.shape == other.shape:
+            return self.__mul__(other)
+
+        return Broadcast_op[type,math.mul](self,other)
+
+    @always_inline
+    fn div(self : Self, x : SIMD[type,1]) -> Self:
+        return self.__truediv__(x)
+
+    fn div(self: Self, other: Tensor[type]) -> Self:
+        if self.shape == other.shape:
+            return self.__truediv__(other)
+
+        return Broadcast_op[type,math.div](self,other)
+
+    @always_inline
+    fn zeros(self : Self):
         memset_zero(self.storage, self.shape.num_elements)
     
     @always_inline
-    fn ones(inout self : Self):
+    fn ones(self : Self):
         for i in range(self.shape.num_elements):
             self.storage.store(i,1)
 
     @always_inline
-    fn rand(inout self):
+    fn rand(self, seed : Optional[Int] = None):
+        if seed:
+            random.seed(seed.value())
+        else:
+            random.seed()
         random.randn(self.storage, self.num_elements(),0,self.rank())
             
     @always_inline
-    fn random(inout self) -> Self:
+    fn random(self, seed : Optional[Int]) -> Self:
+        if seed:
+            random.seed(seed.value())
+        else:
+            random.seed()
         random.randn(self.storage, self.num_elements(),0,self.rank())
         return self
 
-    fn fill(inout self: Self, value: SIMD[type, 1]):
+    fn fill(self: Self, value: SIMD[type, 1]):
         """ Fill the tensor with a specified value."""
         for i in range(self.num_elements()):
             self.storage[i] = value
@@ -407,6 +326,7 @@ struct Tensor[type : DType]:
         
         if dim1 >= self.rank() or dim2 >= self.rank():
             print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
+            abort(external_call["exit", Int](1))
 
         var tshape = self.shape._shapelist
         
@@ -418,56 +338,25 @@ struct Tensor[type : DType]:
             var _indices = self.shape.indices(index)
             var tindices = _indices
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
-            var tindex = ttensor.shape.position(tindices)
+            var tindex = ttensor.shape.offset(tindices)
             ttensor[tindex] = self[index]
         
         return ttensor
         
     @always_inline
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
-        
-        if dim1 >= self.rank() or dim2 >= self.rank():
-            print(Error("dim1 and dim2 must be within the range of the tensor's rank"))
-
-        var tshape = self.shape._shapelist
-        
-        tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
-        
-        var ttensor = Tensor[type](tshape)
-        
-        for index in range(self.num_elements()):
-            var _indices = self.shape.indices(index)
-            var tindices = _indices
-            tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]            
-            var tindex = ttensor.shape.position(tindices)
-            ttensor[tindex] = self[index]
-        
+        var ttensor = self.transposed(dim1, dim2)
         self = Self(ttensor.storage, ttensor.shape)
 
     @always_inline
-    fn broadcast(inout self: Self, shapes: shape) -> Self:
+    fn broadcast(self: Self, shapes: shape) -> Self:
         """
         Broadcasts the tensor to a specified shape and returns a new tensor with the broadcasted shape.
         
         Args:
             shapes: The target shape for broadcasting.
         """
-        var broadcasted_shape = self.shape.broadcast_shapes(shapes)
-        
-        if broadcasted_shape.rank() == 0:
-            print("Cannot broadcast tensor due to incompatible shapes")
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)            
-            for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    result_indices[j] = 0
-
-            var _idx = self.shape.offset(result_indices)
-            result[idx] = self[_idx]
-        return result
+        return Broadcast_op[type, math.add](self, Tensor[type](shapes))
 
     @always_inline
     fn broadcast_to(inout self: Self, shapes: shape):
@@ -477,33 +366,18 @@ struct Tensor[type : DType]:
         Args:
             shapes: The target shape for broadcasting.
         """
-        var broadcasted_shape = self.shape.broadcast_shapes(shapes)
-        
-        if broadcasted_shape.rank() == 0:
-            print("Cannot broadcast tensor due to incompatible shapes")
-
-        var result = Tensor[type](broadcasted_shape)
-
-        for idx in range(result.num_elements()):
-            var result_indices = result.shape.indices(idx)            
-            for j in range(self.shape.rank()):
-                if self.shape[j] == 1:
-                    result_indices[j] = 0
-
-            var _idx = self.shape.offset(result_indices)
-
-            result[idx] = self[_idx]
+        var result = self.broadcast(shapes)
         self = Self(result.storage, result.shape)
 
     @always_inline
     fn reshape(self: Self, other: shape) -> Self:
-        """ Reshape the tensor to the new dimensions."""
+        """ Reshape the tensor to the new dimensions and returns the reshaped tensor."""
         if self.shape.rank() != other.rank():
             print("Error: Cannot reshape tensor with different ranks.")
-            return self
-        if self.num_elements() != other.count_elements():
+            abort(external_call["exit", Int](1))
+        if self.num_elements() != other.size():
             print("Error: Total number of elements must remain the same after reshaping.")
-            return self
+            abort(external_call["exit", Int](1))
         var data = Tensor[type](self.num_elements())
         for idx in range(self.num_elements()):
             var old_indices = self.shape.indices(idx)
@@ -512,6 +386,11 @@ struct Tensor[type : DType]:
             var new_idx = other.offset(new_indices)
             data.store(new_idx, self[old_idx])
         return Self(data.storage, other)
+
+    @always_inline
+    fn reshape_to(inout self: Self, other: shape):
+        """ Reshape the tensor to the new dimensions."""
+        self = Self(self.reshape(other).storage, other)
 
     @always_inline
     fn rank(self: Self) -> Int:
@@ -527,15 +406,31 @@ struct Tensor[type : DType]:
     
     @always_inline
     fn num_elements(self: Self) -> Int:
-        return self.shape.count_elements()
+        return self.shape.size()
+    
+    fn astype[dtype : DType](self : Self) -> Tensor[dtype]:
+        var casted = Tensor[dtype](self.shape)
+        alias nelts = simdwidthof[dtype]()
+        var num_elements = self.num_elements()
+
+        @parameter
+        fn caster(start_index: Int):
+            @parameter
+            fn cast_single_element[nelts : Int](index: Int):
+                casted.store[nelts](start_index + index, self[start_index + index].cast[dtype]())
+
+            vectorize[cast_single_element, nelts](num_elements - start_index)
+
+        parallelize[caster](num_elements, nelts)
+        return casted
 
     @always_inline   
     fn num_bytes(self: Self) -> Int:
-        return _bytes(self.num_elements(), self.dtype)
+        return sizeof[type]() * self.shape.size()
     
     @always_inline  
     fn itemsize(self: Self) -> Int:
-        return _bytes(1,self.dtype)
+        return sizeof[type]()
 
 fn tensor[dtype : DType = DType.int8](Shape : List[Int], rand : Bool = False) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
@@ -615,17 +510,23 @@ fn fill[dtype : DType = DType.int8](Shape : VariadicList[Int], rand : Bool = Tru
     tensor.ones()
     return tensor
 
-fn rand[dtype : DType = DType.int8](Shape : List[Int]) -> Tensor[dtype]:
+fn rand[dtype : DType = DType.int8](Shape : List[Int], seed : Optional[Int]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
+    if seed:
+        tensor.rand(seed)
     tensor.rand()
     return tensor
 
-fn rand[dtype : DType = DType.int8](Shape : VariadicList[Int]) -> Tensor[dtype]:
+fn rand[dtype : DType = DType.int8](Shape : VariadicList[Int], seed : Optional[Int]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
+    if seed:
+        tensor.rand(seed)
     tensor.rand()
     return tensor
 
-fn rand[dtype : DType = DType.int8](*Shape : Int) -> Tensor[dtype]:
+fn rand[dtype : DType = DType.int8](*Shape : Int, seed : Optional[Int]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
+    if seed:
+        tensor.rand(seed)
     tensor.rand()
     return tensor
