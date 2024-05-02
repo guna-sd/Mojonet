@@ -3,7 +3,7 @@ from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
 import math
 from collections.optional import Optional, Variant
-from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn
+from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn, num_physical_cores
 
 @value
 struct Tensor[type : DType]:
@@ -184,45 +184,81 @@ struct Tensor[type : DType]:
         return True
 
     fn __add__(self: Self, other: Self) -> Self:
-        if self.shape._rank == other.shape._rank:
-                if self.dtype == other.dtype:
-                    return tensor_op[type,math.add](self,other)
-        return self
+        return tensor_op[type,math.add](self,other)
 
     fn __add__(self: Self, other: SIMD[type,1]) -> Self:
         return scalar_op[type,math.add](self,other)
-            
+
+    fn __radd__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.add](self,other)
+
+    fn __iadd__(inout self: Self, other: Self):
+        self = tensor_op[type,math.add](self,other)
+ 
+    fn __iadd__(inout self: Self, other: SIMD[type,1]):
+        self = scalar_op[type,math.add](self,other)
+
     fn __sub__(self: Self, other: Self) -> Self:
-        if self.shape._rank == other.shape._rank:
-                if self.dtype == other.dtype:
-                    return tensor_op[type,math.sub](self,other)
-        return self
+        return tensor_op[type,math.sub](self,other)
 
     fn __sub__(self: Self, other: SIMD[type,1]) -> Self:
         return scalar_op[type,math.sub](self,other)
+
+    fn __rsub__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.sub](self,other)
+
+    fn __isub__(inout self: Self, other: Self):
+        self = tensor_op[type,math.sub](self,other)
+ 
+    fn __isub__(inout self: Self, other: SIMD[type,1]):
+        self = scalar_op[type,math.sub](self,other)
     
     fn __mul__(self: Self, other: Self) -> Self:
-        if self.shape._rank == other.shape._rank:
-                if self.dtype == other.dtype:
-                    return tensor_op[type,math.mul](self,other)
-        return self
+        return tensor_op[type,math.mul](self,other)
 
     fn __mul__(self: Self, other: SIMD[type,1]) -> Self:
         return scalar_op[type,math.mul](self,other)
+
+    fn __rmul__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.mul](self,other)
+
+    fn __imul__(inout self: Self, other: Self):
+        self = tensor_op[type,math.mul](self,other)
+ 
+    fn __imul__(inout self: Self, other: SIMD[type,1]):
+        self = scalar_op[type,math.mul](self,other)
     
     fn __truediv__(self: Self, other: Self) -> Self:
-        if self.shape._rank == other.shape._rank:
-                if self.dtype == other.dtype:
-                    return tensor_op[type,math.div](self,other)
-        return self
+        return tensor_op[type,math.div](self,other)
 
     fn __truediv__(self: Self, other: SIMD[type,1]) -> Self:
         return scalar_op[type,math.div](self,other)
+
+    fn __rtruediv__(self: Self, other: SIMD[type,1]) -> Self:
+        return scalar_op[type,math.div](self,other)
+
+    fn __itruediv__(inout self: Self, other: Self):
+        self = tensor_op[type,math.div](self,other)
+ 
+    fn __itruediv__(inout self: Self, other: SIMD[type,1]):
+        self = scalar_op[type,math.div](self,other)
     
     fn __pow__(self: Self, exponent: Int) -> Self:
+        """
+        Exponentiation of each element in the tensor by the given exponent.
+        """
+        var result = self
+        for i in range(result.shape.num_elements):
+            result.storage[i] = math.pow(result.storage[i], exponent)
+        return result
+
+    fn __ipow__(inout self: Self, exponent: Int):
+        """
+        In-place exponentiation of each element in the tensor by the given exponent.
+        """
         for i in range(self.shape.num_elements):
             self.storage[i] = math.pow(self.storage[i], exponent)
-        return self
+
 
     @always_inline
     fn __matmul__(self: Self, other: Self) -> Self:
@@ -289,6 +325,98 @@ struct Tensor[type : DType]:
             return self.__truediv__(other)
 
         return Broadcast_op[type,math.div](self,other)
+    
+    @always_inline
+    fn sum(self: Self) -> Scalar[type]:
+        var result = Scalar[type]()
+        alias nelts = simdwidthof[type]()
+        @parameter
+        fn _sum[nelts : Int](i : Int):
+            result += self[i]
+        vectorize[_sum,nelts](self.num_elements())
+        return result
+
+    @always_inline
+    fn max(self: Self) -> Scalar[type]:
+        """
+        Find the maximum value in the tensor.
+
+        Returns:
+            The maximum value in the tensor as a scalar value.
+        """
+        var result = Scalar[type]()
+        alias nelts = simdwidthof[type]()
+        @parameter
+        fn _max[nelts : Int](i : Int):
+            result = math.max(result, self[i])
+        vectorize[_max,nelts](self.num_elements())
+        return result
+
+    @always_inline
+    fn min(self: Self) -> Scalar[type]:
+        """
+        Find the minimum value in the tensor.
+
+        Returns:
+            The minimum value in the tensor as a scalar value.
+        """
+        var result = Scalar[type]()
+        alias nelts = simdwidthof[type]()
+        @parameter
+        fn _min[nelts : Int](i : Int):
+            result = math.min(result, self[i])
+        vectorize[_min,nelts](self.num_elements())
+        return result
+
+    @always_inline
+    fn mean(self: Self) -> Scalar[type]:
+        """
+        Compute the mean (average) value of the tensor.
+
+        Returns:
+            The mean value of the tensor as a scalar value.
+        """
+        return self.sum() / Scalar[type](self.num_elements())
+
+    @always_inline
+    fn prod(self: Self) -> Scalar[type]:
+        """
+        Compute the product of all elements in the tensor.
+
+        Returns:
+            The product of all elements in the tensor as a scalar value.
+        """
+        var result = Scalar [type]()
+        alias nelts = simdwidthof[type]()
+        @parameter
+        fn _prod[nelts : Int](i : Int):
+            result *= self[i]
+        vectorize[_prod,nelts](self.num_elements())
+        return result
+
+    @always_inline
+    fn arange(self, start: Scalar[type], end: Scalar[type], step: Scalar[type] = 1) -> Tensor[type]:
+        """
+        Returns a tensor with values from start to end with specified step size.
+
+        Args:
+            start: The start value of the sequence.
+            end: The end value of the sequence.
+            step: The step size between consecutive values. Default is 1.
+
+        Returns:
+            A tensor containing the values from start to end with the specified step size.
+        """
+        var result = Tensor[type](self.shape)
+        var value = start
+        for i in range(self.num_elements()):
+            result[i] = value
+            value += step
+        return result
+    
+    @always_inline
+    fn arange(inout self):
+        self = self.arange(0,self.num_elements())
 
     @always_inline
     fn zeros(self : Self):
@@ -316,10 +444,37 @@ struct Tensor[type : DType]:
         random.randn(self.storage, self.num_elements(),0,self.rank())
         return self
 
-    fn fill(self: Self, value: SIMD[type, 1]):
-        """ Fill the tensor with a specified value."""
-        for i in range(self.num_elements()):
-            self.storage[i] = value
+    fn fill(self: Self, value: Scalar[type]) -> Self:
+        """Fill the tensor with a specified value."""
+        var result = self
+        var num_elements = self.shape.num_elements
+        alias nelts = simdwidthof[type]()
+
+        @parameter
+        fn filler(start_index: Int):
+            @parameter
+            fn _set[nelts : Int](index: Int):
+                result.store[nelts](start_index + index, value)
+
+            vectorize[_set, nelts](num_elements - start_index)
+
+        parallelize[filler](num_elements, nelts)
+        return result
+
+    fn ifill(self: Self, value: Scalar[type]):
+        """Fill the tensor with a specified value."""
+        var num_elements = self.shape.num_elements
+        alias nelts = simdwidthof[type]()
+
+        @parameter
+        fn filler(start_index: Int):
+            @parameter
+            fn _set[nelts : Int](index: Int):
+                self.store[nelts](start_index + index, value)
+
+            vectorize[_set, nelts](num_elements - start_index)
+
+        parallelize[filler](num_elements, nelts)
 
     @always_inline
     fn transposed(self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
@@ -369,7 +524,7 @@ struct Tensor[type : DType]:
     @always_inline
     fn reshape(self: Self, other: shape) -> Self:
         """ Reshape the tensor to the new dimensions and returns the reshaped tensor."""
-        if self.shape._rank != other._rank or self.shape.num_elements != other.num_elements:
+        if self.shape.num_elements != other.num_elements:
             print("Error: Cannot reshape tensor.")
             abort(external_call["exit", Int](1))
 
@@ -381,9 +536,33 @@ struct Tensor[type : DType]:
         return Self(data.storage, other)
 
     @always_inline
+    fn reshape(self: Self, *new: Int) -> Self:
+        """
+        Reshape the tensor to the specified new shape.
+        
+        Args:
+            new: The new shape dimensions as variadic integers.
+
+        Returns:
+            A new tensor reshaped to the new dimensions specified.
+        """   
+        return self.reshape(shape(new))
+
+    @always_inline
     fn reshape_to(inout self: Self, other: shape):
         """ Reshape the tensor to the new dimensions."""
         self = Self(self.reshape(other).storage, other)
+
+    @always_inline
+    fn flatten(self: Self) -> Self:
+        """
+        Flatten the tensor into a 1D array.
+        
+        Returns:
+            A new tensor with all elements in a single dimension.
+        """
+        var new_shape = shape(self.shape.num_elements)
+        return self.reshape(new_shape)
 
     @always_inline
     fn rank(self: Self) -> Int:

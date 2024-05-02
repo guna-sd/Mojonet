@@ -10,6 +10,12 @@ alias Strdtype = ",  dtype="
 alias Strshape = ", shape="
 alias Comma = ", "
 
+@always_inline
+fn max_width[type : DType](ptr : DTypePointer, shapes : shape) -> Int:
+  var _max : Scalar[type] = 0
+  for i in range(shapes.num_elements):
+    _max = math.max(_max,int(ptr[i]))
+  return str(_max).__len__()
 
 @always_inline
 fn _rank0(type : DType, shape : shape) -> String:
@@ -27,13 +33,14 @@ fn _rank0(type : DType, shape : shape) -> String:
 
 
 @always_inline
-fn complete(ptr : DTypePointer, len : Int) -> String:
+fn complete(ptr : DTypePointer, len : Int, max_width : Int) -> String:
   """
   Concatenates the elements of a tensor into a string, separated by commas and padded with spaces.
   
   Args:
     ptr: A pointer to the data of the tensor elements.
     len: The number of elements to include in the string.
+    max_width: The maximum width of the string.
   
   Returns:
     A string representation of the tensor elements.
@@ -44,19 +51,19 @@ fn complete(ptr : DTypePointer, len : Int) -> String:
     buf += ptr.load()
     for i in range(1, len):
         buf += Comma
+        #buf+= String(" ") * max_width
         buf += str(ptr.load(i))
     return buf
 
-
-
 @always_inline
-fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
+fn _serialize_elements(ptr: DTypePointer, len: Int, max_width : Int) -> String:
   """
   Serializes the elements of a tensor into a string representation, including square brackets.
   
   Args:
     ptr: A pointer to the data type of the tensor elements.
     len: The number of elements to serialize.
+    max_width: The maximum width of the string.
   
   Returns:
     A string representation of the tensor elements, enclosed in square brackets.
@@ -66,7 +73,7 @@ fn _serialize_elements(ptr: DTypePointer, len: Int) -> String:
     if len == 0:
         return String("")
     buf += SquareBracketL
-    buf += complete(ptr, len)
+    buf += complete(ptr, len, max_width)
     buf += SquareBracketR
     return buf
 
@@ -98,6 +105,7 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
     var row_elem_count = 1 if rank < 2 else shape._shapelist[-2]
     
     var matrix_elem_count = column_elem_count * row_elem_count
+    var max_width = max_width[type](ptr, shape)
     
     for i in range(2,rank):
         buffer+=SquareBracketL
@@ -120,7 +128,7 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
 
             buffer += _serialize_elements(
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count,)
+            column_elem_count,max_width,)
             row_idx += 1
 
             if row_idx != row_elem_count:
@@ -356,7 +364,7 @@ struct shape:
           else:
               var message: String = "Shapes " + self.__str__() + " and " + str(_shape) + " cannot be broadcasted."
               print(message)
-              abort(external_call["exit", Int](1))
+              return shape()
       for i in range(diff - 1, -1, -1):
           res[i] = big_shape[i]
 
@@ -579,17 +587,19 @@ fn num_elements(shape : List[Int]) -> Int:
 
 
 @always_inline
-fn _bytes(num_elements : Int, type : DType) -> Int:
+fn _bytes[type : DType](num_elements : Int) -> Int:
   """
   Calculates the total number of bytes required to store the elements of an Tensor.
 
+  Parameters:
+      type : DType of the elements.
+
   Args:
       num_elements: The number of elements in the Tensor.
-      type : DType of the elements.
-  
+
   Returns:
       The total number of bytes required to store the elements as an integer.
   """
-  var bytes = type.sizeof()
+  var bytes = sizeof[type]()
 
   return (bytes * num_elements)

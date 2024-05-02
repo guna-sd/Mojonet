@@ -56,7 +56,7 @@ fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
 
     Args:
         Input  : Tensor[dtype] The input tensor.
-        value  : SIMD[dtype,1] The scalar value.
+        value  : Scalar[dtype] The scalar value.
 
     Returns:
         Returns Tensor[dtype] output tensor.
@@ -81,7 +81,7 @@ fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
 
     var broadcasted_shape = t1.shape.broadcast_shapes(t2.shape)
     if broadcasted_shape.rank() == 0:
-        print(Error("Cannot add tensors with incompatible shapes"))
+        print(Error("Cannot Broadcast tensor with incompatible shapes"))
         abort(external_call["exit", Int](1))
 
     var result = Tensor[dtype](broadcasted_shape)
