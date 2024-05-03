@@ -22,74 +22,99 @@ struct Tensor[type : DType]:
     """
     The storage is a pointer to a block of memory that holds the elements of the tensor.
     """
+    var grad : Optional[Tensor[type]]
 
     fn __init__(inout self):
         self.storage = DTypePointer[type]().alloc(0)
         self.shape = shape()
         self.dtype = type
+        self.grad = None
 
     fn __init__(inout self, *shapes : Int):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
     
     fn __init__(inout self, data : DTypePointer[type], shape : shape):
         self.storage = data
         self.dtype = type
         self.shape = shape
+        self.grad = None
 
     fn __init__(inout self, shapes : VariadicList[Int]):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
     
     fn __init__(inout self, shapes : List[Int]):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
     
     fn __init__[size : Int](inout self, shapes : StaticIntTuple[size]):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
 
     fn __init__(inout self : Self, shapes : shape):
         self.shape = shapes
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
 
     fn __init__(inout self : Self, shapes : TensorShape):
         self.shape = shape(shapes)
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
 
     fn __init__(inout self : Self, shapes : TensorSpec):
         self.shape = shape(shapes)
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
+        self.grad = None
     
     fn __init__(inout self : Self, data : _Tensor[type]):
         self.shape = shape(data.shape())
         self.storage = data._ptr
         self.dtype = type
+        self.grad = None
 
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memcpy(self.storage, other.storage, self.shape.num_elements)
         self.dtype = other.dtype
+        self.grad = other.grad
     
     fn __moveinit__(inout self: Self, owned existing: Self):
         self.shape = existing.shape
         self.storage = existing.storage
         self.dtype = existing.dtype
+        self.grad = existing.grad
+
+    fn set_grad(inout self: Self, grad: Tensor[type]):
+        self.grad = grad
+
+    fn zero_grad(inout self: Self):
+        self.grad.value().zeros()
+
+    fn accumulate_grad(inout self: Self, grad: Tensor[type]):
+        if self.grad:
+            self.grad = self.grad.value() + grad
+        else:
+            self.grad = grad
 
     fn load[nelts : Int](self, owned index: Int) -> SIMD[type,nelts]:
         """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor storage at the specified index.
