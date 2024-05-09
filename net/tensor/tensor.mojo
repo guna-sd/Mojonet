@@ -6,7 +6,7 @@ from collections.optional import Optional, Variant
 from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn, num_physical_cores
 
 @value
-struct Tensor[type : DType]:
+struct Tensor[type : DType = DType.float32]:
     """
     A tensor is a multi-dimensional array of elements.
     """
@@ -23,73 +23,99 @@ struct Tensor[type : DType]:
     The storage is a pointer to a block of memory that holds the elements of the tensor.
     """
     var grad : Optional[Tensor[type]]
+    """
+    The grad is an optional tensor that holds the gradients of the tensor with respect to a loss function.
+    """
+    var requires_grad : Bool
+    """
+    Indicates whether the tensor requires gradients.
+    """
+    # var grad_fn : Optional[Node, None]
 
     fn __init__(inout self):
         self.storage = DTypePointer[type]().alloc(0)
         self.shape = shape()
         self.dtype = type
+        self.requires_grad = False
         self.grad = None
 
-    fn __init__(inout self, *shapes : Int):
+    fn __init__(inout self, *shapes : Int, requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.shape = shape(shapes)
         self.dtype = type
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad        
     
-    fn __init__(inout self, data : DTypePointer[type], shape : shape):
+    fn __init__(inout self, shape : shape, data : DTypePointer[type], requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.storage = data
         self.dtype = type
         self.shape = shape
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad
 
-    fn __init__(inout self, shapes : VariadicList[Int]):
-        self.shape = shape(shapes)
+    fn __init__(inout self, shape : shape, data : DTypePointer[type], value : Int, requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
+        self.storage = data
         self.dtype = type
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
-    
-    fn __init__(inout self, shapes : List[Int]):
-        self.shape = shape(shapes)
-        self.dtype = type
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
-    
-    fn __init__[size : Int](inout self, shapes : StaticIntTuple[size]):
-        self.shape = shape(shapes)
-        self.dtype = type
-        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
-        memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
+        self.shape = shape
+        self.grad = grad
+        self.requires_grad = requires_grad
+        self = self.fill(value)
 
-    fn __init__(inout self : Self, shapes : shape):
+    fn __init__(inout self, shapes : VariadicList[Int], requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
+        self.shape = shape(shapes)
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        memset_zero(self.storage, self.shape.num_elements)
+        self.grad = grad
+        self.requires_grad = requires_grad
+    
+    fn __init__(inout self, shapes : List[Int], requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
+        self.shape = shape(shapes)
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        memset_zero(self.storage, self.shape.num_elements)
+        self.grad = grad
+        self.requires_grad = requires_grad
+    
+    fn __init__[size : Int](inout self, shapes : StaticIntTuple[size], requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
+        self.shape = shape(shapes)
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        memset_zero(self.storage, self.shape.num_elements)
+        self.grad = grad
+        self.requires_grad = requires_grad
+
+    fn __init__(inout self : Self, shapes : shape, requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.shape = shapes
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad
 
-    fn __init__(inout self : Self, shapes : TensorShape):
+    fn __init__(inout self : Self, shapes : TensorShape, requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.shape = shape(shapes)
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad
 
-    fn __init__(inout self : Self, shapes : TensorSpec):
+    fn __init__(inout self : Self, shapes : TensorSpec, requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.shape = shape(shapes)
         self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
         memset_zero(self.storage, self.shape.num_elements)
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad
     
-    fn __init__(inout self : Self, data : _Tensor[type]):
+    fn __init__(inout self : Self, data : _Tensor[type], requires_grad : Bool = False, grad : Optional[Tensor[type]] = None):
         self.shape = shape(data.shape())
         self.storage = data._ptr
         self.dtype = type
-        self.grad = None
+        self.grad = grad
+        self.requires_grad = requires_grad
 
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
@@ -97,24 +123,17 @@ struct Tensor[type : DType]:
         memcpy(self.storage, other.storage, self.shape.num_elements)
         self.dtype = other.dtype
         self.grad = other.grad
+        self.requires_grad = other.requires_grad
     
     fn __moveinit__(inout self: Self, owned existing: Self):
         self.shape = existing.shape
         self.storage = existing.storage
         self.dtype = existing.dtype
         self.grad = existing.grad
+        self.requires_grad = existing.requires_grad
 
     fn set_grad(inout self: Self, grad: Tensor[type]):
         self.grad = grad
-
-    fn zero_grad(inout self: Self):
-        self.grad.value().zeros()
-
-    fn accumulate_grad(inout self: Self, grad: Tensor[type]):
-        if self.grad:
-            self.grad = self.grad.value() + grad
-        else:
-            self.grad = grad
 
     fn load[nelts : Int](self, owned index: Int) -> SIMD[type,nelts]:
         """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor storage at the specified index.
@@ -523,7 +542,7 @@ struct Tensor[type : DType]:
     @always_inline
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
         var ttensor = self.transposed(dim1, dim2)
-        self = Self(ttensor.storage, ttensor.shape)
+        self = Self(ttensor.shape, ttensor.storage)
 
     @always_inline
     fn broadcast(self: Self, shapes: shape) -> Self:
@@ -544,7 +563,7 @@ struct Tensor[type : DType]:
             shapes: The target shape for broadcasting.
         """
         var result = self.broadcast(shapes)
-        self = Self(result.storage, result.shape)
+        self = Self(result.shape, result.storage)
 
     @always_inline
     fn reshape(self: Self, other: shape) -> Self:
@@ -558,7 +577,7 @@ struct Tensor[type : DType]:
             var old_indices = self.shape.indices(idx)
             var new_indices = other.indices(idx)
             data[new_indices] = self[old_indices]
-        return Self(data.storage, other)
+        return Self(other, data.storage)
 
     @always_inline
     fn reshape(self: Self, *new: Int) -> Self:
@@ -576,7 +595,7 @@ struct Tensor[type : DType]:
     @always_inline
     fn reshape_to(inout self: Self, other: shape):
         """ Reshape the tensor to the new dimensions."""
-        self = Self(self.reshape(other).storage, other)
+        self = Self(other, self.reshape(other).storage)
 
     @always_inline
     fn flatten(self: Self) -> Self:
