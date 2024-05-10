@@ -474,7 +474,7 @@ struct Tensor[type : DType = DType.float32]:
     @always_inline
     fn rand(self, seed : Optional[Int] = None):
         if seed:
-            random.seed(seed.value())
+            random.seed(seed.value()[])
         else:
             random.seed()
         random.randn(self.storage, self.num_elements(),0,self.rank())
@@ -482,7 +482,7 @@ struct Tensor[type : DType = DType.float32]:
     @always_inline
     fn random(self, seed : Optional[Int]) -> Self:
         if seed:
-            random.seed(seed.value())
+            random.seed(seed.value()[])
         else:
             random.seed()
         random.randn(self.storage, self.num_elements(),0,self.rank())

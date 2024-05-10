@@ -17,7 +17,7 @@ fn mkdir( path: String, exists_ok : Bool) -> Bool:
     Create a directory at the given path.
     """
     if not exists(path):
-        if external_call["mkdir", Int, AnyPointer[Int8]](path._buffer.data) == 0:
+        if external_call["mkdir", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
             return True
         return False
     else:
@@ -37,7 +37,7 @@ fn rmdir(path : String) -> Bool:
     Remove a directory from the given path.
     """
     if exists(path):
-        if external_call["rmdir", Int, AnyPointer[Int8]](path._buffer.data) == 0:
+        if external_call["rmdir", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
             return True
         else:
             print("Directory is not empty")
@@ -51,7 +51,7 @@ fn remove(path : String) -> Bool:
     Remove a file from the given path.
     """
     if exists(path):
-        if external_call["rm", Int, AnyPointer[Int8]](path._buffer.data) == 0:
+        if external_call["rm", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
             return True
         else:
             print("Error: Cannot remove file " + path)
@@ -118,7 +118,3 @@ struct File:
 
     fn __enter__(owned self) -> Self:
         return self ^
-
-fn main():
-    with File("/home/guna/test.sh","w") as f:
-        f.write("jenvbo")
