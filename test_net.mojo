@@ -1,12 +1,13 @@
 from net.tensor import Tensor, shape
-import net as torch
-from net.nn.activation import Fuctional as F
 import math
-from net.kernel import matmul_submatrix, calculate_shapes, accumulate, matmul
+from net.kernel import calculate_shapes, matmul
 from testing import assert_equal
 from tensor import Tensor as _Tensor
 from net.kernel import randn
+from net.checkpoint import File
 import time
+import os
+
 fn main() raises:
     # var tensor1 = Tensor[DType.int16](2,4)
     # var nshape = shape(List[Int](1,4))
@@ -20,7 +21,10 @@ fn main() raises:
     # print(randnum)
     # print(simdwidthof[DType.int8]())
     # print(sizeof[DType.int8]())
-    test_div()
+    var testa = Tensor(512,1024).random()
+    var testb = Tensor(1024, 1024).random()
+    var f = File("/home/guna/test.", "r")
+    f.write(testa)
     # var a = Tensor[DType.bfloat16](4,5,4)
     # a.rand()
     # print(a)

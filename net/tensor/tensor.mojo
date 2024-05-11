@@ -442,7 +442,7 @@ struct Tensor[type : DType = DType.float32]:
         random.randn(self.storage, self.num_elements(),0,self.rank())
             
     @always_inline
-    fn random(self, seed : Optional[Int]) -> Self:
+    fn random(self, seed : Optional[Int] = None) -> Self:
         if seed:
             random.seed(seed.value()[])
         else:

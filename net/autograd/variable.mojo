@@ -1,6 +1,5 @@
 from utils.variant import Variant
 from collections import Optional
-from _mlir import Context
 
 trait operation:
     fn forward(self):
