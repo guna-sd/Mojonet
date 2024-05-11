@@ -105,6 +105,3 @@ struct File:
 
 fn fopen(path : String, mode : String) -> File:
     return File(path, mode)
-
-fn fopen(path : Path, mode : String) -> File:
-    return File(path, mode)
