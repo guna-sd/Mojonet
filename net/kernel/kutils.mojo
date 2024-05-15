@@ -174,6 +174,50 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
 
     return shape(batch_dims)
 
+
+@always_inline
+fn compute_matrix_block[dtype : DType,](
+    result: DTypePointer[dtype],
+    matrix1: DTypePointer[dtype],
+    matrix2: DTypePointer[dtype],
+    MatrixHeight: Int,
+    MatrixWidth: Int,
+    MatrixDepth: Int,
+    BlockHeight: Int, BlockWidth: Int,
+    block_row_index: Int,
+    block_column_index: Int,
+):
+    # Compute tile
+    alias nelts = simdwidthof[dtype]()
+    var accumulator = DTypePointer[dtype](BlockHeight * BlockWidth)
+    memset_zero[dtype](accumulator, BlockHeight * BlockWidth)
+
+    for depth_index in range(MatrixDepth):
+        @unroll
+        for block_row in range(BlockHeight):
+            @parameter
+            fn process_block_column[nelts: Int](block_column: Int):
+                accumulator.store[width=nelts](
+                    block_row * BlockWidth + block_column,
+                    SIMD[dtype, nelts].splat(matrix1[(block_row_index + block_row) * MatrixDepth + depth_index])
+                    .fma(
+                        matrix2.load[width=nelts](depth_index * MatrixWidth + (block_column_index + block_column)),
+                        accumulator.load[width=nelts](block_row * BlockWidth + block_column),),)
+            vectorize[process_block_column, nelts](BlockWidth)
+
+    # Store tile
+    for block_row in range(BlockHeight):
+
+        @parameter
+        fn store_block_column[nelts: Int](block_column: Int):
+            result.store[width=nelts](
+                (block_row_index + block_row) * MatrixWidth + (block_column_index + block_column),
+                accumulator.load[width=nelts](block_row * BlockWidth + block_column)
+            )
+
+        vectorize[store_block_column, nelts](BlockWidth)
+
+
 struct randn:
     alias Int8MAX = Int8.MAX
     alias Int16MAX = Int16.MAX

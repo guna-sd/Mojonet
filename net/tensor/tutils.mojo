@@ -428,7 +428,7 @@ struct shape:
         offset += indices[i] * _strides[i]
       return offset
 
-  
+
   @always_inline
   fn indices(self : Self, index : Int) -> List[Int]:
     """
@@ -455,6 +455,10 @@ fn calculate_strides(_shapelist : List[Int]) -> List[Int]:
       stride *= _temp[size]
     _strides.reverse()
     return _strides
+
+fn Index(*Shapes : Int) -> StaticIntTuple[8]:
+  """Index Function which returns a StaticIntTuple of size 8."""
+  return StaticIntTuple[8](Shapes)
 
 @always_inline
 fn convert_position(index: Int, size: Int) -> Int:

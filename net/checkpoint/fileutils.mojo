@@ -1,14 +1,5 @@
 from os.path import exists
-from pathlib import Path
 
-
-
-alias RDONLY = 0
-alias WRONLY = 1
-alias RDWR = 2
-alias APPEND = 8
-alias CREAT = 512
-alias SYNC = 8192
 alias SEEK_SET = 0
 alias SEEK_END = 2
 

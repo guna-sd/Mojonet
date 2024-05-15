@@ -1,12 +1,13 @@
 from .tutils import shape, Tensorprinter
 from tensor import Tensor as _Tensor
 from tensor import TensorShape, TensorSpec
+from net.checkpoint import fopen
 import math
 from collections.optional import Optional, Variant
-from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn, num_physical_cores
+from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn, num_physical_cores, compute_matrix_block
 
 @value
-struct Tensor[type : DType = DType.float32]:
+struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, EqualityComparable, Stringable):
     """
     A tensor is a multi-dimensional array of elements.
     """
@@ -24,7 +25,7 @@ struct Tensor[type : DType = DType.float32]:
     """
 
     fn __init__(inout self):
-        self.storage = DTypePointer[type]().alloc(0)
+        self.storage = stack_allocation[0,type]()
         self.shape = shape()
         self.dtype = type
 
@@ -35,14 +36,46 @@ struct Tensor[type : DType = DType.float32]:
         memset_zero(self.storage, self.shape.num_elements)      
     
     fn __init__(inout self, shape : shape, data : DTypePointer[type],):
-        self.storage = data
-        self.dtype = type
         self.shape = shape
+        self.storage = DTypePointer[type](self.shape.num_elements)
+        self.dtype = type
+        memcpy(self.storage, data, self.shape.num_elements)
+
+    fn __init__(inout self, *shapes : Int, data : DTypePointer[type],):
+        self.shape = shape(shapes)
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        self.dtype = type
+        memcpy(self.storage, data, self.shape.num_elements)
+    
+    fn __init__(inout self, shape : shape, data : List[Scalar[type]],):
+        self.shape = shape
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        if self.shape.num_elements == data.__len__():
+            for i in range(self.shape.num_elements):
+                self.storage[i] = data[i]
+
+    fn __init__(inout self, shape : shape, *data : Scalar[type],):
+        self.shape = shape
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        if self.shape.num_elements == data.__len__():
+            for i in range(self.shape.num_elements):
+                self.storage[i] = data[i]
+
+    fn __init__(inout self, shapes : List[Int], *data : Scalar[type],):
+        self.shape = shape(shapes)
+        self.dtype = type
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        if self.shape.num_elements == data.__len__():
+            for i in range(self.shape.num_elements):
+                self.storage[i] = data[i]
 
     fn __init__(inout self, shape : shape, data : DTypePointer[type], value : Int,):
-        self.storage = data
-        self.dtype = type
         self.shape = shape
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
+        self.dtype = type
+        memcpy(self.storage, data, self.shape.num_elements)
         self = self.fill(value)
 
     fn __init__(inout self, shapes : VariadicList[Int],):
@@ -83,8 +116,9 @@ struct Tensor[type : DType = DType.float32]:
     
     fn __init__(inout self : Self, data : _Tensor[type],):
         self.shape = shape(data.shape())
-        self.storage = data._ptr
+        self.storage = DTypePointer[type]().alloc(self.shape.num_elements)
         self.dtype = type
+        memcpy(self.storage, data._ptr, self.shape.num_elements)
 
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
@@ -338,7 +372,7 @@ struct Tensor[type : DType = DType.float32]:
         alias nelts = simdwidthof[type]()
         @parameter
         fn _sum[nelts : Int](i : Int):
-            result += self[i]
+            result += self[i].reduce_add()
         vectorize[_sum,nelts](self.num_elements())
         return result
 
@@ -392,12 +426,18 @@ struct Tensor[type : DType = DType.float32]:
         Returns:
             The product of all elements in the tensor as a scalar value.
         """
-        var result = Scalar [type]()
+        var result = Scalar[type](1)
         alias nelts = simdwidthof[type]()
         @parameter
         fn _prod[nelts : Int](i : Int):
-            result *= self[i]
+            result *= self[i].reduce_mul()
         vectorize[_prod,nelts](self.num_elements())
+        return result
+    
+    fn list(self) -> List[Scalar[type]]:
+        var result = List[Scalar[type]]()
+        for i in range(self.num_elements()):
+            result.append(self.storage[i])
         return result
 
     @always_inline
@@ -439,8 +479,7 @@ struct Tensor[type : DType = DType.float32]:
             random.seed(seed.value()[])
         else:
             random.seed()
-        random.randn(self.storage, self.num_elements(),0,self.rank())
-            
+        random.randn(self.storage, self.num_elements(),self.shape.rank(),self.shape.size())
     @always_inline
     fn random(self, seed : Optional[Int] = None) -> Self:
         if seed:
@@ -452,7 +491,7 @@ struct Tensor[type : DType = DType.float32]:
 
     fn fill(self: Self, value: Scalar[type]) -> Self:
         """Fill the tensor with a specified value."""
-        var result = self
+        var result = DTypePointer[type]().alloc(self.num_elements())
         var num_elements = self.shape.num_elements
         alias nelts = simdwidthof[type]()
 
@@ -460,27 +499,16 @@ struct Tensor[type : DType = DType.float32]:
         fn filler(start_index: Int):
             @parameter
             fn _set[nelts : Int](index: Int):
-                result.store[nelts](start_index + index, value)
+                self.store[nelts](start_index + index, self.load[nelts](start_index + index).splat(value))
 
             vectorize[_set, nelts](num_elements - start_index)
 
         parallelize[filler](num_elements, nelts)
-        return result
+        return Self(self.shape, result)
 
-    fn ifill(self: Self, value: Scalar[type]):
+    fn ifill(inout self: Self, value: Scalar[type]):
         """Fill the tensor with a specified value."""
-        var num_elements = self.shape.num_elements
-        alias nelts = simdwidthof[type]()
-
-        @parameter
-        fn filler(start_index: Int):
-            @parameter
-            fn _set[nelts : Int](index: Int):
-                self.store[nelts](start_index + index, value)
-
-            vectorize[_set, nelts](num_elements - start_index)
-
-        parallelize[filler](num_elements, nelts)
+        self = self.fill(value)
 
     @always_inline
     fn transposed(self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
@@ -609,8 +637,19 @@ struct Tensor[type : DType = DType.float32]:
     @always_inline  
     fn itemsize(self: Self) -> Int:
         return sizeof[type]()
+    
+    fn save(self: Self, path : String)raises:
+        with fopen(path, 'wb') as f:
+            f.write("mnetbfile\n".__str__())
+            f.write("!s!")
+            f.write(__type_of(self.shape._shapelist).__str__(self.shape._shapelist))
+            f.write("\n")
+            f.write("!T!")
+            f.write(__type_of(self.list()).__str__(self.list()))
+            f.write("\n")
 
-fn tensor[dtype : DType = DType.int8](Shape : List[Int], rand : Bool = False) -> Tensor[dtype]:
+
+fn tensor[dtype : DType = DType.float32](Shape : List[Int], rand : Bool = False) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     if rand:
         tensor.rand()
@@ -618,7 +657,7 @@ fn tensor[dtype : DType = DType.int8](Shape : List[Int], rand : Bool = False) ->
     tensor.zeros()
     return tensor
 
-fn tensor[dtype : DType = DType.int8](*Shape : Int, rand : Bool = False) -> Tensor[dtype]:
+fn tensor[dtype : DType = DType.float32](*Shape : Int, rand : Bool = False) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     if rand:
         tensor.rand()
@@ -626,83 +665,64 @@ fn tensor[dtype : DType = DType.int8](*Shape : Int, rand : Bool = False) -> Tens
     tensor.zeros()
     return tensor
 
-fn tensor[dtype : DType = DType.int8](Shape : VariadicList[Int], rand : Bool = False) -> Tensor[dtype]:
+fn ones[dtype : DType = DType.float32](Shape : List[Int],) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    if rand:
-        tensor.rand()
-        return tensor
-    tensor.zeros()
+    fill[dtype](tensor,Scalar[dtype](1))
     return tensor
 
-fn ones[dtype : DType = DType.int8](Shape : VariadicList[Int],) -> Tensor[dtype]:
+fn ones[dtype : DType = DType.float32](*Shape : Int,) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    tensor.ones()
+    fill[dtype](tensor,Scalar[dtype](1))
     return tensor
 
-fn ones[dtype : DType = DType.int8](Shape : List[Int],) -> Tensor[dtype]:
+fn zeros[dtype : DType = DType.float32](Shape : List[Int],) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    tensor.ones()
+    fill[dtype](tensor,Scalar[dtype](0))
     return tensor
 
-fn ones[dtype : DType = DType.int8](*Shape : Int,) -> Tensor[dtype]:
+fn zeros[dtype : DType = DType.float32](*Shape : Int,) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    tensor.ones()
+    fill[dtype](tensor,Scalar[dtype](0))
     return tensor
 
-fn zeros[dtype : DType = DType.int8](Shape : VariadicList[Int],) -> Tensor[dtype]:
+@always_inline
+fn fill[dtype : DType = DType.float32](shape : shape, val: Scalar[dtype]) -> Tensor[dtype]:
+    var result = Tensor[dtype](shape)
+    alias nelts = simdwidthof[dtype]()
+    @parameter
+    fn fill_vec[nelts: Int](idx: Int):
+        result.store[nelts](idx, result.load[nelts](idx).splat(val))
+
+    vectorize[fill_vec, nelts](result.num_elements())
+    return result
+
+@always_inline
+fn fill[dtype : DType = DType.float32](inout x: Tensor[dtype], val: Scalar[dtype]):
+    alias nelts = simdwidthof[dtype]()
+    @parameter
+    fn fill_vec[nelts: Int](idx: Int):
+        x.store[nelts](idx, x.load[nelts](idx).splat(val))
+
+    vectorize[fill_vec, nelts](x.num_elements())
+
+fn fill[dtype : DType = DType.float32](*Shape : Int, val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    tensor.zeros()
+    fill[dtype](tensor,Scalar[dtype](val))
     return tensor
 
-fn zeros[dtype : DType = DType.int8](Shape : List[Int],) -> Tensor[dtype]:
+fn fill[dtype : DType = DType.float32](Shape : List[Int], val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    tensor.zeros()
+    fill[dtype](tensor,Scalar[dtype](val))
     return tensor
 
-fn zeros[dtype : DType = DType.int8](*Shape : Int,) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    tensor.zeros()
-    return tensor
-
-fn fill[dtype : DType = DType.int8](*Shape : Int, rand : Bool = True) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if rand:
-        tensor.rand()
-        return tensor
-    tensor.ones()
-    return tensor
-
-fn fill[dtype : DType = DType.int8](Shape : List[Int], rand : Bool = True) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if rand:
-        tensor.rand()
-        return tensor
-    tensor.ones()
-    return tensor
-
-fn fill[dtype : DType = DType.int8](Shape : VariadicList[Int], rand : Bool = True) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if rand:
-        tensor.rand()
-        return tensor
-    tensor.ones()
-    return tensor
-
-fn rand[dtype : DType = DType.int8](Shape : List[Int], seed : Optional[Int]) -> Tensor[dtype]:
+fn rand[dtype : DType = DType.float32](Shape : List[Int], seed : Optional[Int]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     if seed:
         tensor.rand(seed)
     tensor.rand()
     return tensor
 
-fn rand[dtype : DType = DType.int8](Shape : VariadicList[Int], seed : Optional[Int]) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if seed:
-        tensor.rand(seed)
-    tensor.rand()
-    return tensor
-
-fn rand[dtype : DType = DType.int8](*Shape : Int, seed : Optional[Int]) -> Tensor[dtype]:
+fn rand[dtype : DType = DType.float32](*Shape : Int, seed : Optional[Int]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     if seed:
         tensor.rand(seed)

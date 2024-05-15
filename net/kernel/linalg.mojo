@@ -1,5 +1,5 @@
 @always_inline
-fn matmuls[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
+fn matmul2d[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     """Matrix multiplication of two tensors A and B 2D.
     A should be of shape (m, k) and B should be of shape (k, n).
     The result will be a tensor of shape (m, n).
@@ -31,6 +31,7 @@ fn add_list(a : List[Int], b : List[Int]) -> List[Int]:
     var temp = a
     temp.extend(b)
     return temp
+
 
 @always_inline
 fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
@@ -98,10 +99,10 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     return result
 
 
-
 fn accumulate[dtype : DType](acc : SIMD[dtype,1], A : SIMD[dtype,1], B : SIMD[dtype,1]) -> SIMD[dtype,1]:
     
     return A.fma(B,acc)
+
 
 fn matmul_submatrix[type : DType](inout a: Tensor[type], inout b: Tensor[type], inout c: Tensor[type],
                     lo_m: Int, hi_m: Int, lo_n: Int, hi_n: Int, lo_k: Int, hi_k: Int):
@@ -119,14 +120,32 @@ fn matmul_submatrix[type : DType](inout a: Tensor[type], inout b: Tensor[type], 
       lo_k: Starting column index for the sub-matrix in a (and row index for sub-matrix in b) (inclusive).
       hi_k: Ending column index for the sub-matrix in a (and row index for sub-matrix in b) (exclusive).
   """
-
-  ## Get sub-matrix shapes
-  var m_size = hi_m - lo_m
-  var k_size = hi_k - lo_k
-  var n_size = hi_n - lo_n
-
-  ## Loop through sub-matrices (assuming in-place modification of c)
   for m in range(lo_m, hi_m):
-    for n in range(lo_n, hi_n):
-      for k in range(lo_k, hi_k):
-        c[List[Int](m, n)] += a[m, k] * b[k, n]
+    for k in range(lo_k, hi_k):
+      for n in range(lo_n, hi_n):
+        c.store(m, n, val=accumulate(c.load(m, n), a.load(m, k) , b.load(k, n)))
+
+
+fn matmulImplTiling[type : DType](
+  left: Tensor[type],
+  right: Tensor[type],
+  result: Tensor[type],
+  tile_size: Int,
+  rows: Int,
+  cols: Int
+):
+
+  var num_tiles = (cols + tile_size - 1) / tile_size
+
+  for tile_index in range(num_tiles):
+    var tile_start = tile_index * tile_size;
+    var tile_end = math.min((tile_index + 1) * tile_size, cols)
+
+    for row in range(rows):
+      for inner in range(tile_start, tile_end):
+        for col in range(cols):
+          result.store(row, col, val=accumulate[type](
+            result[row, col],
+            left[row, inner],
+            right[inner, col]
+          ))

@@ -1,13 +1,7 @@
 import net
 from gpu.host import Device
 
-trait Module:
-
-    fn __init__(inout self):
-        """
-        Initialize the layer with necessary parameters.
-        """
-        ...
+trait Modules:
 
     fn forward[dtype : DType](inout self, x : net.Tensor[dtype]) -> net.Tensor[dtype]:
         """
@@ -105,3 +99,6 @@ trait Module:
         Loads the module's state from a file.
         """
         ...
+
+struct Module:
+    ...
