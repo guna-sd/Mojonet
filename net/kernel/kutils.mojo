@@ -219,18 +219,23 @@ fn compute_matrix_block[dtype : DType,](
 
 
 struct randn:
-    alias Int8MAX = Int8.MAX
-    alias Int16MAX = Int16.MAX
-    alias Int32MAX = Int32.MAX
-    alias Int64MAX = Int64.MAX
-    alias F16Max : Float16 = 65504.0
-    alias F32Max : Float32 = 3.4028234663852886e+38
-    alias F64Max : Float64 = 1.7976931348623157e+308
+    alias F16 : Float16 = Float16.MAX_FINITE
+    alias F32 : Float32 = 3.4028234481811523
+    alias F64 : Float64 = 3.1415926535897931
 
     var _seed : Optional[Int]
 
     fn __init__(inout self):
         self._seed = time.now()
+
+    fn __init__(inout self, seed: Int):
+        """
+        Initializes the random number generator with the provided seed.
+
+        Args:
+            seed: The seed value.
+        """
+        self._seed = seed
 
     fn seed(inout self):
         """
@@ -249,107 +254,52 @@ struct randn:
     
     fn lcg(self) -> Int:
         return (self._seed.value()[] * 1103515245 + 12345) % 65504_1234
+    
+    fn u64(self, inout state : UInt64) -> UInt64:
+        state ^= state >> 12
+        state ^= state << 25
+        state ^= state >> 27
+        return ((state * 0x2545F4914F6CDD1D) >> 32).cast[DType.uint64]()
 
-    fn randint8(self) -> Int:
+    fn randint8(self) -> Int8:
         """
         Generates a random integer of type Int8.
 
         Returns:
             A random integer value of type Int8.
         """
-        return self.lcg() % int(self.Int8MAX)
+        var val = UInt64(self._seed.value()[])
+        return Int8((self.u64(val)).cast[DType.int8]()) % Int8.MAX_FINITE
 
-    fn randint8(self, low: Int, high: Int) -> Int:
-        """
-        Generates a random integer between low and high (inclusive) of type Int8.
-
-        Args:
-            low: The lower bound (inclusive) of the random integer range.
-            high: The upper bound (inclusive) of the random integer range.
-
-        Returns:
-            A random integer value of type Int8 between low and high (inclusive).
-        """
-        return low + self.randint8() % (high - low + 1)
-
-    fn randint16(self) -> Int:
+    fn randint16(self) -> Int16:
         """
         Generates a random integer of type Int16.
 
         Returns:
             A random integer value of type Int16.
         """
-        return self.lcg() % int(self.Int16MAX)
+        var val = UInt64(self._seed.value()[])
+        return Int16((self.u64(val)).cast[DType.int16]()) % Int16.MAX_FINITE
 
-    fn randint16(self, low: Int, high: Int) -> Int:
-        """
-        Generates a random integer between low and high (inclusive) of type Int16.
-
-        Args:
-            low: The lower bound (inclusive) of the random integer range.
-            high: The upper bound (inclusive) of the random integer range.
-
-        Returns:
-            A random integer value of type Int16 between low and high (inclusive).
-        """
-        return low + self.randint16() % (high - low + 1)
-
-    fn randint32(self) -> Int:
+    fn randint32(self) -> Int32:
         """
         Generates a random integer of type Int32.
 
         Returns:
             A random integer value of type Int32.
         """
-        return self.lcg() % int(self.Int32MAX)
+        var val = UInt64(self._seed.value()[])
+        return Int32((self.u64(val)).cast[DType.int32]()) % Int32.MAX_FINITE
 
-    fn randint32(self, low: Int, high: Int) -> Int:
-        """
-        Generates a random integer between low and high (inclusive) of type Int32.
-
-        Args:
-            low: The lower bound (inclusive) of the random integer range.
-            high: The upper bound (inclusive) of the random integer range.
-
-        Returns:
-            A random integer value of type Int32 between low and high (inclusive).
-        """
-        return low + self.randint32() % (high - low + 1)
-
-    fn randint64(self) -> Int:
+    fn randint64(self) -> Int64:
         """
         Generates a random integer of type Int64.
 
         Returns:
             A random integer value of type Int64.
         """
-        return self.lcg() % int(self.Int64MAX)
-
-    fn randint64(self, low: Int, high: Int) -> Int:
-        """
-        Generates a random integer between low and high (inclusive) of type Int64.
-
-        Args:
-            low: The lower bound (inclusive) of the random integer range.
-            high: The upper bound (inclusive) of the random integer range.
-
-        Returns:
-            A random integer value of type Int64 between low and high (inclusive).
-        """
-        return low + self.randint64() % (high - low + 1)
-
-    fn randint(self, low: Int, high: Int) -> Int:
-        """
-        Generates a random integer between low and high (inclusive).
-
-        Args:
-            low: The lower bound (inclusive) of the random integer range.
-            high: The upper bound (inclusive) of the random integer range.
-
-        Returns:
-            A random integer value between low and high.
-        """
-        return low + self.randint64() % (high - low + 1)
+        var val = UInt64(self._seed.value()[])
+        return Int64((self.u64(val)).cast[DType.int64]()) % Int64.MAX_FINITE
 
     fn randf(self) -> Float32:
         """
@@ -358,22 +308,8 @@ struct randn:
         Returns:
             A random floating-point number.
         """
-        var random_int = self.lcg()
-        var scaled_random = Float32(random_int) * 0.0000000003
-        return Float32(scaled_random % self.F32Max)
-
-    fn randf16(self, low: Float16, high: Float16) -> Float16:
-        """
-        Generates a random floating-point number in the range [low, high).
-
-        Args:
-            low: The lower bound (inclusive) of the random floating-point range.
-            high: The upper bound (exclusive) of the random floating-point range.
-
-        Returns:
-            A random floating-point number within the specified range.
-        """
-        return Float16(low + self.randf16() % (high - low + 1))   
+        var val = UInt64(self._seed.value()[])
+        return Float32((self.u64(val) >> 8).cast[DType.float32]() % self.F32)
 
     fn randf16(self) -> Float16:
         """
@@ -382,22 +318,8 @@ struct randn:
         Returns:
             A random floating-point number of type Float16.
         """
-        var random_int = self.lcg() % 65504
-        var scaled_random = Float16(random_int) * 0.00001
-        return Float16(scaled_random % self.F16Max)
-
-    fn randf32(self, low: Float32, high: Float32) -> Float32:
-        """
-        Generates a random floating-point number in the range [low, high).
-
-        Args:
-            low: The lower bound (inclusive) of the random floating-point range.
-            high: The upper bound (exclusive) of the random floating-point range.
-
-        Returns:
-            A random floating-point number within the specified range.
-        """
-        return Float32(low + self.randf32() % (high - low + 1))   
+        var val = UInt64(self._seed.value()[])
+        return Float16((self.u64(val) >> 16).cast[DType.float16]() / self.F16)
 
     fn randf32(self) -> Float32:
         """
@@ -408,19 +330,6 @@ struct randn:
         """
         return self.randf()
 
-    fn randf64(self, low: FloatLiteral, high: FloatLiteral) -> Float32:
-        """
-        Generates a random floating-point number in the range [low, high).
-
-        Args:
-            low: The lower bound (inclusive) of the random floating-point range.
-            high: The upper bound (exclusive) of the random floating-point range.
-
-        Returns:
-            A random floating-point number within the specified range.
-        """
-        return Float64(low + self.randf64() % (high - low + 1))   
-
     fn randf64(self) -> Float64:
         """
         Generates a random floating-point number of type Float64.
@@ -428,6 +337,48 @@ struct randn:
         Returns:
             A random floating-point number of type Float64.
         """
-        var random_int = self.lcg()
-        var scaled_random = Float64(random_int) * 0.0000000000001
-        return Float64(scaled_random % self.F64Max)
+        var val = UInt64(self._seed.value()[])
+        return Float64((self.u64(val) >> 16).cast[DType.float64]() % self.F64)
+    
+fn rand[type : DType](ptr : DTypePointer[type], count : Int):
+    alias nelts = simdwidthof[type]()
+
+    @parameter
+    if type.is_int8():
+        for i in range(count):
+            ptr[i] = randn().randint8().cast[type]()
+
+    @parameter
+    if type.is_int16():
+        for i in range(count):
+            ptr[i] = randn().randint16().cast[type]()
+
+    @parameter
+    if type.is_int32():
+        for i in range(count):
+            ptr[i] = randn().randint32().cast[type]()
+
+    @parameter
+    if type.is_int64():
+        for i in range(count):
+            ptr[i] = randn().randint64().cast[type]()
+
+    @parameter
+    if type.is_float16():
+        for i in range(count):
+            ptr[i] = randn().randf16().cast[type]()
+
+    @parameter
+    if type.is_float32():
+        for i in range(count):
+            ptr[i] = randn().randf32().cast[type]()
+
+    @parameter
+    if type.is_float64():
+        for i in range(count):
+            ptr[i] = randn().randf64().cast[type]()
+
+    @parameter
+    if type.is_bfloat16():
+        for i in range(count):
+            ptr[i] = randn().randf16().cast[type]()

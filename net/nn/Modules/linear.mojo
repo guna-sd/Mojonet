@@ -66,7 +66,7 @@ struct Linear[dtype : DType]:
             Tensor[dtype]: Gradient of the loss with respect to the input of the layer (dL/dx).
         """
         var dWeights = self.Inputs.transposed() @ Outputs
-        #Gradient of the loss with respect to the input (dL/dx)
+        #Gradient -> the loss with respect to the input (dL/dx)
         var dInput = Outputs @ self.Weights
         return dInput
 

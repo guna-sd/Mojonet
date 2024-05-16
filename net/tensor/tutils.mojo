@@ -9,13 +9,28 @@ alias Truncation = "...,"
 alias Strdtype = ",  dtype="
 alias Strshape = ", shape="
 alias Comma = ", "
+alias max_widths = 6
 
 @always_inline
-fn max_width[type : DType](ptr : DTypePointer, shapes : shape) -> Int:
-  var _max : Scalar[type] = 0
-  for i in range(shapes.num_elements):
-    _max = math.max(_max,int(ptr[i]))
-  return str(_max).__len__()
+fn max_elems_row(shape: shape) -> Int:
+    """
+    Determines the maximum number of elements per row based on the shape of the tensor and the console printing limit.
+
+    Args:
+        shape: The shape of the tensor.
+
+    Returns:
+        The maximum number of elements per row.
+    """
+    if shape.num_elements <= 1:
+        return shape.num_elements
+
+    var elements_per_row = 1
+    for i in range(shape._rank - 1):
+        elements_per_row *= shape._shapelist[i]
+
+    return math.min(elements_per_row, 12)
+
 
 @always_inline
 fn _rank0(type : DType, shape : shape) -> String:
@@ -33,47 +48,72 @@ fn _rank0(type : DType, shape : shape) -> String:
 
 
 @always_inline
-fn complete(ptr : DTypePointer, len : Int, max_width : Int) -> String:
-  """
-  Concatenates the elements of a tensor into a string, separated by commas and padded with spaces.
-  
-  Args:
-    ptr: A pointer to the data of the tensor elements.
-    len: The number of elements to include in the string.
-    max_width: The maximum width of the string.
-  
-  Returns:
-    A string representation of the tensor elements.
-  """
+fn complete(ptr : DTypePointer, len : Int) -> String:
+    """
+    Concatenates the elements of a tensor into a string, separated by commas and sliced based on the specified width.
+    
+    Args:
+        ptr: A pointer to the data of the tensor elements.
+        len: The number of elements to include in the string.
+    
+    Returns:
+        A string representation of the tensor elements.
+    """
     var buf = String("")
     if len == 0:
         return buf
-    buf += ptr.load()
+    
+    var max_width= 3 if ptr.load().element_type.is_int8() or ptr.load().element_type.is_int16() else max_widths
+    @parameter
+    fn slice_value[type: DType](value: Scalar[type]) -> String:
+        var value_str = str(value)
+        var value_len = value_str.__len__()
+        if value_len >= max_width:
+            return value_str[:max_width]
+        else:
+            var padding = String(" ") * (max_width - value_len)
+            if value == 0.0:
+                return value_str.__add__(str("0") * (max_width-3))
+            else:
+                return value_str + padding
+    
+    buf += slice_value(ptr.load())
     for i in range(1, len):
         buf += Comma
-        #buf+= String(" ") * max_width
-        buf += str(ptr.load(i))
+        buf += slice_value(ptr.load(i))
+    
     return buf
 
+
 @always_inline
-fn _serialize_elements(ptr: DTypePointer, len: Int, max_width : Int) -> String:
-  """
-  Serializes the elements of a tensor into a string representation, including square brackets.
-  
-  Args:
-    ptr: A pointer to the data type of the tensor elements.
-    len: The number of elements to serialize.
-    max_width: The maximum width of the string.
-  
-  Returns:
-    A string representation of the tensor elements, enclosed in square brackets.
-  """
+fn _serialize_elements(ptr: DTypePointer, len: Int,max_elements_per_row : Int) -> String:
+    """
+    Serializes the elements of a tensor into a string representation, including square brackets.
+
+    Args:
+        ptr: A pointer to the data type of the tensor elements.
+        len: The number of elements to serialize.
+        max_elements_per_row: The maximum number of elements to serialize in the row.
+
+    Returns:
+        A string representation of the tensor elements, enclosed in square brackets.
+    """
     var buf = String("")
 
     if len == 0:
         return String("")
     buf += SquareBracketL
-    buf += complete(ptr, len, max_width)
+
+    var elements_in_row = 0
+    for i in range(len):
+        if i > 0:
+            buf += Comma
+        if elements_in_row == max_elements_per_row:
+            buf += "\n\t "
+            elements_in_row = 0
+        buf += complete(ptr + i, 1)
+        elements_in_row += 1
+
     buf += SquareBracketR
     return buf
 
@@ -105,7 +145,7 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
     var row_elem_count = 1 if rank < 2 else shape._shapelist[-2]
     
     var matrix_elem_count = column_elem_count * row_elem_count
-    var max_width = max_width[type](ptr, shape)
+    var max_elements_per_row = max_elems_row(shape)
     
     for i in range(2,rank):
         buffer+=SquareBracketL
@@ -124,11 +164,11 @@ fn Tensorprinter[type : DType, print_dtype : Bool = True, print_shape : Bool = T
         var row_idx = 0
         while row_idx < row_elem_count:
             if row_idx > 0:
-                buffer+="\n\t "
+                buffer+="\n\t"
 
             buffer += _serialize_elements(
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count,max_width,)
+            column_elem_count,max_elements_per_row)
             row_idx += 1
 
             if row_idx != row_elem_count:

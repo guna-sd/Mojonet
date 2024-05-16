@@ -5,6 +5,7 @@ from net.checkpoint import fopen
 import math
 from collections.optional import Optional, Variant
 from net.kernel import scalar_op, tensor_op, Broadcast_op, vectorize, parallelize, calculate_shapes, matmul, randn, num_physical_cores, compute_matrix_block
+from net.kernel import rand as rfill
 
 @value
 struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, EqualityComparable, Stringable):
@@ -163,13 +164,21 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
 
     fn load(self, index : Int) -> SIMD[type,1]:
         return self.load[1](index)
-    
+
+    fn load[nelts : Int](self, *indices : Int) -> SIMD[type,nelts]:
+        var pos = self.shape.offset(indices)
+        return self.load[nelts](pos)
+
     fn load(self, *indices : Int) -> SIMD[type,1]:
         var pos = self.shape.offset(indices)
         return self.load[1](pos)
 
     fn store(self: Self, index: Int, val: SIMD[type, 1]):
         self.store[1](index, val)
+
+    fn store[nelts : Int](self: Self, *indices: Int, val: SIMD[type, nelts]):
+        var pos = self.shape.offset(indices)
+        self.store[nelts](pos, val)
 
     fn store(self: Self, *indices: Int, val: SIMD[type, 1]):
         var pos = self.shape.offset(indices)
@@ -475,18 +484,10 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
 
     @always_inline
     fn rand(self, seed : Optional[Int] = None):
-        if seed:
-            random.seed(seed.value()[])
-        else:
-            random.seed()
-        random.randn(self.storage, self.num_elements(),self.shape.rank(),self.shape.size())
+        rfill[type](self.storage, self.num_elements())
     @always_inline
     fn random(self, seed : Optional[Int] = None) -> Self:
-        if seed:
-            random.seed(seed.value()[])
-        else:
-            random.seed()
-        random.randn(self.storage, self.num_elements(),0,self.rank())
+        rfill(self.storage, self.num_elements())
         return self
 
     fn fill(self: Self, value: Scalar[type]) -> Self:
