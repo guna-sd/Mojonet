@@ -1,25 +1,4 @@
-from algorithm import Static2DTileUnitFunc as Tile2DFunc
-
-fn matmuld[type : DType](A: Tensor[type], B: Tensor[type]) -> Tensor[type]:
-    alias nelts = simdwidthof[type]()
-    var C : Tensor[type] = Tensor[type](calculate_shapes(A.shape, B.shape))
-    var m = A.shape[0]  
-    var k = A.shape[1]  
-    var n = B.shape[1]
-    
-    @parameter
-    fn calc_row(m_idx: Int):
-        for n_idx in range(n):
-            var sum: Scalar[type] = Scalar[type]()
-            for k_idx in range(k):
-                sum += A.load(m_idx, k_idx) * B.load(k_idx, n_idx)
-            C.store(m_idx, n_idx, val=sum)
-    
-    parallelize[calc_row](m, m)
-    return C
-
-
-@always_inline
+@always_inline("nodebug")
 fn matmul2d[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     """Matrix multiplication of two tensors A and B 2D.
     A should be of shape (m, k) and B should be of shape (k, n).
@@ -39,44 +18,15 @@ fn matmul2d[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
             result.store(i, j,val=sum)
     return result
 
-# fn matmul_tiled_unrolled_parallelized[type : DType](A: Tensor[type], B: Tensor[type]) -> Tensor[type]:
-#     alias nelts = simdwidthof[type]()
-#     var C : Tensor[type] = Tensor[type](calculate_shapes(A.shape, B.shape))
-#     var m = A.shape[0]  
-#     var k = A.shape[1]  
-#     var n = B.shape[1]
-#     @parameter
-#     fn calc_row(m: Int):
-#         @parameter
-#         fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
-#             for k in range(y, y + tile_y):
-#                 @parameter
-#                 fn dot[nelts: Int](n: Int):
-#                     C.store[nelts](m, n + x, val=accumulate[type, nelts](C.load[nelts](m, n + x) , A[m, k] , B.load[nelts](k, n + x)))
 
-#                 alias unroll_factor = tile_x // nelts
-#                 vectorize[dot, nelts, size=tile_x, unroll_factor=unroll_factor]()
-
-#         alias tile_size = 4
-#         tile[calc_tile, nelts * tile_size, tile_size](A.shape[1], C.shape[1])
-
-#     parallelize[calc_row](C.shape[0], C.shape[0])
-#     return C
-
-
-# fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
-#     for y in range(0, end_y, tile_y):
-#         for x in range(0, end_x, tile_x):
-#             tiled_fn[tile_x, tile_y](x, y)
-
-
+@always_inline("nodebug")
 fn add_list(a : List[Int], b : List[Int]) -> List[Int]:
     var temp = a
     temp.extend(b)
     return temp
 
 
-@always_inline
+@always_inline("nodebug")
 fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     """
     Multi-dimensional matrix multiplication of two tensors A and B.
@@ -107,7 +57,6 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     var batch_shape = shape(batch_dims)
 
     alias nelts = simdwidthof[dtype]()
-    var cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
 
     @parameter
     fn multiply_and_sum(batch_indices: List[Int], i: Int, j: Int):
@@ -130,8 +79,6 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
             fn process_column[nelts: Int](j : Int):
                 multiply_and_sum(batch_indices, i, j)
             vectorize[process_column, nelts,unroll_factor=4](n)
-        
-        parallelize[process_row](m, cores)
 
 
     var total_batches = batch_shape.num_elements
@@ -142,11 +89,13 @@ fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
     return result
 
 
+@always_inline("nodebug")
 fn accumulate[dtype : DType, nelts : Int](acc : SIMD[dtype,nelts], A : SIMD[dtype,nelts], B : SIMD[dtype,nelts]) -> SIMD[dtype,nelts]:
     
     return A.fma(B,acc)
 
 
+@always_inline("nodebug")
 fn matmul_submatrix[type : DType](inout a: Tensor[type], inout b: Tensor[type], inout c: Tensor[type],
                     lo_m: Int, hi_m: Int, lo_n: Int, hi_n: Int, lo_k: Int, hi_k: Int):
   """
@@ -167,28 +116,3 @@ fn matmul_submatrix[type : DType](inout a: Tensor[type], inout b: Tensor[type], 
     for k in range(lo_k, hi_k):
       for n in range(lo_n, hi_n):
         c.store(m, n, val=accumulate(c.load(m, n), a.load(m, k) , b.load(k, n)))
-
-
-fn matmulImplTiling[type : DType](
-  left: Tensor[type],
-  right: Tensor[type],
-  result: Tensor[type],
-  tile_size: Int,
-  rows: Int,
-  cols: Int
-):
-
-  var num_tiles = (cols + tile_size - 1) / tile_size
-
-  for tile_index in range(num_tiles):
-    var tile_start = tile_index * tile_size;
-    var tile_end = math.min((tile_index + 1) * tile_size, cols)
-
-    for row in range(rows):
-      for inner in range(tile_start, tile_end):
-        for col in range(cols):
-          result.store(row, col, val=accumulate[type](
-            result[row, col],
-            left[row, inner],
-            right[inner, col]
-          ))

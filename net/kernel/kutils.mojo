@@ -1,12 +1,13 @@
-from net.tensor import Tensor
-from algorithm import vectorize, parallelize
-from sys.info import num_physical_cores, num_logical_cores
-import math
-from collections.optional import Optional
-import time.time as time
+@always_inline("nodebug")
+fn is_compatible(A : List[Int], B : List[Int]) -> Bool:
+    for i in range(len(A)):
+        if A[i] != B[i]:
+            print("Incompatible Shapes: Tensors must have the same shape got [",A[i],"] and [",B[i],"] at [",i,"]")
+            return False
+    return True
 
 
-@always_inline
+@always_inline("nodebug")
 fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
         x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
             t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
@@ -24,26 +25,20 @@ fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     Returns:
         Returns Tensor[dtype] output tensor.
     """
-    var shape = t1.shape == t2.shape
-    var elm = t1.num_elements() == t2.num_elements()
-    if shape!= elm: 
+    if not is_compatible(t1.shape.shapes, t2.shape.shapes): 
         print(Error("Tensors must be in same shape"))
-        abort(external_call["exit", Int](1))
-    alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
-    var res = Tensor[dtype](t1.shape)
+        exit(1)
+    alias nelts = 1#simdwidthof[dtype]()
+    var result = Tensor[dtype](t1.shape)
 
     @parameter
-    fn calc(i : Int):
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            res[idx] = func(t1.load(idx), t2.load(idx))
-        vectorize[operation, nelts, unroll_factor=4](t1.num_elements())
-    parallelize[calc](t1.num_elements(), num_cores)
+    fn operation[nelts: Int](idx: Int):
+        result.store(idx, func(t1.load(idx), t2.load(idx)))
+    vectorize[operation, nelts, unroll_factor=4](t1.num_elements())
+    return result
 
-    return res
 
-@always_inline
+@always_inline("nodebug")
 fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
         x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
     Input : Tensor[dtype], value : SIMD[dtype,1]) -> Tensor[dtype]:
@@ -61,19 +56,15 @@ fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     Returns:
         Returns Tensor[dtype] output tensor.
     """
-    alias nelts = simdwidthof[dtype]()
-    var num_cores = num_physical_cores()-2 if num_physical_cores() > 4 else 2
+    alias nelts = 1#simdwidthof[dtype]()
     var Output = Tensor[dtype](Input.shape)
 
     @parameter
-    fn calc(i : Int):
-        @parameter
-        fn operation[nelts : Int](j : Int):
-            Output[j] = func(Input[j], value)
-        vectorize[operation, nelts, unroll_factor=4](Input.num_elements())
-    parallelize[calc](Input.num_elements(), num_cores)
-    
+    fn operation[nelts : Int](idx : Int):
+        Output.store(idx,func(Input[idx], value))
+    vectorize[operation, nelts, unroll_factor=4](Input.num_elements())
     return Output
+
 
 fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
         x: SIMD[dtype, nelts], y: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
@@ -107,7 +98,8 @@ fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
 
     return result
 
-@always_inline
+
+@always_inline("nodebug")
 fn check_shape(a: shape, b: shape) -> Bool:
     """
     Checks whether two shapes are compatible for matrix multiplication.
@@ -137,6 +129,7 @@ fn check_shape(a: shape, b: shape) -> Bool:
     return True
 
 
+@always_inline("nodebug")
 fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
     """
     Calculates the resulting shape of the matrix multiplication operation between two input shapes.
@@ -150,7 +143,7 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
     """
     if not check_shape(shape1, shape2):
         print("Error: Tensors cannot be multiplied due to incompatible shapes.")
-        abort(external_call["exit", Int](1))
+        exit(1)
 
     var batch_dims = List[Int]()
     var max_batch_rank = math.max(shape1.rank() - 2, shape2.rank() - 2)
@@ -159,8 +152,7 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         var dim2 = shape2[i] if i < shape2.rank() - 2 else 1
         if dim1 != dim2 and dim1 != 1 and dim2 != 1:
             print("Error: Incompatible dimensions at index", i, ":", dim1, "vs", dim2)
-            print("Error: Batch dimensions do not match and are not broadcastable.")
-            abort(external_call["exit", Int](1))
+            exit(1)
 
         batch_dims.append(math.max(dim1, dim2))
 
@@ -175,7 +167,7 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
     return shape(batch_dims)
 
 
-@always_inline
+@always_inline("nodebug")
 fn compute_matrix_block[dtype : DType,](
     result: DTypePointer[dtype],
     matrix1: DTypePointer[dtype],
@@ -237,12 +229,14 @@ struct randn:
         """
         self._seed = seed
 
+    @always_inline("nodebug")
     fn seed(inout self):
         """
         Seeds the random number generator using the current time.
         """
         self._seed = time.now()
-    
+
+    @always_inline("nodebug")
     fn seed(inout self, seed : Int):
         """
         Seeds the random number generator with the specified seed.
@@ -251,16 +245,19 @@ struct randn:
             seed: Int The seed value.
         """
         self._seed = seed
-    
+
+    @always_inline("nodebug")
     fn lcg(self) -> Int:
         return (self._seed.value()[] * 1103515245 + 12345) % 65504_1234
-    
+
+    @always_inline("nodebug")
     fn u64(self, inout state : UInt64) -> UInt64:
         state ^= state >> 12
         state ^= state << 25
         state ^= state >> 27
         return ((state * 0x2545F4914F6CDD1D) >> 32).cast[DType.uint64]()
 
+    @always_inline("nodebug")
     fn randint8(self) -> Int8:
         """
         Generates a random integer of type Int8.
@@ -271,6 +268,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Int8((self.u64(val)).cast[DType.int8]()) % Int8.MAX_FINITE
 
+    @always_inline("nodebug")
     fn randint16(self) -> Int16:
         """
         Generates a random integer of type Int16.
@@ -281,6 +279,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Int16((self.u64(val)).cast[DType.int16]()) % Int16.MAX_FINITE
 
+    @always_inline("nodebug")
     fn randint32(self) -> Int32:
         """
         Generates a random integer of type Int32.
@@ -291,6 +290,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Int32((self.u64(val)).cast[DType.int32]()) % Int32.MAX_FINITE
 
+    @always_inline("nodebug")
     fn randint64(self) -> Int64:
         """
         Generates a random integer of type Int64.
@@ -301,6 +301,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Int64((self.u64(val)).cast[DType.int64]()) % Int64.MAX_FINITE
 
+    @always_inline("nodebug")
     fn randf(self) -> Float32:
         """
         Generates a random floating-point number.
@@ -311,6 +312,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Float32((self.u64(val) >> 8).cast[DType.float32]() % self.F32)
 
+    @always_inline("nodebug")
     fn randf16(self) -> Float16:
         """
         Generates a random floating-point number of type Float16.
@@ -321,6 +323,7 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Float16((self.u64(val) >> 16).cast[DType.float16]() / self.F16)
 
+    @always_inline("nodebug")
     fn randf32(self) -> Float32:
         """
         Generates a random floating-point number of type Float32.
@@ -330,6 +333,7 @@ struct randn:
         """
         return self.randf()
 
+    @always_inline("nodebug")
     fn randf64(self) -> Float64:
         """
         Generates a random floating-point number of type Float64.
@@ -340,45 +344,48 @@ struct randn:
         var val = UInt64(self._seed.value()[])
         return Float64((self.u64(val) >> 16).cast[DType.float64]() % self.F64)
     
+
+@always_inline("nodebug")
 fn rand[type : DType](ptr : DTypePointer[type], count : Int):
     alias nelts = simdwidthof[type]()
 
     @parameter
-    if type.is_int8():
-        for i in range(count):
-            ptr[i] = randn().randint8().cast[type]()
+    fn gen[nelts : Int](i : Int):
+        @parameter
+        if type.is_int8():
+                ptr[i] = randn().randint8().cast[type]()
 
-    @parameter
-    if type.is_int16():
-        for i in range(count):
-            ptr[i] = randn().randint16().cast[type]()
+        @parameter
+        if type.is_int16():
+            for i in range(count):
+                ptr[i] = randn().randint16().cast[type]()
 
-    @parameter
-    if type.is_int32():
-        for i in range(count):
-            ptr[i] = randn().randint32().cast[type]()
+        @parameter
+        if type.is_int32():
+            for i in range(count):
+                ptr[i] = randn().randint32().cast[type]()
 
-    @parameter
-    if type.is_int64():
-        for i in range(count):
-            ptr[i] = randn().randint64().cast[type]()
+        @parameter
+        if type.is_int64():
+            for i in range(count):
+                ptr[i] = randn().randint64().cast[type]()
 
-    @parameter
-    if type.is_float16():
-        for i in range(count):
-            ptr[i] = randn().randf16().cast[type]()
+        @parameter
+        if type.is_float16():
+            for i in range(count):
+                ptr[i] = randn().randf16().cast[type]()
 
-    @parameter
-    if type.is_float32():
-        for i in range(count):
-            ptr[i] = randn().randf32().cast[type]()
+        @parameter
+        if type.is_float32():
+            for i in range(count):
+                ptr[i] = randn().randf32().cast[type]()
 
-    @parameter
-    if type.is_float64():
-        for i in range(count):
-            ptr[i] = randn().randf64().cast[type]()
+        @parameter
+        if type.is_float64():
+            for i in range(count):
+                ptr[i] = randn().randf64().cast[type]()
 
-    @parameter
-    if type.is_bfloat16():
-        for i in range(count):
-            ptr[i] = randn().randf16().cast[type]()
+        @parameter
+        if type.is_bfloat16():
+            for i in range(count):
+                ptr[i] = randn().randf16().cast[type]()

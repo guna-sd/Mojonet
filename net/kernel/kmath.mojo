@@ -1,5 +1,3 @@
-from net.tensor import Tensor
-
 fn abs[type : DType](value : SIMD[type,1]) -> SIMD[type,1]:
     """
     Find the absolute value of a number.
@@ -51,7 +49,7 @@ fn add[type : DType](owned first: SIMD[type,1], owned second: SIMD[type,1]) -> S
 
 fn add[type : DType](owned first: Tensor[type], owned second: Tensor[type]) -> Tensor[type]:
     var out : Tensor[type] = Tensor[type](first.shape)
-    if first.shape._rank == second.shape._rank:
+    if first.shape.rank() == second.shape.rank():
         for i in range(first.shape.num_elements):
             out[i] = add[type](first[i], second[i])
         return out
