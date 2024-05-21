@@ -250,8 +250,9 @@ struct randn:
     fn lcg(self) -> Int:
         return (self._seed.value()[] * 1103515245 + 12345) % 65504_1234
 
+    @staticmethod
     @always_inline("nodebug")
-    fn u64(self, inout state : UInt64) -> UInt64:
+    fn u64(inout state : UInt64) -> UInt64:
         state ^= state >> 12
         state ^= state << 25
         state ^= state >> 27

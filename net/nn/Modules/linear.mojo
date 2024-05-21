@@ -20,6 +20,7 @@ struct Linear[dtype : DType]:
     var Input_dim : Int
     var Output_dim : Int
     var Inputs : Tensor[dtype]
+    var dWeights : Tensor[dtype]
 
     fn __init__(inout self, Input_dim : Int, Output_dim : Int):
         self.Input_dim = Input_dim
@@ -65,7 +66,7 @@ struct Linear[dtype : DType]:
         Returns:
             Tensor[dtype]: Gradient of the loss with respect to the input of the layer (dL/dx).
         """
-        var dWeights = self.Inputs.transposed() @ Outputs
+        self.dWeights = self.Inputs.transposed() @ Outputs
         #Gradient -> the loss with respect to the input (dL/dx)
         var dInput = Outputs @ self.Weights
         return dInput
