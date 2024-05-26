@@ -2,6 +2,7 @@ from os.path import exists
 
 alias SEEK_SET = 0
 alias SEEK_END = 2
+alias NBytes = DType.uint64.sizeof()
 
 fn mkdir( path: String) -> Bool:
     """
@@ -62,6 +63,16 @@ struct File:
             print("read failed")
         return String(buffer, int(ssize))
 
+    fn read_bytes(self, size : Int = -1) -> List[UInt8]:
+        var ssize = size
+        if ssize == -1:
+            ssize = self.size()
+        var buffer = UnsafePointer[UInt8]().alloc(ssize)
+        var ret = external_call['fread',Int32,UnsafePointer[UInt8],Int32,Int32,Pointer[FILE]](buffer,ssize,ssize,self.fd)
+        if ret == -1:
+            print("read failed")
+        return List[UInt8](data=buffer, size=int(ssize), capacity=int(ssize))
+
     fn size(self) -> Int:
         var result = external_call['fseek', Int, Pointer[FILE], Int, Int32](self.fd, 0, SEEK_END)
         if result != 0:
@@ -83,8 +94,13 @@ struct File:
         if ret == -1:
             print("write failed")
 
+    fn write(self, buffer : Bytes):
+        var ret = external_call['fwrite',Int32,DTypePointer[DType.uint8],Int32,Int32](buffer._ptr(),1, len(buffer),self.fd)
+        if ret == -1:
+            print("write failed")
+
     fn close(inout self):
-        var ret = external_call['fclose',Int8,Pointer[FILE]](self.fd)
+        var ret = external_call['fclose',Int32,Pointer[FILE]](self.fd)
         if ret == -1:
             print("Failed to close")
     
@@ -95,7 +111,11 @@ struct File:
         self.fd = new.fd
 
     fn __enter__(owned self) -> Self:
-        return self ^
+        """The function to call when entering the context."""
+        return self^
+    
+    fn __del__(owned self):
+        self.close()
 
 fn fopen(path : String, mode : String) -> File:
     return File(path, mode)
@@ -105,6 +125,9 @@ struct Bytes:
   
     fn __init__(inout self):
         self.data = List[UInt8]()
+
+    fn __init__(inout self, data : List[UInt8]):
+        self.data = data
   
     fn __init__(inout self, capacity : Int):
         self.data = List[UInt8](capacity=capacity)
@@ -160,19 +183,19 @@ struct Bytes:
 
 fn tobytes[dtype: DType](value: Scalar[dtype]) -> Bytes:
     var bits = bitcast[DType.uint64](value.cast[type64[dtype]()]())
-    var data = Bytes(capacity=8)
-    for i in range(8):
-        data.append(((bits >> (i * 8))).cast[DType.uint8]())
+    var data = Bytes(capacity=NBytes)
+    for i in range(NBytes):
+        data.append(((bits >> (i * NBytes))).cast[DType.uint8]())
     return data
 
 fn frombytes[dtype: DType](data: Bytes) -> Scalar[dtype]:
-    if data.__len__() != 8:
+    if data.__len__() != NBytes:
         print("Invalid byte length for conversion")
         exit(1)
 
     var bits: UInt64 = 0
-    for i in range(8):
-        bits |= ((data[i]).cast[DType.uint64]()) << (i * 8)
+    for i in range(NBytes):
+        bits |= ((data[i]).cast[DType.uint64]()) << (i * NBytes)
 
     return bitcast[type64[dtype]()](bits).cast[dtype]()
 

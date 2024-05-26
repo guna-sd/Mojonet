@@ -655,7 +655,24 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         return sizeof[type]()
 
     @always_inline("nodebug")
-    fn save(self: Self, path : String)raises:
+    fn serialize(self) -> List[Bytes]:
+        var bytes = List[Bytes](capacity=self.num_elements())
+        for i in range(self.num_elements()):
+            bytes.append(tobytes[type](self.data[i]))
+        return bytes
+
+    fn deserialize(self, data: List[Bytes], shape: List[Int]) -> Tensor[type]:
+        var num_elements = num_elements(shape)
+        var tensor_data = List[Scalar[type]](capacity=num_elements)
+        for i in range(num_elements):
+            var value = frombytes[type](data[i])
+            tensor_data.append(value)
+        return Tensor[type](shape, tensor_data)
+    
+
+    @always_inline("nodebug")
+    fn saver(self: Self, path : String):
+        alias makgic = 2
         with fopen(path, 'wb') as f:
             f.write("mnetbfile\n".__str__())
             f.write("!s!")
@@ -664,7 +681,6 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             f.write("!T!")
             f.write(__type_of(self.list()).__str__(self.list()))
             f.write("\n")
-
 
 fn tensor[dtype : DType = DType.float32](Shape : List[Int], rand : Bool = False) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)

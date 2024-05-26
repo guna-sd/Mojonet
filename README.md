@@ -2,7 +2,7 @@
   <img src="assets/net.png" alt="mojonet">
 </div>
 
-``` Mojonet is a ML/DL framework written in Mojo🔥.```
+#### Mojonet is a ML/DL framework written in Mojo🔥.
 
 
  

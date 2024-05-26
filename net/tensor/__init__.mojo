@@ -1,7 +1,7 @@
 from tensor import TensorShape, TensorSpec
 from tensor import Tensor as _Tensor
 from collections.optional import Optional, Variant
-from net.checkpoint import fopen
+from net.checkpoint import fopen, tobytes, frombytes, Bytes, File
 import math
 from sys import exit
 from .tutils import *
