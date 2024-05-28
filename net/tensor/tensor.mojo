@@ -547,6 +547,19 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             ttensor[tindices] = self[index]
         
         return ttensor
+
+    fn init_weights(inout self, lower_bound: Float32, upper_bound:Float32):
+        var low_bound = lower_bound.cast[DType.float64]()
+        var up_bound = upper_bound.cast[DType.float64]()
+
+        @parameter
+        fn init_weights_fn[width: Int](index: Int) -> None:
+            var weight_val = random.random_float64(low_bound, up_bound)
+            var weight_simd = SIMD[DType.float64, width].splat(weight_val)
+            var weight_simd_dtype = weight_simd.cast[type]()
+            self.data.simd_nt_store[width](index, weight_simd_dtype)
+
+        vectorize[init_weights_fn, 1](self.num_elements())
         
     @always_inline("nodebug")
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
