@@ -28,6 +28,7 @@ struct Linear[dtype : DType]:
         self.Weights = Tensor[dtype](self.Output_dim,self.Input_dim)
         self.biases = Tensor[dtype](self.Output_dim)
         self.Inputs = Tensor[dtype]()
+        self.dWeights = Tensor[dtype]()
 
         self.Weights.rand()
         self.biases.zeros()

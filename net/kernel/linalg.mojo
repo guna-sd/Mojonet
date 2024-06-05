@@ -1,118 +1,246 @@
 @always_inline("nodebug")
-fn matmul2d[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-    """Matrix multiplication of two tensors A and B 2D.
-    A should be of shape (m, k) and B should be of shape (k, n).
-    The result will be a tensor of shape (m, n).
+fn mm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], m : Int, n : Int, p : Int):
     """
-    var m = A.shape[0]
-    var k = A.shape[1]
-    var n = B.shape[1]
-    
-    var result = Tensor[dtype](m, n)
-
-    for i in range(m):
-        for j in range(n):
-            var sum: Scalar[dtype] = 0
-            for p in range(k):
-                sum += A[i, p] * B[p, j]
-            result.store(i, j,val=sum)
-    return result
-
-
-@always_inline("nodebug")
-fn add_list(a : List[Int], b : List[Int]) -> List[Int]:
-    var temp = a
-    temp.extend(b)
-    return temp
-
-
-@always_inline("nodebug")
-fn matmul[dtype : DType](A: Tensor[dtype], B: Tensor[dtype]) -> Tensor[dtype]:
-    """
-    Multi-dimensional matrix multiplication of two tensors A and B.
-    The matrix multiplication will be applied to the last two dimensions of A and B.
-    The earlier dimensions will be broadcasted accordingly.
-
-    Parameters:
-        dtype : DType.
+    Performs matrix multiplication on matrices A and B and stores the result in matrix C with vectorization and parallelization.
 
     Args:
-        A : Tensor[dtype].
-        B : Tensor[dtype].
-
-    Eg:
-        A with shape (a1, ..., an, m, k) and B with shape (b1, ..., bn, k, n) will result in a tensor with shape (max(a1, b1), ..., max(an, bn), m, n).
+        A: Pointer to the first matrix.
+        B: Pointer to the second matrix.
+        C: Pointer to the result matrix.
+        m: Number of rows in matrix A.
+        n: Number of columns in matrix A and number of rows in matrix B.
+        p: Number of columns in matrix B.
     """
-
-    var shapes = calculate_shapes(A.shape, B.shape)
-    var result = Tensor[dtype](shapes)
-
-    var m = shapes[-2]
-    var n = shapes[-1]
-    var k = A.shape[-1]
-
-    var batch_dims : List[Int] = List[Int]()
-    for i in range(len(shapes) - 2):
-        batch_dims.append(shapes[i])
-    var batch_shape = shape(batch_dims)
-
-    alias nelts = simdwidthof[dtype]()
+    alias nelts = simdwidthof[T]() * 2
 
     @parameter
-    fn multiply_and_sum(batch_indices: List[Int], i: Int, j: Int):
-        var sum: SIMD[dtype, 1] = 0
-        
-        for p in range(k):
-            # A[i, p] * B[p, j] for each batch, i, j. Need to handle batch indexing.
-            var a_index = add_list(batch_indices , List[Int](i, p))
-            var b_index = add_list(batch_indices , List[Int](p, j))
-            sum = A[a_index].fma(multiplier = B[b_index], accumulator=sum) 
-        
-        var result_index = add_list(batch_indices , List[Int](i, j))
-        result.store(result_index, sum)
+    fn calc_row(i: Int):
+        for k in range(n):
 
-    @parameter
-    fn process_batch(batch_indices: List[Int]):
-        @parameter
-        fn process_row(i: Int):
             @parameter
-            fn process_column[nelts: Int](j : Int):
-                multiply_and_sum(batch_indices, i, j)
-            vectorize[process_column, nelts,unroll_factor=4](n)
+            fn dot[nelts: Int](n_idx: Int):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
+                DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
+
+                C.store[width=nelts](i * p + n_idx,
+                     A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx), C.load[width=nelts](i * p + n_idx))
+                )
+
+            vectorize[dot, nelts](size = p - (p % nelts))
+
+        for j in range(p - (p % nelts), p):
+            var acc_sum = Scalar[T](0) 
+            for k in range(n):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
+            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            C[i * p + j] = acc_sum
+
+    parallelize[calc_row](m)
 
 
-    var total_batches = batch_shape.num_elements
-    for batch_index in range(total_batches):
-        var current_batch = batch_shape.indices(batch_index)
-        process_batch(current_batch)
+@always_inline("nodebug")
+fn mm3d2d[dtype: DType](
+    A: DTypePointer[dtype],
+    B: DTypePointer[dtype],
+    C: DTypePointer[dtype],
+    M: Int,
+    N: Int,
+    K: Int,
+    Q: Int
+):
+    """
+    Performs matrix multiplication on a 3D tensor A and a 2D matrix B and stores the result in a 3D tensor C.
+    `A = (M,N,K) B = (Q,K) -> C = (M,N,Q)`.
+    
+    Args:
+        A: Pointer to the 3D tensor.
+        B: Pointer to the 2D matrix.
+        C: Pointer to the result 3D tensor.
+        M: Size of the first dimension of tensor A.
+        N: Size of the second dimension of tensor A and the number of rows in matrix B.
+        K: Size of the third dimension of tensor A and number of columns in matrix B.
+        Q: Number of columns in matrix A.
+    """
+    alias nelts = simdwidthof[dtype]()
+    @parameter
+    fn _calc(b: Int):
+        for t in range(N):
+            var out_bt: DTypePointer[dtype] = C + b * N * Q + t * Q
+            var inp_bt: DTypePointer[dtype] = A + b * N * K + t * K
 
+            for o in range(Q):
+                var val: SIMD[dtype,1] = 0
+                var wrow: DTypePointer[dtype] = B + o * K
+
+                @parameter
+                fn _op[width: Int](iv: Int):
+                    var t = inp_bt.load[width=width](iv) * wrow.load[width=width](iv)
+                    val += t.reduce_add()
+
+                vectorize[_op, nelts](size=K)
+
+                out_bt[o] = val
+
+    parallelize[_calc](M)
+
+
+@always_inline("nodebug")
+fn Compute_blocks[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], 
+                              i_outer : Int, i_limit : Int, j_outer : Int, j_limit : Int,
+                              k_outer : Int, k_limit : Int, n : Int, p : Int):
+    """
+    Multiply blocks of matrices A and B and accumulate the result in matrix C.
+
+    Args:
+        A: Pointer to the first matrix.
+        B: Pointer to the second matrix.
+        C: Pointer to the result matrix.
+        i_outer: Start index for the outer loop (i).
+        i_limit: End index for the outer loop (i).
+        j_outer: Start index for the outer loop (j).
+        j_limit: End index for the outer loop (j).
+        k_outer: Start index for the outer loop (k).
+        k_limit: End index for the outer loop (k).
+        n: Number of columns in matrix A and number of rows in matrix B.
+        p: Number of columns in matrix B.
+    """
+    alias nelts = simdwidthof[T]() * 2
+
+    for i in range(i_outer, i_limit):
+        for j in range(j_outer, j_limit):
+            @parameter
+            fn dot_product[nelts: Int](k_idx: Int):
+                var acc_sum = SIMD[T,nelts](0)
+                for k in range(k_outer, k_limit):
+                    DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                    DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + nelts))
+                    acc_sum += A.load[width=nelts](i * n + k) * B.load[width=nelts](k * p + j)
+                DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + nelts))
+                C.store[width=nelts](i * p + j, acc_sum)
+
+            vectorize[dot_product, nelts](size = k_limit - k_outer)
+
+        var acc_sum = Scalar[T](0)
+        for k_idx in range(k_outer, k_limit):
+            DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k_idx + 1))
+            DTypePointer.prefetch[PREFETCH_READ](B + (k_idx * p + j_outer + 1))
+            acc_sum += A[i * n + k_idx] * B[k_idx * p + j_outer]
+        DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j_outer + 1))
+        C[i * p + j_outer] = acc_sum
+
+
+#TODO : write a more efficient and also device-specific optimizations for better performance.
+@always_inline("nodebug")
+fn tmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], m : Int, n : Int, p : Int):
+    """
+    Performs tiled matrix multiplication on matrices A and B and stores the result in matrix C.
+
+    Args:
+        A: Pointer to the first matrix.
+        B: Pointer to the second matrix.
+        C: Pointer to the result matrix.
+        m: Number of rows in matrix A.
+        n: Number of columns in matrix A and number of rows in matrix B.
+        p: Number of columns in matrix B.
+    """
+    alias block_size = 16
+
+    for i_outer in range(0, m, block_size):
+        for j_outer in range(0, p, block_size):
+            for k_outer in range(0, n, block_size):
+                var i_limit = math.min(i_outer + block_size, m)
+                var j_limit = math.min(j_outer + block_size, p)
+                var k_limit = math.min(k_outer + block_size, n)
+
+                Compute_blocks[T](A, B, C, i_outer, i_limit, j_outer, j_limit, k_outer, k_limit, n, p)
+
+
+@always_inline("nodebug")
+fn bmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], inout C : DTypePointer[T], b : Int, m : Int, n : Int, p : Int):
+    """
+    Performs batch matrix multiplication on batches of matrices A and B and stores the result in matrix C.
+
+    Args:
+        A: Pointer to the first batch of matrices.
+        B: Pointer to the second batch of matrices.
+        C: Pointer to the result batch of matrices.
+        b: Number of batches.
+        m: Number of rows in each matrix of A.
+        n: Number of columns in each matrix of A and number of rows in each matrix of B.
+        p: Number of columns in each matrix of B.
+    """
+    for batch in range(b):
+        tmm[T](A + batch * (m * n), B + batch * (n * p), C + batch * (m * p), m, n, p)
+
+
+@always_inline("nodebug")
+fn matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype]) -> Tensor[dtype]:
+    """
+    Performs matrix multiplication on two tensors and returns the resulting tensor.
+
+    Args:
+        tensor1: The first tensor in the multiplication.
+        tensor2: The second tensor in the multiplication.
+
+    Returns:
+        A new tensor resulting from the batch matrix multiplication of the two input tensors.
+    """
+    if tensor1.rank() > 2 and tensor2.rank() > 2:
+        print("matrix multiplication only works with 2d use batch_matmul for tensor with rank > 2.")
+        exit(1)
+    var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
+    var result = Tensor[dtype](result_shape)
+
+    var A = tensor1.data
+    var B = tensor2.data
+    var C = result.data
+
+    var m = tensor1.shape[-2]
+    var n = tensor1.shape[-1]
+    var p = result.shape[-1]
+
+    if tensor1.rank() == 3 and tensor2.rank() == 2:
+        mm3d2d(A, B, C, tensor1.shape[0], tensor1.shape[1], tensor1.shape[2], tensor2.shape[1])
+
+    mm[dtype](A,B,C,m,n,p)
     return result
 
-
 @always_inline("nodebug")
-fn accumulate[dtype : DType, nelts : Int](acc : SIMD[dtype,nelts], A : SIMD[dtype,nelts], B : SIMD[dtype,nelts]) -> SIMD[dtype,nelts]:
+fn batch_matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype]) -> Tensor[dtype]:
+    """
+    Performs batch matrix multiplication on two tensors and returns the resulting tensor.
+
+    Args:
+        tensor1: The first tensor in the multiplication.
+        tensor2: The second tensor in the multiplication.
+
+    Returns:
+        A new tensor resulting from the batch matrix multiplication of the two input tensors.
+    """
+    var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
+    print(result_shape)
     
-    return A.fma(B,acc)
+    var result = Tensor[dtype](result_shape)
+    var tensorA = tensor1
+    var tensorB = tensor2
 
-
-@always_inline("nodebug")
-fn matmul_submatrix[type : DType](inout a: Tensor[type], inout b: Tensor[type], inout c: Tensor[type],
-                    lo_m: Int, hi_m: Int, lo_n: Int, hi_n: Int, lo_k: Int, hi_k: Int):
-  """
-  Performs matrix multiplication on sub-matrices of the provided tensors.
-
-  Args:
-      a: The first input tensor.
-      b: The second input tensor.
-      c: The output tensor.
-      lo_m: Starting row index for the sub-matrix in a (inclusive).
-      hi_m: Ending row index for the sub-matrix in a (exclusive).
-      lo_n: Starting column index for the sub-matrix in b (inclusive).
-      hi_n: Ending column index for the sub-matrix in b (exclusive).
-      lo_k: Starting column index for the sub-matrix in a (and row index for sub-matrix in b) (inclusive).
-      hi_k: Ending column index for the sub-matrix in a (and row index for sub-matrix in b) (exclusive).
-  """
-  for m in range(lo_m, hi_m):
-    for k in range(lo_k, hi_k):
-      for n in range(lo_n, hi_n):
-        c.store(m, n, val=accumulate(c.load(m, n), a.load(m, k) , b.load(k, n)))
+    if tensor1.shape.rank() > 2 and tensor2.shape.rank() == 2:
+        tensorB.broadcast_to(tensor1.shape)
+    if tensor2.shape.rank() > 2 and tensor1.shape.rank() == 2:
+        tensorA.broadcast_to(tensor2.shape)
+    
+    var A = tensorA.data
+    var B = tensorB.data
+    var C = result.data
+    
+    var b = result.shape[0]
+    var m = tensorA.shape[-2]
+    var n = tensorA.shape[-1]
+    var p = result.shape[-1]
+    
+    bmm[dtype](A, B, C, b, m, n, p)
+    
+    return result

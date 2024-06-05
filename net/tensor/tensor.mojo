@@ -1,4 +1,3 @@
-
 @value
 struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, EqualityComparable, Stringable):
     """
@@ -210,6 +209,10 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     fn __setitem__(self: Self, index: Int, val: SIMD[type, 1]):
         self.store(index, val)
 
+    fn __setitem__(self: Self, *indices: Int, val: SIMD[type, 1]):
+        var pos = self.shape.offset(list(indices))
+        self[pos] = val
+
     fn __setitem__(self: Self, indices: List[Int], val: SIMD[type, 1]):
         var pos = self.shape.offset(indices)
         self[pos] = val
@@ -324,6 +327,9 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     fn __itruediv__(inout self: Self, other: SIMD[type,1]):
         self = scalar_op[type,math.div](self,other)
     
+    fn __neg__(self : Self) -> Self:
+        return self.multiply(Scalar[type](-1))
+
     fn __pow__(self: Self, exponent: Int) -> Self:
         """
         Exponentiation of each element in the tensor by the given exponent.
@@ -347,7 +353,14 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         Implements matrix multiplication for Tensor.
         The operation is defined as self @ other.
         """
-        return matmul(self,other)
+        if self.rank() > 2 and other.rank() == 2:
+            return matmul(self, other)
+        if self.rank() == 2 and other.rank() == 2:
+            return matmul(self, other)
+        if self.rank() > 2 and other.rank() > 2:
+            return batch_matmul[type](self, other)
+        else:
+            return batch_matmul(self,other)
     
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
@@ -355,6 +368,23 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
 
     fn __str__[print_dtype : Bool = True, print_shape : Bool = True](self: Self) -> String:
         return Tensorprinter[type, print_dtype, print_shape](self.data, self.shape)
+    
+    @always_inline("nodebug")
+    fn apply[func: fn[dtype: DType, nelts: Int] (x: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](self: Self) -> Self:
+        alias nelts = simdwidthof[type]() * 2
+
+        @parameter
+        fn operation[nelts: Int](idx: Int):
+            self.store(idx, func(self.load(idx)))
+        vectorize[operation, nelts, unroll_factor=4](self.num_elements())
+
+        for i in range(self.num_elements() - (self.num_elements() % nelts)):
+            if i >= self.num_elements():
+                break
+            if i % nelts == 0:
+                continue
+            self.store(i, func(self.load(i)))
+        return self
    
     @always_inline("nodebug")
     fn pow(inout self: Self, pow: Int):    
@@ -505,6 +535,7 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     @always_inline("nodebug")
     fn rand(self, seed : Optional[Int] = None):
         rfill[type](self.data, self.num_elements())
+        #random.randn[type](self.data, self.shape.num_elements, 2, self.num_elements())
 
     @always_inline("nodebug")
     fn random(self, seed : Optional[Int] = None) -> Self:
@@ -567,27 +598,6 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         self = Self(ttensor.shape, ttensor.data)
 
     @always_inline("nodebug")
-    fn broadcast(self: Self, shapes: shape) -> Self:
-        """
-        Broadcasts the tensor to a specified shape and returns a new tensor with the broadcasted shape.
-        
-        Args:
-            shapes: The target shape for broadcasting.
-        """
-        return Broadcast_op[type, math.add](self, Tensor[type](shapes))
-
-    @always_inline("nodebug")
-    fn broadcast_to(inout self: Self, shapes: shape):
-        """
-        Broadcasts the tensor to a specified shape.
-        
-        Args:
-            shapes: The target shape for broadcasting.
-        """
-        var result = self.broadcast(shapes)
-        self = Self(result.shape, result.data)
-
-    @always_inline("nodebug")
     fn reshape(self: Self, other: shape) -> Self:
         """ Reshape the tensor to the new dimensions and returns the reshaped tensor."""
         if self.shape.num_elements != other.num_elements:
@@ -602,6 +612,11 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             data[new_indices] = self[old_indices]
         vectorize[_reshape,1](self.num_elements())
         return Self(other, data.data)
+    
+    fn broadcast_to(inout self: Self, other: shape):
+        var temp = Tensor[type](other)
+        memset_zero(temp.data,temp.num_elements())
+        self=Broadcast_op[type,math.add](self,temp)
 
     @always_inline("nodebug")
     fn reshape(self: Self, *new: Int) -> Self:
@@ -641,7 +656,7 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         return self.shape
         
     @always_inline("nodebug")
-    fn _dtype(self: Self) -> String:
+    fn Dtype(self: Self) -> String:
         return self.dtype.__str__()
     
     @always_inline("nodebug")
@@ -774,3 +789,9 @@ fn rand[dtype : DType = DType.float32](*Shape : Int, seed : Optional[Int]) -> Te
         tensor.rand(seed)
     tensor.rand()
     return tensor
+
+fn empty[dtype : DType = DType.float32](*Shape : Int) -> Tensor[dtype]:
+    return Tensor[dtype](Shape)
+
+fn empty[dtype : DType = DType.float32](Shape : List[Int]) -> Tensor[dtype]:
+    return Tensor[dtype](Shape)

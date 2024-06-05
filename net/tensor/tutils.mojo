@@ -11,13 +11,14 @@ alias Comma = ", "
 struct shape:
     """_ptr: A pointer to an array of integers, each representing the size of a dimension in the tensor."""
     var num_elements : Int
-    """Num_elements: The total number of elements that the tensor can hold, calculated as the product of its dimensions."""
+    """`num_elements:` The total number of elements that the tensor can hold, calculated as the product of its dimensions."""
     var ndim : Int
-    """'ndim: The number of dimensions in the tensor, also known as its rank."""
+    """`ndim:` The number of dimensions in the tensor, also known as its rank."""
     var shapes : List[Int]
-    """Shapes: A list of integers, each representing the size of a dimension in the tensor, providing an alternative to _ptr for accessing dimension sizes."""
+    """`shapes:` A list of integers, each representing the size of a dimension in the tensor, providing an alternative to _ptr for accessing dimension sizes."""
     var strides : List[Int]
 
+    @always_inline("nodebug")
     fn __init__(inout self : Self):
       """Initializes an empty shape."""
       self.num_elements = 0
@@ -25,6 +26,7 @@ struct shape:
       self.shapes = List[Int]()
       self.strides = calculate_strides(List[Int]())
 
+    @always_inline("nodebug")
     fn __init__(inout self :Self, *dim : Int):
       """
       Initializes a shape with given dimensions.
@@ -40,6 +42,7 @@ struct shape:
       self.num_elements = num_elements(list(dim))
       self.strides = calculate_strides(self.shapes)
 
+    @always_inline("nodebug")
     fn __init__(inout self :Self, dim : List[Int]):
       """
       Initializes a shape with given dimensions.
@@ -54,6 +57,7 @@ struct shape:
       self.num_elements = num_elements(dim)
       self.strides = calculate_strides(self.shapes)
 
+    @always_inline("nodebug")
     fn __init__[size : Int](inout self :Self, dim : StaticIntTuple[size]):
       """
       Initializes a shape with given dimensions.
@@ -69,6 +73,7 @@ struct shape:
       self.num_elements = dim.flattened_length()
       self.strides = calculate_strides(self.shapes)
 
+    @always_inline("nodebug")
     fn __init__(inout self : Self, shape : TensorShape):
       """
       Initializes a shape from a TensorSpec.
@@ -84,6 +89,7 @@ struct shape:
       self.num_elements = shape.num_elements()
       self.strides = calculate_strides(self.shapes)
 
+    @always_inline("nodebug")
     fn __init__(inout self : Self, shape : TensorSpec):
       """
       Initializes a shape from a TensorSpec.
@@ -99,6 +105,7 @@ struct shape:
       self.num_elements = shape.num_elements()
       self.strides = calculate_strides(self.shapes)
 
+    @always_inline("nodebug")
     fn __copyinit__(inout self: Self, old: Self):
       """Copy initializes a shape from another shape."""
       self.ndim = old.ndim
@@ -106,6 +113,7 @@ struct shape:
       self.shapes = old.shapes
       self.strides = old.strides
 
+    @always_inline("nodebug")
     fn __moveinit__(inout self: Self, owned existing: Self):
       """Move initializes a shape, transferring ownership from another shape."""
       self.ndim = existing.ndim
@@ -113,10 +121,12 @@ struct shape:
       self.shapes = existing.shapes
       self.strides = existing.strides
 
+    @always_inline("nodebug")
     fn __getitem__(self : Self, index : Int) -> Int:
       """Retrieves the dimension size at the given index."""
       return self.shapes[index if index>=0 else self.ndim + index]
 
+    @always_inline("nodebug")
     fn __setitem__(inout self : Self, index : Int, value : Int):
       """Sets the size of the dimension at the given index."""
       if index>=0:
@@ -124,10 +134,12 @@ struct shape:
       else:
           self.shapes.insert(self.ndim + index, value)
 
+    @always_inline("nodebug")
     fn __len__(self: Self) -> Int:
       """Returns the rank (number of dimensions) of the shape."""
       return self.ndim
 
+    @always_inline("nodebug")
     fn __eq__(self : Self, other : Self) -> Bool:
       """Checks if two shapes are equal."""
       if self.rank() != other.rank():
@@ -137,6 +149,7 @@ struct shape:
           return False
       return True
 
+    @always_inline("nodebug")
     fn __eq__(self : Self, other : TensorShape) -> Bool:
       """Checks if two shapes are equal."""
       if self.rank() != other.rank():
@@ -146,10 +159,12 @@ struct shape:
           return False
       return True
 
+    @always_inline("nodebug")
     fn __ne__(self : Self, other : Self) -> Bool:
       """Checks if two shapes are not equal."""
       return not self.__eq__(other)
 
+    @always_inline("nodebug")
     fn __str__(self : Self) -> String:
       """Returns a string representation of the shape."""
       var buf = String("")
@@ -174,49 +189,6 @@ struct shape:
     @always_inline("nodebug")
     fn Strides(self : Self) -> List[Int]:
       return calculate_strides(self.shapes)
-
-    @always_inline("nodebug")
-    fn broadcast_shapes(self, shapes: shape) -> shape:
-      """
-      Broadcasts two shapes to a common shape.
-      
-      Args:
-        shapes: The shape to broadcast with.
-      
-      Returns:
-        The broadcasted shape.
-      """
-      var shape1 = self
-      var shape2 = shapes
-      var max_rank = math.max(shape1.__len__(), shape2.__len__())
-      var result_shape = List[Int](capacity=max_rank)
-      for i in range(max_rank):
-          var dim1 = shape1[shape1.__len__() - 1 - i] if i < shape1.__len__() else 1
-          var dim2 = shape2[shape2.__len__() - 1 - i] if i < shape2.__len__() else 1
-          if dim1 != dim2 and dim1 != 1 and dim2 != 1:
-              print("Shapes are not compatible for broadcasting:",str(shape1), " and ",str(shape2))
-              exit()
-          result_shape.insert(0, math.max(dim1, dim2))
-      return shape(result_shape)
-
-    @always_inline("nodebug")
-    fn transpose(self : Self, *axes : Int) -> shape:
-      """
-      Transposes the shape according to the provided axes.
-
-      Args:
-        axes: Integers representing the permutation of axes.
-      
-      Returns:
-        The transposed shape.
-      """
-      var new_dims = List[Int]()
-      var strides = self.strides
-      var new_strides = List[Int]()
-      for i in range(axes.__len__()):
-        new_dims.append(self[axes[i]])
-        new_strides.append(strides[axes[i]])
-      return shape(new_dims)
 
     @always_inline("nodebug")
     fn size(self : Self) -> Int:
@@ -248,53 +220,21 @@ struct shape:
       """
       return calculate_indices(self.shapes, index)
 
-@always_inline
-fn broadcast_calculate_strides(shape : shape, broadcast_rank : Int) -> List[Int]:
-    var shape_rank = shape.rank()
-    var diff = broadcast_rank - shape_rank
-
-    var strides = List[Int]()
-
-    var stride = 1
-    for i in range(shape_rank - 1, -1, -1):
-        if shape[i] != 1:
-            strides[i + diff] = stride
-            stride *= shape[i]
-    return strides
 
 @always_inline
-fn get_index(strides_shape: List[Int], broadcast_shape: shape, i: Int) -> Int:
-    var index_res = 0
-    var linear_index = i
-    var size = broadcast_shape.rank()
-
-    @parameter
-    fn unroll_dims[nelts: Int](dim:Int):
-        var j = size - 1 - dim
-        var stride_value = strides_shape[j]
-        var shape_value = broadcast_shape[j]
-
-        var divmod_index = math.divmod(linear_index, shape_value)
-
-        index_res += divmod_index[1] * stride_value
-        linear_index = divmod_index[0]
-    vectorize[unroll_dims,1](size)
-    return index_res
-
-@always_inline("nodebug")
-fn calculate_broadcast[T : DType](tensor : Tensor[T] , shapes : List[Int]) -> List[Int]:
-    var shape1 = tensor.shape.shapes
-    var shape2 = shapes
-    var max_rank = math.max(shape1.__len__(), shape2.__len__())
-    var result_shape = List[Int](capacity=max_rank)
-    for i in range(max_rank):
-        var dim1 = shape1[shape1.__len__() - 1 - i] if i < shape1.__len__() else 1
-        var dim2 = shape2[shape2.__len__() - 1 - i] if i < shape2.__len__() else 1
-        if dim1 != dim2 and dim1 != 1 and dim2 != 1:
-            print("Shapes are not compatible for broadcasting:",__type_of(shape1).__str__(shape1), " and ",__type_of(shape2).__str__(shape2))
-            exit()
-        result_shape.insert(0, math.max(dim1, dim2))
-    return result_shape
+fn broadcast_shapes(s1: shape, s2: shape) -> shape:
+      var shape1 = s1
+      var shape2 = s2
+      var max_rank = math.max(shape1.__len__(), shape2.__len__())
+      var result_shape = List[Int](capacity=max_rank)
+      for i in range(max_rank):
+          var dim1 = shape1[shape1.__len__() - 1 - i] if i < shape1.__len__() else 1
+          var dim2 = shape2[shape2.__len__() - 1 - i] if i < shape2.__len__() else 1
+          if dim1 != dim2 and dim1 != 1 and dim2 != 1:
+              print("Shapes are not compatible for broadcasting:",str(shape1), " and ",str(shape2))
+              exit()
+          result_shape.insert(0, math.max(dim1, dim2))
+      return shape(result_shape)
 
 
 @always_inline("nodebug")
@@ -308,26 +248,23 @@ fn calculate_strides(shapes : List[Int]) -> List[Int]:
 
 
 @always_inline("nodebug")
-fn Index(*Shapes : Int) -> StaticIntTuple[8]:
-  """Index Function which returns a StaticIntTuple of size 8."""
-  return StaticIntTuple[8](Shapes)
+fn get_broadcast_index(index: Int, src_shape: shape, result_shape: shape) -> Int:
+    var src_index = 0
+    var stride = 1
+    for i in range(result_shape.ndim):
+        var result_dim = result_shape.ndim - 1 - i
+        var src_dim = src_shape.ndim - 1 - i
+        var result_idx = (index // stride) % result_shape[result_dim]
+        var src_idx = result_idx if src_dim >= 0 and src_shape[src_dim] != 1 else 0
+        src_index += src_idx * src_shape.strides[src_dim] if src_dim >= 0 else 0
+        stride *= result_shape[result_dim]
+    return src_index
 
 
 @always_inline("nodebug")
-fn convert_position(index: Int, size: Int) -> Int:
-    """
-    Convert a negative index to a positive one within the given size.
-
-    Args:
-        index : The index to convert.
-        size : The size of the dimension.
-
-    Returns:
-        Int: The positive index within the dimension.
-    """
-    if index < 0:
-        return size + index
-    return index
+fn Index(*Shapes : Int) -> StaticIntTuple[8]:
+  """Index Function which returns a StaticIntTuple of size 8."""
+  return StaticIntTuple[8](Shapes)
 
 
 @always_inline("nodebug")
@@ -390,11 +327,38 @@ fn num_elements(shape : List[Int]) -> Int:
         elements *=  shape[i]
     return elements
 
+
+@always_inline("nodebug")
+fn num_batches(shape: shape) -> Int:
+    """
+    Calculates the number of batches in a tensor based on its shape.
+
+    Args:
+        shape: The shape of the tensor.
+
+    Returns:
+        The number of batches.
+    """
+    if shape.rank() <= 2:
+        return 1
+    var num_batches = 1
+    for i in range(shape.rank() - 2):
+        num_batches *= shape[i]
+    return num_batches
+
+
 @always_inline("nodebug")
 fn list(shapes : VariadicList[Int])-> List[Int]:
     var list = List[Int](capacity=shapes.__len__())
     for i in shapes:
         list.append(i)
+    return list
+
+@always_inline("nodebug")
+fn list[size : Int](shapes : StaticIntTuple[size])-> List[Int]:
+    var list = List[Int](capacity=shapes.__len__())
+    for i in range(shapes.__len__()):
+        list.append(shapes[i])
     return list
 
 @always_inline("nodebug")
@@ -404,6 +368,11 @@ fn list(*shapes : Int)-> List[Int]:
         list.append(i)
     return list
 
+@always_inline("nodebug")
+fn fill_list(inout list : List[Int], val : Int)-> List[Int]:
+  for i in range(list.__len__()):
+    list[i] = val
+  return list
 
 @always_inline("nodebug")
 fn _bytes[type : DType](num_elements : Int) -> Int:
