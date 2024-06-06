@@ -12,6 +12,7 @@ fn mm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], 
         p: Number of columns in matrix B.
     """
     alias nelts = simdwidthof[T]() * 2
+    alias unroll = 4
 
     @parameter
     fn calc_row(i: Int):
@@ -27,7 +28,7 @@ fn mm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], 
                      A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx), C.load[width=nelts](i * p + n_idx))
                 )
 
-            vectorize[dot, nelts](size = p - (p % nelts))
+            vectorize[dot, nelts, unroll_factor=unroll](size = p - (p % nelts))
 
         for j in range(p - (p % nelts), p):
             var acc_sum = Scalar[T](0) 
@@ -38,7 +39,7 @@ fn mm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], 
             DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
             C[i * p + j] = acc_sum
 
-    parallelize[calc_row](m)
+    parallelize[calc_row](m,m)
 
 
 @always_inline("nodebug")
@@ -64,7 +65,7 @@ fn mm3d2d[dtype: DType](
         K: Size of the third dimension of tensor A and number of columns in matrix B.
         Q: Number of columns in matrix A.
     """
-    alias nelts = simdwidthof[dtype]()
+    alias nelts = simdwidthof[dtype]() * 2
     @parameter
     fn _calc(b: Int):
         for t in range(N):
@@ -80,11 +81,11 @@ fn mm3d2d[dtype: DType](
                     var t = inp_bt.load[width=width](iv) * wrow.load[width=width](iv)
                     val += t.reduce_add()
 
-                vectorize[_op, nelts](size=K)
+                vectorize[_op, nelts, unroll_factor=4](size=K)
 
                 out_bt[o] = val
 
-    parallelize[_calc](M)
+    parallelize[_calc](M,M)
 
 
 @always_inline("nodebug")
@@ -121,7 +122,7 @@ fn Compute_blocks[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DType
                 DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + nelts))
                 C.store[width=nelts](i * p + j, acc_sum)
 
-            vectorize[dot_product, nelts](size = k_limit - k_outer)
+            vectorize[dot_product, nelts, unroll_factor=4](size = k_limit - k_outer)
 
         var acc_sum = Scalar[T](0)
         for k_idx in range(k_outer, k_limit):
@@ -131,7 +132,7 @@ fn Compute_blocks[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DType
         DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j_outer + 1))
         C[i * p + j_outer] = acc_sum
 
-
+#For now using this Tiled version is slower than the mm version will be optimized in future...
 #TODO : write a more efficient and also device-specific optimizations for better performance.
 @always_inline("nodebug")
 fn tmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T], m : Int, n : Int, p : Int):
@@ -146,7 +147,7 @@ fn tmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T],
         n: Number of columns in matrix A and number of rows in matrix B.
         p: Number of columns in matrix B.
     """
-    alias block_size = 16
+    alias block_size = 8
 
     for i_outer in range(0, m, block_size):
         for j_outer in range(0, p, block_size):
@@ -172,9 +173,10 @@ fn bmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], inout C : DTypePoint
         n: Number of columns in each matrix of A and number of rows in each matrix of B.
         p: Number of columns in each matrix of B.
     """
-    for batch in range(b):
-        tmm[T](A + batch * (m * n), B + batch * (n * p), C + batch * (m * p), m, n, p)
-
+    @parameter
+    fn MM(batch : Int):
+        mm[T](A + batch * (m * n), B + batch * (n * p), C + batch * (m * p), m, n, p)
+    parallelize[MM](b,b)
 
 @always_inline("nodebug")
 fn matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype]) -> Tensor[dtype]:
@@ -191,6 +193,7 @@ fn matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype]) -> Te
     if tensor1.rank() > 2 and tensor2.rank() > 2:
         print("matrix multiplication only works with 2d use batch_matmul for tensor with rank > 2.")
         exit(1)
+
     var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
     var result = Tensor[dtype](result_shape)
 
@@ -220,17 +223,15 @@ fn batch_matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype])
     Returns:
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
+    if tensor1.rank() <= 2 and tensor2.rank() <= 2:
+        print("Error: batch matrix multiplication requires a rank >= 3")
+        exit(1)
+
     var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
-    print(result_shape)
     
     var result = Tensor[dtype](result_shape)
     var tensorA = tensor1
     var tensorB = tensor2
-
-    if tensor1.shape.rank() > 2 and tensor2.shape.rank() == 2:
-        tensorB.broadcast_to(tensor1.shape)
-    if tensor2.shape.rank() > 2 and tensor1.shape.rank() == 2:
-        tensorA.broadcast_to(tensor2.shape)
     
     var A = tensorA.data
     var B = tensorB.data

@@ -367,7 +367,7 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         return self ^
 
     fn __str__[print_dtype : Bool = True, print_shape : Bool = True](self: Self) -> String:
-        return Tensorprinter[type, print_dtype, print_shape](self.data, self.shape)
+        return Tensorprinter[tprint, type, print_dtype, print_shape](self.data, self.shape)
     
     @always_inline("nodebug")
     fn apply[func: fn[dtype: DType, nelts: Int] (x: SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](self: Self) -> Self:
@@ -423,12 +423,23 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     
     @always_inline("nodebug")
     fn sum(self: Self) -> Scalar[type]:
+        """
+        Compute the sum of all elements in the tensor.
+
+        Returns:
+            The sum of all elements in the tensor as a scalar value.
+        """
         var result = Scalar[type]()
-        alias nelts = 1#simdwidthof[type]()
+        alias nelts = simdwidthof[type]() * 2
+
         @parameter
         fn _sum[nelts : Int](i : Int):
             result += self[i].reduce_add()
-        vectorize[_sum,nelts](self.num_elements())
+
+        vectorize[_sum, nelts](self.num_elements())
+        for i in range(self.num_elements() - (self.num_elements() % nelts), self.num_elements()):
+            result += self[i]
+
         return result
 
     @always_inline("nodebug")
@@ -440,12 +451,18 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             The maximum value in the tensor as a scalar value.
         """
         var result = Scalar[type]()
-        alias nelts = 1#simdwidthof[type]()
+        alias nelts = simdwidthof[type]() * 2
+
         @parameter
         fn _max[nelts : Int](i : Int):
             result = math.max(result, self[i])
-        vectorize[_max,nelts](self.num_elements())
+
+        vectorize[_max, nelts](self.num_elements())
+        for i in range(self.num_elements() - (self.num_elements() % nelts), self.num_elements()):
+            result = math.max(result, self[i])
+
         return result
+
 
     @always_inline("nodebug")
     fn min(self: Self) -> Scalar[type]:
@@ -456,11 +473,16 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             The minimum value in the tensor as a scalar value.
         """
         var result = Scalar[type]()
-        alias nelts = 1#simdwidthof[type]()
+        alias nelts = simdwidthof[type]() * 2
+
         @parameter
         fn _min[nelts : Int](i : Int):
             result = math.min(result, self[i])
-        vectorize[_min,nelts](self.num_elements())
+
+        vectorize[_min, nelts](self.num_elements())
+        for i in range(self.num_elements() - (self.num_elements() % nelts), self.num_elements()):
+            result = math.min(result, self[i])
+
         return result
 
     @always_inline("nodebug")
@@ -481,21 +503,23 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
         Returns:
             The product of all elements in the tensor as a scalar value.
         """
-        var result = Scalar[type](1)
-        alias nelts = 1#simdwidthof[type]()
+        var result = Scalar[type](1) 
+        alias nelts = simdwidthof[type]() * 2
+
         @parameter
         fn _prod[nelts : Int](i : Int):
             result *= self[i].reduce_mul()
-        vectorize[_prod,nelts](self.num_elements())
+
+        vectorize[_prod, nelts](self.num_elements())
+        for i in range(self.num_elements() - (self.num_elements() % nelts), self.num_elements()):
+            result *= self[i]
         return result
     
     @always_inline("nodebug")
     fn list(self) -> List[Scalar[type]]:
         var result = List[Scalar[type]]()
-        @parameter
-        fn lis[nelts : Int](i : Int):
-            result.append(self.data.load(i))
-        vectorize[lis,1](self.num_elements())
+        for i in range(self.num_elements()):
+            result.append(self.load(i))
         return result
 
     @always_inline("nodebug")
@@ -546,13 +570,12 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     fn fill(self: Self, value: Scalar[type]) -> Self:
         """Fill the tensor with a specified value."""
         var result = DTypePointer[type]().alloc(self.num_elements())
-        alias nelts = 1#simdwidthof[type]()
 
         @parameter
-        fn _set[nelts : Int](index: Int):
-            self.store[nelts](index, self.load[nelts](index).splat(value))
+        fn _set(index: Int):
+            self.store(index, self.load(index).splat(value))
 
-        vectorize[_set, nelts](self.num_elements())
+        parallelize[_set](self.num_elements(), self.num_elements())
         return Self(self.shape, result)
 
     @always_inline("nodebug")
@@ -578,19 +601,6 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
             ttensor[tindices] = self[index]
         
         return ttensor
-
-    fn init_weights(inout self, lower_bound: Float32, upper_bound:Float32):
-        var low_bound = lower_bound.cast[DType.float64]()
-        var up_bound = upper_bound.cast[DType.float64]()
-
-        @parameter
-        fn init_weights_fn[width: Int](index: Int) -> None:
-            var weight_val = random.random_float64(low_bound, up_bound)
-            var weight_simd = SIMD[DType.float64, width].splat(weight_val)
-            var weight_simd_dtype = weight_simd.cast[type]()
-            self.data.simd_nt_store[width](index, weight_simd_dtype)
-
-        vectorize[init_weights_fn, 1](self.num_elements())
         
     @always_inline("nodebug")
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
@@ -666,12 +676,13 @@ struct Tensor[type : DType = DType.float32](AnyType, CollectionElement, Equality
     @always_inline("nodebug")
     fn astype[dtype : DType](self : Self) -> Tensor[dtype]:
         var casted = Tensor[dtype](self.shape)
-        alias nelts = 1#simdwidthof[dtype]()
+        alias nelts = simdwidthof[dtype]() * 2
         @parameter
         fn cast_single_element[nelts : Int](index: Int):
             casted.store[nelts](index, self[index].cast[dtype]())
-
         vectorize[cast_single_element, nelts](self.num_elements())
+        for index in range(self.num_elements() - (self.num_elements() % nelts), self.num_elements()):
+            casted[index] = self[index].cast[dtype]()
         return casted
 
     @always_inline("nodebug")
@@ -759,21 +770,16 @@ fn fill[dtype : DType = DType.float32](shape : shape, val: Scalar[dtype]) -> Ten
 
 @always_inline
 fn fill[dtype : DType = DType.float32](inout x: Tensor[dtype], val: Scalar[dtype]):
-    alias nelts = simdwidthof[dtype]()
-    @parameter
-    fn fill_vec[nelts: Int](idx: Int):
-        x.store[nelts](idx, x.load[nelts](idx).splat(val))
-
-    vectorize[fill_vec, nelts](x.num_elements())
+    x.ifill(val)
 
 fn fill[dtype : DType = DType.float32](*Shape : Int, val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    fill[dtype](tensor,Scalar[dtype](val))
+    fill[dtype](tensor,val)
     return tensor
 
 fn fill[dtype : DType = DType.float32](Shape : List[Int], val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
-    fill[dtype](tensor,Scalar[dtype](val))
+    fill[dtype](tensor,val)
     return tensor
 
 fn rand[dtype : DType = DType.float32](Shape : List[Int], seed : Optional[Int]) -> Tensor[dtype]:

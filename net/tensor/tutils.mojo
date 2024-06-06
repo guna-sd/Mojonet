@@ -425,6 +425,8 @@ fn max_elems_row(shape: shape) -> Int:
 
     return math.min(elements_per_row, 12)
 
+fn tprint[T : Stringable](elem: T) capturing -> None:
+  print(elem, end="", flush=True)
 
 @always_inline("nodebug")
 fn _rank0(type : DType, shape : shape) -> String:
@@ -457,37 +459,10 @@ fn complete(ptr: DTypePointer, len: Int) -> String:
     if len == 0:
         return buf
     
-    var max_width= 3 if ptr.load().element_type.is_int8() or ptr.load().element_type.is_int16() else 6
-    
-    # @parameter
-    # fn slice_value[type: DType](value: Scalar[type]) -> String:
-    #     var value_str = str(value)
-    #     var value_len = value_str.__len__()
-    #     if value_len >= max_width:
-    #         return value_str[:max_width]
-    #     else:
-    #         var padding = String(" ") * (max_width - value_len)
-    #         if value == 0.0:
-    #             return value_str.__add__(str(0) * (max_width - 3))
-    #         else:
-    #             return value_str + padding
-
-    # @parameter
-    # fn slicer(value: Float64) -> String:
-    #     var precision = 4
-    #     var rounded_value = round(value, precision)
-    #     return slice_value[DType.float64](rounded_value)
-
-    if ptr.load().element_type.is_floating_point():
-        buf += ptr.load()
-        for i in range(1, len):
-            buf += ", "
-            buf += ptr.load(i)
-    else:
-        buf += ptr.load()
-        for i in range(1, len):
-            buf += ", "
-            buf += ptr.load(i)
+    buf += ptr.load()
+    for i in range(1, len):
+        buf += ", "
+        buf += ptr.load(i)
     
     return buf
 
@@ -526,10 +501,11 @@ fn _serialize_elements(ptr: DTypePointer, len: Int,max_elements_per_row : Int) -
 
 
 @always_inline("nodebug")
-fn Tensorprinter[type : DType, print_dtype : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape) -> String:
+fn Tensorprinter[printer : fn[T : Stringable](element : T) capturing -> None, type : DType, print_dtype : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape) -> String:
   """Generates a string representation of a tensor, including its data type and shape if specified.
 
   Parameters:
+      printer : A format function to print the tensor data.
       type: The data type of the tensor.
       print_dtype: A boolean indicating whether to include the data type in the string representation.
       print_shape: A boolean indicating whether to include the shape in the string representation.
@@ -541,12 +517,12 @@ fn Tensorprinter[type : DType, print_dtype : Bool = False, print_shape : Bool = 
   Returns:
     A string representation of the tensor.
   """
-    var buffer = String()
+    var buffer = "\n"
     var rank = shape.ndim
 
     if rank == 0:
         return _rank0(type, shape)
-    buffer += TensorStart
+    printer(TensorStart)
 
     var column_elem_count  = 1 if rank < 1 else shape.shapes[-1]
     var row_elem_count = 1 if rank < 2 else shape.shapes[-2]
@@ -555,7 +531,7 @@ fn Tensorprinter[type : DType, print_dtype : Bool = False, print_shape : Bool = 
     var max_elements_per_row = max_elems_row(shape)
     
     for i in range(2,rank):
-        buffer+=SquareBracketL
+        printer(SquareBracketL)
     
     var num_matrices = 1
 
@@ -565,34 +541,34 @@ fn Tensorprinter[type : DType, print_dtype : Bool = False, print_shape : Bool = 
     var matrix_idx = 0
     while matrix_idx < num_matrices:
         if matrix_idx > 0:
-            buffer+=",\n\n\t"
-        buffer+=SquareBracketL
+            printer(",\n\n\t")
+        printer(SquareBracketL)
 
         var row_idx = 0
         while row_idx < row_elem_count:
             if row_idx > 0:
-                buffer+="\n\t"
+                printer("\n\t")
 
-            buffer += _serialize_elements(
+            printer(_serialize_elements(
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count,max_elements_per_row)
+            column_elem_count,max_elements_per_row))
             row_idx += 1
 
             if row_idx != row_elem_count:
-                buffer+=", "
+                printer(", ")
             
-        buffer+=SquareBracketR
+        printer(SquareBracketR)
         matrix_idx+=1
 
     for i in range(2,rank):
-        buffer+=SquareBracketR
+        printer(SquareBracketR)
     
     if print_dtype:
-        buffer+=Strdtype
-        buffer+=type.__str__()
+        printer(Strdtype)
+        printer(type.__str__())
     
     if print_shape:
-        buffer+=Strshape
-        buffer+=shape.__str__()
-    buffer+=TensorEnd
+        printer(Strshape)
+        printer(shape.__str__())
+    printer(TensorEnd)
     return buffer
