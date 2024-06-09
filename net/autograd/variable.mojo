@@ -29,6 +29,7 @@ struct variable:
     fn backward(inout self : Self):
         ...
 
+@value
 struct GradientTape:
     var operations : List[variable]
     def __init__(inout self):
@@ -38,6 +39,6 @@ struct GradientTape:
         self.operations.append(op)
 
     def backward(self, target):
-        target.grad = 1  # Initialize gradient of target to 1
+        target.grad = 1
         for op in range(self.operations.__len__()-1,-1,-1):
-            self.operations[op].backward()  # Compute gradients for each operation
+            self.operations[op].backward()

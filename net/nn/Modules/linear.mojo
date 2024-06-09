@@ -1,5 +1,3 @@
-from net.tensor import Tensor
-
 struct Linear[dtype : DType]:
     """
     Applies a linear transformation to the incoming data: y = x @ w.T + b.
@@ -47,7 +45,7 @@ struct Linear[dtype : DType]:
         Returns:
             Tensor[dtype]: The output tensor of shape (batch_size, output_features).
         """
-        if Inputs.shape[1] != self.Input_dim:
+        if Inputs.tensor.shape[1] != self.Input_dim:
             print("Inputs must have the same shape as self.Input_dim (batch_size, input_features).")
 
         self.Inputs = Inputs

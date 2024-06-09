@@ -1,4 +1,5 @@
 from os.path import exists
+from os.os import remove
 
 alias SEEK_SET = 0
 alias SEEK_END = 2
@@ -9,7 +10,7 @@ fn mkdir( path: String) -> Bool:
     Create a directory at the given path.
     """
     if not exists(path):
-        if external_call["mkdir", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
+        if external_call["mkdir", Int, DTypePointer[DType.uint8]](path.unsafe_uint8_ptr()) == 0:
             return True
         return False
     else:
@@ -21,7 +22,7 @@ fn rmdir(path : String) -> Bool:
     Remove a directory from the given path.
     """
     if exists(path):
-        if external_call["rmdir", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
+        if external_call["rmdir", Int, DTypePointer[DType.uint8]](path.unsafe_uint8_ptr()) == 0:
             return True
         else:
             print("Directory is not empty")
@@ -30,35 +31,22 @@ fn rmdir(path : String) -> Bool:
         print("Path does not exist")
         return False
 
-fn remove(path : String) -> Bool:
-    """
-    Remove a file from the given path.
-    """
-    if exists(path):
-        if external_call["rm", Int, DTypePointer[DType.int8]](path._as_ptr()) == 0:
-            return True
-        else:
-            print("Error: Cannot remove file " + path)
-            return False
-    else:
-        print("Path does not exist")
-        return False
 
 struct FILE:
     ...
 
 struct File:
-    var fd : Pointer[FILE]
+    var fd : UnsafePointer[FILE]
 
     fn __init__(inout self, path : String, mode : String):
-        self.fd = external_call['fopen',Pointer[FILE], DTypePointer[DType.int8], DTypePointer[DType.int8]](path._as_ptr(),mode._as_ptr())
+        self.fd = external_call['fopen',UnsafePointer[FILE], UnsafePointer[UInt8], UnsafePointer[UInt8]](path.unsafe_uint8_ptr(),mode.unsafe_uint8_ptr())
     
     fn read(self, size : Int = -1) -> String:
         var ssize = size
         if ssize == -1:
             ssize = self.size()
-        var buffer = DTypePointer[DType.int8]().alloc(ssize)
-        var ret = external_call['fread',Int32,DTypePointer[DType.int8],Int32,Int32,Pointer[FILE]](buffer,ssize,ssize,self.fd)
+        var buffer = UnsafePointer[UInt8]().alloc(ssize)
+        var ret = external_call['fread',Int32,UnsafePointer[UInt8],Int32,Int32,UnsafePointer[FILE]](buffer,ssize,ssize,self.fd)
         if ret == -1:
             print("read failed")
         return String(buffer, int(ssize))
@@ -68,39 +56,39 @@ struct File:
         if ssize == -1:
             ssize = self.size()
         var buffer = UnsafePointer[UInt8]().alloc(ssize)
-        var ret = external_call['fread',Int32,UnsafePointer[UInt8],Int32,Int32,Pointer[FILE]](buffer,ssize,ssize,self.fd)
+        var ret = external_call['fread',Int32,UnsafePointer[UInt8],Int32,Int32,UnsafePointer[FILE]](buffer,ssize,ssize,self.fd)
         if ret == -1:
             print("read failed")
-        return List[UInt8](data=buffer, size=int(ssize), capacity=int(ssize))
+        return List[UInt8](unsafe_pointer=buffer, size=int(ssize), capacity=int(ssize))
 
     fn size(self) -> Int:
-        var result = external_call['fseek', Int, Pointer[FILE], Int, Int32](self.fd, 0, SEEK_END)
+        var result = external_call['fseek', Int, UnsafePointer[FILE], Int, Int32](self.fd, 0, SEEK_END)
         if result != 0:
             print("Error seeking to end")
             return -1
-        var size = external_call['ftell', Int, Pointer[FILE]](self.fd)
+        var size = external_call['ftell', Int, UnsafePointer[FILE]](self.fd)
         if size == -1:
             print("Error getting file size")
             return -1
-        result = external_call['fseek', Int, Pointer[FILE], Int, Int32](self.fd, 0, SEEK_SET)
+        result = external_call['fseek', Int, UnsafePointer[FILE], Int, Int32](self.fd, 0, SEEK_SET)
         if result != 0:
             print("Error resetting to start")
             return -1
 
-        return int(size)
+        return int(size+1)
     
     fn write(self, buffer : String):
-        var ret = external_call['fwrite',Int32,DTypePointer[DType.uint8],Int32,Int32](buffer._as_ptr().bitcast[DType.uint8](),1, len(buffer),self.fd)
+        var ret = external_call['fwrite',Int32,UnsafePointer[UInt8],Int32,Int32,UnsafePointer[FILE]](buffer.unsafe_uint8_ptr(),1, len(buffer),self.fd)
         if ret == -1:
             print("write failed")
 
     fn write(self, buffer : Bytes):
-        var ret = external_call['fwrite',Int32,DTypePointer[DType.uint8],Int32,Int32](buffer._ptr(),1, len(buffer),self.fd)
+        var ret = external_call['fwrite',Int32,UnsafePointer[UInt8],Int32,Int32,UnsafePointer[FILE]](buffer.data.unsafe_ptr(),1, len(buffer),self.fd)
         if ret == -1:
             print("write failed")
 
     fn close(inout self):
-        var ret = external_call['fclose',Int32,Pointer[FILE]](self.fd)
+        var ret = external_call['fclose',Int32,UnsafePointer[FILE]](self.fd)
         if ret == -1:
             print("Failed to close")
     

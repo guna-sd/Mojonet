@@ -113,7 +113,7 @@ fn Compute_blocks[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DType
     for i in range(i_outer, i_limit):
         for j in range(j_outer, j_limit):
             @parameter
-            fn dot_product[nelts: Int](k_idx: Int):
+            fn dot_product[nelts: Int](`_` : Int):
                 var acc_sum = SIMD[T,nelts](0)
                 for k in range(k_outer, k_limit):
                     DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
@@ -152,9 +152,9 @@ fn tmm[T : DType](A : DTypePointer[T], B : DTypePointer[T], C : DTypePointer[T],
     for i_outer in range(0, m, block_size):
         for j_outer in range(0, p, block_size):
             for k_outer in range(0, n, block_size):
-                var i_limit = math.min(i_outer + block_size, m)
-                var j_limit = math.min(j_outer + block_size, p)
-                var k_limit = math.min(k_outer + block_size, n)
+                var i_limit = min(i_outer + block_size, m)
+                var j_limit = min(j_outer + block_size, p)
+                var k_limit = min(k_outer + block_size, n)
 
                 Compute_blocks[T](A, B, C, i_outer, i_limit, j_outer, j_limit, k_outer, k_limit, n, p)
 
@@ -194,19 +194,19 @@ fn matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype]) -> Te
         print("matrix multiplication only works with 2d use batch_matmul for tensor with rank > 2.")
         exit(1)
 
-    var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
+    var result_shape = calculate_shapes(tensor1.tensor.shape, tensor2.tensor.shape)
     var result = Tensor[dtype](result_shape)
 
-    var A = tensor1.data
-    var B = tensor2.data
-    var C = result.data
+    var A = tensor1.tensor.data
+    var B = tensor2.tensor.data
+    var C = result.tensor.data
 
-    var m = tensor1.shape[-2]
-    var n = tensor1.shape[-1]
-    var p = result.shape[-1]
+    var m = tensor1.tensor.shape[-2]
+    var n = tensor1.tensor.shape[-1]
+    var p = result.tensor.shape[-1]
 
     if tensor1.rank() == 3 and tensor2.rank() == 2:
-        mm3d2d(A, B, C, tensor1.shape[0], tensor1.shape[1], tensor1.shape[2], tensor2.shape[1])
+        mm3d2d(A, B, C, tensor1.tensor.shape[0], tensor1.tensor.shape[1], tensor1.tensor.shape[2], tensor2.tensor.shape[1])
 
     mm[dtype](A,B,C,m,n,p)
     return result
@@ -227,20 +227,20 @@ fn batch_matmul[dtype : DType](tensor1 : Tensor[dtype], tensor2 : Tensor[dtype])
         print("Error: batch matrix multiplication requires a rank >= 3")
         exit(1)
 
-    var result_shape = calculate_shapes(tensor1.shape, tensor2.shape)
+    var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
     
     var result = Tensor[dtype](result_shape)
     var tensorA = tensor1
     var tensorB = tensor2
     
-    var A = tensorA.data
-    var B = tensorB.data
-    var C = result.data
+    var A = tensorA.tensor.data
+    var B = tensorB.tensor.data
+    var C = result.tensor.data
     
-    var b = result.shape[0]
-    var m = tensorA.shape[-2]
-    var n = tensorA.shape[-1]
-    var p = result.shape[-1]
+    var b = result.tensor.shape[0]
+    var m = tensorA.tensor.shape[-2]
+    var n = tensorA.tensor.shape[-1]
+    var p = result.tensor.shape[-1]
     
     bmm[dtype](A, B, C, b, m, n, p)
     

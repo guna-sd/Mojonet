@@ -225,7 +225,7 @@ struct shape:
 fn broadcast_shapes(s1: shape, s2: shape) -> shape:
       var shape1 = s1
       var shape2 = s2
-      var max_rank = math.max(shape1.__len__(), shape2.__len__())
+      var max_rank = max(shape1.__len__(), shape2.__len__())
       var result_shape = List[Int](capacity=max_rank)
       for i in range(max_rank):
           var dim1 = shape1[shape1.__len__() - 1 - i] if i < shape1.__len__() else 1
@@ -233,7 +233,7 @@ fn broadcast_shapes(s1: shape, s2: shape) -> shape:
           if dim1 != dim2 and dim1 != 1 and dim2 != 1:
               print("Shapes are not compatible for broadcasting:",str(shape1), " and ",str(shape2))
               exit()
-          result_shape.insert(0, math.max(dim1, dim2))
+          result_shape.insert(0, max(dim1, dim2))
       return shape(result_shape)
 
 
@@ -423,7 +423,7 @@ fn max_elems_row(shape: shape) -> Int:
     for i in range(shape.ndim - 1):
         elements_per_row *= shape.shapes[i]
 
-    return math.min(elements_per_row, 12)
+    return min(elements_per_row, 12)
 
 fn tprint[T : Stringable](elem: T) capturing -> None:
   print(elem, end="", flush=True)
@@ -459,10 +459,10 @@ fn complete(ptr: DTypePointer, len: Int) -> String:
     if len == 0:
         return buf
     
-    buf += ptr.load()
+    buf += ptr.load().__str__()
     for i in range(1, len):
         buf += ", "
-        buf += ptr.load(i)
+        buf += ptr.load(i).__str__()
     
     return buf
 
@@ -501,7 +501,7 @@ fn _serialize_elements(ptr: DTypePointer, len: Int,max_elements_per_row : Int) -
 
 
 @always_inline("nodebug")
-fn Tensorprinter[printer : fn[T : Stringable](element : T) capturing -> None, type : DType, print_dtype : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape) -> String:
+fn Tensorprinter[printer : fn[T : Stringable](T) capturing -> None, type : DType, print_dtype : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape) -> String:
   """Generates a string representation of a tensor, including its data type and shape if specified.
 
   Parameters:
@@ -517,7 +517,7 @@ fn Tensorprinter[printer : fn[T : Stringable](element : T) capturing -> None, ty
   Returns:
     A string representation of the tensor.
   """
-    var buffer = "\n"
+    var buffer = ""
     var rank = shape.ndim
 
     if rank == 0:
@@ -530,12 +530,12 @@ fn Tensorprinter[printer : fn[T : Stringable](element : T) capturing -> None, ty
     var matrix_elem_count = column_elem_count * row_elem_count
     var max_elements_per_row = max_elems_row(shape)
     
-    for i in range(2,rank):
+    for _ in range(2,rank):
         printer(SquareBracketL)
     
     var num_matrices = 1
 
-    for i in range(math.max(rank -2, 0)):
+    for i in range(max(rank -2, 0)):
         num_matrices *= shape.shapes[i]
     
     var matrix_idx = 0
@@ -560,7 +560,7 @@ fn Tensorprinter[printer : fn[T : Stringable](element : T) capturing -> None, ty
         printer(SquareBracketR)
         matrix_idx+=1
 
-    for i in range(2,rank):
+    for _ in range(2,rank):
         printer(SquareBracketR)
     
     if print_dtype:

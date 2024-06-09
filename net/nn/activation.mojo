@@ -1,6 +1,6 @@
 @always_inline("nodebug")
 fn relu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return math.max[type,nelts](value, 0)
+    return max[type,nelts](value, 0)
 
 
 @always_inline("nodebug")
@@ -25,7 +25,7 @@ fn tanh[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts
 
 @always_inline("nodebug")
 fn gelu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return 0.5 * value * (1.0 + math.tanh[type, nelts](math.sqrt[type,nelts](2.0 / pi) * (value + 0.044715 * math.pow[type,nelts](value, 3))))
+    return 0.5 * value * (1.0 + math.tanh[type, nelts](math.sqrt[type,nelts](2.0 / pi) * (value + 0.044715 * pow(value, 3))))
 
 
 @always_inline("nodebug")
@@ -46,10 +46,10 @@ fn tanh[type : DType](Input: Tensor[type]) -> Tensor[type]:
 
     alias nelts = simdwidthof[type]() * 2
     var num_elements = Input.num_elements()
-    var Output = Tensor[type](Input.shape)
+    var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(index: Int):
+    fn calc_row(`_` : Int):
         @parameter
         fn tanh_op[nelts: Int](n: Int):
             Output.store[nelts](n, math.tanh[type,nelts](Input.load[nelts](n)))
@@ -76,10 +76,10 @@ fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
 
     alias nelts = simdwidthof[type]() * 2
     var num_elements = Input.num_elements()
-    var Output = Tensor[type](Input.shape)
+    var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(index: Int):
+    fn calc_elem(`_` : Int):
         @parameter
         fn sigmoid_op[nelts: Int](n: Int):
             Output.store[nelts](n, sigmoid[type,nelts](Input.load[nelts](n)))
@@ -107,10 +107,10 @@ fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
 
     alias nelts = simdwidthof[type]() * 2
     var num_elements = Input.num_elements()
-    var Output = Tensor[type](Input.shape)
+    var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(index: Int):
+    fn calc_elem(`_` : Int):
         @parameter
         fn relu_op[nelts: Int](n: Int):
             Output.store[nelts](n, relu[type,nelts](Input.load[nelts](n)))
@@ -138,10 +138,10 @@ fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
 
     alias nelts = simdwidthof[type]() * 2
     var num_elements = Input.num_elements()
-    var Output = Tensor[type](Input.shape)
+    var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(index: Int):
+    fn calc_elem(`_` : Int):
         @parameter
         fn gelu_op[nelts: Int](n: Int):
             Output.store[nelts](n, gelu[type, nelts](Input.load[nelts](n)))
@@ -169,10 +169,10 @@ fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
 
     alias nelts = simdwidthof[type]() * 2
     var num_elements = Input.num_elements()
-    var Output = Tensor[type](Input.shape)
+    var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(index: Int):
+    fn calc_elem(`_` : Int):
         @parameter
         fn silu_op[nelts: Int](n: Int):
             Output.store[nelts](n,(Input.load[nelts](n) * sigmoid[type,nelts](Input.load[nelts](n))))
@@ -253,11 +253,10 @@ struct GeLU[type : DType]:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
         var x = Input
-        var pi = 3.141592653589793
         var sqrt2 : Scalar[type] = math.sqrt(2)
-        var coeff = 0.5 * (1 + (x / (sqrt2 * sqrt2)).apply[math.erf]())
-
-        return GradOutput * (0.5 * (1 + ((x / sqrt2).apply[math.erf]())) + x * (pi * 0.5) * ((-(x * x) / Scalar[type](2)).apply[math.exp]()) / sqrt2 * sqrt2 * sqrt2 * sqrt2)
+        var erf_comp = (x / sqrt2).apply[math.erf]()
+        var exp_comp = ((-(x * x) / Scalar[type](2)).apply[math.exp]())        
+        return GradOutput * (0.5 * (1 + erf_comp) + x * (pi * 0.5) * exp_comp / (sqrt2 * sqrt2 * sqrt2 * sqrt2))
 
 
 @value
@@ -291,7 +290,7 @@ struct ReLU[type : DType]:
         Returns:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
-        var grad = Tensor[type](Input.shape)
+        var grad = Tensor[type](Input.shapes())
         var num_elements = Input.num_elements()
 
         @parameter
