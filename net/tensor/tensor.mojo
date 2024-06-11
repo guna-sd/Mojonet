@@ -57,42 +57,85 @@ struct Tensor[type: DType = DType.float32](
     A tensor is a multi-dimensional array of elements.
     """
 
-    var tensor: TensorType[type]
+    alias Type = TensorType[type]
+
+    var tensor: Self.Type
     """
     The data is a pointer to a block of memory that holds the elements of the tensor.
+    """
+    var grad: Variant[Tensor[type], NoneType]
+    """
+    The grad variable holds the gradient of the tensor. It is an optional instance of the TensorType struct.
+    This gradient is computed during the backward pass if requires_grad is True.
+    """
+    
+    var requires_grad: Bool
+    """
+    The requires_grad variable indicates whether the tensor requires gradient computation.
+    If set to True, the tensor will track operations for gradient computation during backpropagation.
+    """
+    var grad_fn: Variant[Function, NoneType]
+    """
+    The grad_fn variable holds a reference to a function responsible for computing the gradients of the tensor
+    during the backward pass. This function is part of the autograd mechanism.
     """
 
     fn __init__(inout self):
         self.tensor = TensorType[type]()
+        self.requires_grad = False
+        self.grad = None
+        self.grad_fn = None
 
     fn __init__(
         inout self,
         *shapes: Int,
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: shape,
         data: DTypePointer[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shapes, data, device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shapes, device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         *shapes: Int,
         data: DTypePointer[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), data, device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: shape,
         data: List[Scalar[type]],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
         if shapes.num_elements == data.__len__():
@@ -100,12 +143,19 @@ struct Tensor[type: DType = DType.float32](
                 tensor_data[i] = data[i]
         self.tensor = TensorType[type](shapes, tensor_data, device)
         tensor_data.free()
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shapes, device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: shape,
         *data: Scalar[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
         if shapes.num_elements == data.__len__():
@@ -113,12 +163,19 @@ struct Tensor[type: DType = DType.float32](
                 tensor_data[i] = data[i]
         self.tensor = TensorType[type](shapes, tensor_data, device)
         tensor_data.free()
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shapes, device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: List[Int],
         *data: Scalar[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         var tensor_shape = shape(shapes)
         var tensor_data = DTypePointer[type]().alloc(tensor_shape.num_elements)
@@ -130,63 +187,124 @@ struct Tensor[type: DType = DType.float32](
                 tensor_data[i] = data[i]
         self.tensor = TensorType[type](shapes, tensor_data, device)
         tensor_data.free()
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: shape,
         value: Scalar[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shapes, device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shapes, device)
+        else:
+            self.grad = None
         self = self.fill(value)
 
     fn __init__(
         inout self,
         shapes: VariadicList[Int],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self,
         shapes: List[Int],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self: Self,
         shapes: shape,
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shapes, device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shapes, device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self: Self,
         shapes: TensorShape,
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self: Self,
         shapes: TensorSpec,
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(shapes), device)
+        else:
+            self.grad = None
 
     fn __init__(
         inout self: Self,
         data: MojoTensor[type],
         device: String = "cpu",
+        requires_grad : Bool = False,
     ):
         self.tensor = TensorType[type](shape(data._spec), data._ptr, device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = TensorType[type](shape(data._spec), device)
+        else:
+            self.grad = None
 
     fn __copyinit__(inout self: Self, other: Self):
         self.tensor = other.tensor
+        self.requires_grad = other.requires_grad
+        self.grad = other.grad
+        self.grad_fn = other.grad_fn
 
     fn __moveinit__(inout self: Self, owned existing: Self):
         self.tensor = existing.tensor
+        self.requires_grad = existing.requires_grad
+        self.grad = existing.grad
+        self.grad_fn = existing.grad_fn
 
     @always_inline("nodebug")
     fn load[nelts: Int](self, owned index: Int) -> SIMD[type, nelts]:
@@ -714,6 +832,22 @@ struct Tensor[type: DType = DType.float32](
         return result
 
     @always_inline("nodebug")
+    fn relu(inout self : Self) -> Self:
+        return relu[type](self)
+
+    @always_inline("nodebug")
+    fn tanh(inout self : Self) -> Self:
+        return tanh[type](self)
+
+    @always_inline("nodebug")
+    fn gelu(inout self : Self) -> Self:
+        return gelu[type](self)
+
+    @always_inline("nodebug")
+    fn silu(inout self : Self) -> Self:
+        return silu[type](self)
+
+    @always_inline("nodebug")
     fn list(self) -> List[Scalar[type]]:
         var result = List[Scalar[type]]()
         for i in range(self.num_elements()):
@@ -753,6 +887,39 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn zeros(self: Self):
         memset_zero(self.tensor.data, self.num_elements())
+
+    fn zero_grad(inout self):
+        """
+        Zeroes the gradient of the tensor if it requires gradients.
+        """
+        if self.requires_grad:
+            if not self.grad.isa[NoneType]():
+                self.grad = self.grad.take[Tensor[type]]().fill(0)
+
+    @always_inline
+    fn sgd_update(inout self: Self, learning_rate: Float64):
+        """
+        Performs a gradient descent update on the tensor parameters.
+        """
+        if self.requires_grad:
+            if not self.grad.isa[NoneType]():
+                self -= self.grad.take[Tensor[type]]() * learning_rate
+
+    fn backward(inout self, owned grad_output: Optional[Tensor[type]] = None) raises:
+        """
+        Perform the backward pass starting from this tensor, propagating gradients using the grad_fn if present.
+        """
+        if not self.requires_grad:
+            print("Backward called on a tensor that does not require gradients.")
+        
+        if grad_output is None:
+            if not self.grad.isa[NoneType]():
+                self.grad = self.grad.take[Tensor[type]]().fill(0.0)
+        
+        if not self.grad_fn.isa[NoneType]():
+            var func = self.grad_fn.take[Function]()
+            func.invoke[type](self, grad_output.take())
+
 
     @always_inline("nodebug")
     fn ones(self: Self):
@@ -882,6 +1049,7 @@ struct Tensor[type: DType = DType.float32](
     fn dtype(self: Self) -> String:
         return type.__str__()
 
+    #TODO: Add support for CUDA
     @always_inline("nodebug")
     fn device(self: Self) -> String:
         return self.tensor.device
@@ -915,7 +1083,7 @@ struct Tensor[type: DType = DType.float32](
     fn itemsize(self: Self) -> Int:
         return sizeof[type]()
 
-    # TODO: support for seralizing and deserializing tensors
+    # TODO: Add support for seralizing and deserializing tensors
     @always_inline("nodebug")
     fn serialize(self) -> List[Bytes]:
         var bytes = List[Bytes](capacity=self.num_elements())

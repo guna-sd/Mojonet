@@ -97,7 +97,7 @@ fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
 fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `relu`: apply ReLU activation to given Tensor.
-    ReLU activation is defined as max(0, x) for each element x in the Tensor.
+    ReLU activation is defined as `max(0, x)` for each element x in the Tensor.
 
     Args:
         Input: Input Tensor.
@@ -128,7 +128,7 @@ fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
 fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `gelu`: apply GELU activation to given Tensor.
-    GELU activation is defined as x * Φ(x), where Φ(x) is the CDF of the standard normal distribution.
+    GELU activation is defined as `x * Φ(x), where Φ(x)` is the CDF of the standard normal distribution.
 
     Args:
         Input: Input Tensor.
@@ -159,7 +159,7 @@ fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
 fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `silu`: apply SiLU (Swish) activation to given Tensor.
-    SiLU activation is defined as x * sigmoid(x) for each element x in the Tensor.
+    SiLU activation is defined as `x * sigmoid(x)` for each element x in the Tensor.
 
     Args:
         Input: Input Tensor.
@@ -194,8 +194,8 @@ struct Sigmoid[type : DType]:
         """
         Apply the sigmoid activation function to the input tensor.
 
-        Formula:
-            Sigmoid(x) =  1 / (1 + exp(-x)).
+        `Formula:`\n
+            `Sigmoid(x) =  1 / (1 + exp(-x))`.
 
         Arguments:
             Input: Tensor for which Sigmoid activation function is to be applied.
@@ -229,8 +229,8 @@ struct GeLU[type : DType]:
         """
         Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
 
-        Formula:
-            GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2))).
+        `Formula:`\n
+            `GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2)))`.
 
         Arguments:
             Input: Tensor for which GELU activation function is to be applied.
@@ -267,8 +267,8 @@ struct ReLU[type : DType]:
         """
         Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
 
-        Formula:
-            ReLU(x) = max(0, x).
+        `Formula:`\n
+            `ReLU(x) = max(0, x)`.
 
         Arguments:
             Input: Tensor for which GELU activation function is to be applied.
@@ -313,8 +313,8 @@ struct Tanh[type : DType]:
         """
         Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
 
-        Formula:
-            Tanh(x) = (exp(2 * x) - 1) / (exp(2 * x) + 1).
+        `Formula:`\n
+            `Tanh(x) = (exp(2 * x) - 1) / (exp(2 * x) + 1)`.
 
         Arguments:
             Input: Tensor for which GELU activation function is to be applied.
@@ -348,8 +348,8 @@ struct SiLU[type : DType]:
         """
         Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
 
-        Formula:
-            SiLU(x) = x * sigmoid(x).
+        `Formula:`\n
+            `SiLU(x) = x * sigmoid(x)`.
 
         Arguments:
             Input: Tensor for which GELU activation function is to be applied.

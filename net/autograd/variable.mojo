@@ -1,44 +1,37 @@
-from utils.variant import Variant
-from collections import Optional
-
-trait operation:
+trait Operatable:
     fn forward(self):
         ...
     fn backward(self):
         ...
 
-@value
-struct variable:
-    var name : String
-    var shape : shape
-    var type : DType
-    var trainable : Bool
-    var tensor : Tensor
-    var requires_grad: Bool
-    var grad : Optional[Tensor[]]
+struct Valued[T : DType]:
+    alias Type = Variant[Tensor[T], Scalar[T], SIMD[T]]
 
-    fn __init__(inout self : Self, name : String, shape : shape, type : DType, trainable : Bool, tensor : Tensor[], requires_grad : Bool, grad : Optional[Tensor[]]):
-        self.name = name
-        self.shape = shape
-        self.type = type
-        self.trainable = trainable
-        self.tensor = tensor
-        self.requires_grad = requires_grad
-        self.grad = grad
+    var value : Self.Type
+
+    fn __init__(inout self, value : Tensor[T]):
+        self.value = value
     
-    fn backward(inout self : Self):
-        ...
+    fn __init__(inout self, value : Scalar[T]):
+        self.value = value
 
-@value
-struct GradientTape:
-    var operations : List[variable]
-    def __init__(inout self):
-        self.operations = List[variable]()
-
-    def record_operation(self, op : variable):
-        self.operations.append(op)
-
-    def backward(self, target):
-        target.grad = 1
-        for op in range(self.operations.__len__()-1,-1,-1):
-            self.operations[op].backward()
+    fn __init__(inout self, value : SIMD[T]):
+        self.value = value
+    
+    fn get_tensor(self) -> Tensor[T]:
+        if not self.value.isa[Tensor[T]]():
+            print("doesn't contain Tensor could be owner of a Scalar or a SIMD object")
+            return Tensor[T]()
+        return self.value[Tensor[T]]
+    
+    fn get_scalar(self) -> Scalar[T]:
+        if not self.value.isa[Scalar[T]]():
+            print("doesn't contain Scalar could be owner of Tensor or a SIMD object")
+            return Scalar[T]()
+        return self.value[Scalar[T]]
+    
+    fn get_simd(self) -> SIMD[T]:
+        if not self.value.isa[SIMD[T]]():
+            print("doesn't contain a SIMD value could be a owner of a Tensor or a Scalar")
+            return SIMD[T]()
+        return self.value[SIMD[T]]

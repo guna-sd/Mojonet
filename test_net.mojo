@@ -1,5 +1,5 @@
-from net.tensor import Tensor, shape, batch_matmul, matmul
-from tensor import Tensor as _Tensor
+from net.tensor import Tensor, shape, MojoTensor
+from net import batch_matmul, matmul
 import time
 from net.checkpoint import *
 from benchmark.benchmark import run
@@ -12,6 +12,9 @@ alias p = 1024
 
 var A = Tensor[DType.float32](b,m,n).random()
 var B = Tensor[DType.float32](b,n,p).random()
+
+fn add[T : DType, nelts : Int](a : SIMD[T,nelts],b : SIMD[T, nelts]):
+    print(a+b)
 
 fn main() raises:
     bench()

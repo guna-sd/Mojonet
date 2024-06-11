@@ -1,1 +1,1 @@
-from net.tensor import Tensor
+from .linear import *
