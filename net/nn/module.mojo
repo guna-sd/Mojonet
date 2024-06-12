@@ -1,4 +1,5 @@
 import net
+from collections.dict import Dict
 from gpu.host import Device
 
 trait Modules:
@@ -100,5 +101,15 @@ trait Modules:
         """
         ...
 
-struct Module:
-    ...
+@value
+struct ModuleType[type : DType]:
+    var name: String
+    var function : Function
+    
+
+@value
+struct Module[type : DType](CollectionElement):
+    var modules : Dict[String, ModuleType[type]]
+    var params : Dict[String, Parameter[type]]
+    var grads : Dict[String, Tensor[type]]
+    var training : Bool

@@ -35,3 +35,15 @@ struct Valued[T : DType]:
             print("doesn't contain a SIMD value could be a owner of a Tensor or a Scalar")
             return SIMD[T]()
         return self.value[SIMD[T]]
+
+
+struct GradientAdd[T : DType]:
+    var inputs : Tuple[Tensor[T], Tensor[T]]
+
+    fn __init__(inout self, a : Tensor[T], b : Tensor[T]):
+        self.inputs = (a,b)
+    
+    fn backward(self, grad_output : Tensor[T]) -> Tuple[Tensor[T], Tensor[T]]:
+        var grad_a = grad_output
+        var grad_b = grad_output
+        return (grad_a, grad_b)

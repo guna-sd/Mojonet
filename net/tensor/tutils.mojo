@@ -7,174 +7,134 @@ alias Strdtype = ",  dtype="
 alias Strshape = ", shape="
 alias Comma = ", "
 
-@value
+@register_passable("trivial")
 struct shape:
-    """_ptr: A pointer to an array of integers, each representing the size of a dimension in the tensor."""
+    alias maxrank = 26
+    alias shape_type = StaticIntTuple[Self.maxrank]
+
+    var shapes : Self.shape_type
+    var strides : Self.shape_type
+    var rank : Int
+    """`rank` : The number of dimensions in the tensor, also known as its rank."""
     var num_elements : Int
     """`num_elements:` The total number of elements that the tensor can hold, calculated as the product of its dimensions."""
-    var ndim : Int
-    """`ndim:` The number of dimensions in the tensor, also known as its rank."""
-    var shapes : List[Int]
-    """`shapes:` A list of integers, each representing the size of a dimension in the tensor, providing an alternative to _ptr for accessing dimension sizes."""
-    var strides : List[Int]
 
     @always_inline("nodebug")
-    fn __init__(inout self : Self):
-      """Initializes an empty shape."""
-      self.num_elements = 0
-      self.ndim = 0
-      self.shapes = List[Int]()
-      self.strides = calculate_strides(List[Int]())
-
-    @always_inline("nodebug")
-    fn __init__(inout self :Self, *dim : Int):
+    fn __init__[*element_types : Intable](inout self, owned *elements : *element_types):
       """
       Initializes a shape with given dimensions.
 
       Args:
-        dim: A variadic list of integers representing the dimensions of the shape.
+        elements: A variadic list of movable integers representing the dimensions of the shape.
       """
-      self.shapes = List[Int]()
-      for i in range(dim.__len__()):
-        self.shapes.append(dim[i])
+        if (len(elements) > self.maxrank):
+            print("number of elements must be equal or less then rank {26}")
+            exit(1)
+        self.shapes = StaticIntTuple[Self.maxrank]()
 
-      self.ndim = dim.__len__()
-      self.num_elements = num_elements(list(dim))
-      self.strides = calculate_strides(self.shapes)
-
-    @always_inline("nodebug")
-    fn __init__(inout self :Self, dim : List[Int]):
-      """
-      Initializes a shape with given dimensions.
-      
-      Args:
-        dim: A list of integers representing the dimensions of the shape.
-      """
-      self.shapes = List[Int]()
-      for i in range(dim.__len__()):
-        self.shapes.append(dim[i])
-      self.ndim = dim.__len__()
-      self.num_elements = num_elements(dim)
-      self.strides = calculate_strides(self.shapes)
+        @parameter
+        for i in range(0, elements.__len__()):
+            self.shapes[i] = int(elements.__getitem__[i]())
+        
+        self.strides = calculate_strides(self.shapes)
+        self.num_elements = num_elements(list(self.shapes, len(elements)))
+        self.rank = len(elements)
 
     @always_inline("nodebug")
-    fn __init__[size : Int](inout self :Self, dim : StaticIntTuple[size]):
-      """
-      Initializes a shape with given dimensions.
-      
-      Args:
-        dim: A tuple of integers representing the dimensions of the shape.
-      """
-      self.shapes = List[Int]()
-      for i in range(dim.__len__()):
-        self.shapes.append(dim[i])
-
-      self.ndim = dim.__len__()
-      self.num_elements = dim.flattened_length()
-      self.strides = calculate_strides(self.shapes)
+    fn __init__(inout self, shapes : List[Int]):
+        if (len(shapes) > self.maxrank):
+            print("number of elements must be equal or less then rank {26}")
+            exit(1)
+        self.shapes = StaticIntTuple[self.maxrank]()
+        for i in range(len(shapes)):
+            self.shapes[i] = shapes[i]
+        self.strides = calculate_strides(self.shapes)
+        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.rank = len(shapes)
 
     @always_inline("nodebug")
-    fn __init__(inout self : Self, shape : TensorShape):
-      """
-      Initializes a shape from a TensorSpec.
-      
-      Args:
-        shape: A TensorShape object.
-      """
-      self.shapes = List[Int]()
-      for i in range(shape.rank()):
-        self.shapes.append(shape[i])
-
-      self.ndim = shape.rank()
-      self.num_elements = shape.num_elements()
-      self.strides = calculate_strides(self.shapes)
-
+    fn __init__(inout self, shapes : VariadicList[Int]):
+        if (len(shapes) > self.maxrank):
+            print("number of elements must be equal or less then rank {26}")
+            exit(1)
+        self.shapes = StaticIntTuple[self.maxrank]()
+        for i in range(len(shapes)):
+            self.shapes[i] = shapes[i]
+        self.strides = calculate_strides(self.shapes)
+        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.rank = len(shapes)
+    
     @always_inline("nodebug")
-    fn __init__(inout self : Self, shape : TensorSpec):
-      """
-      Initializes a shape from a TensorSpec.
-      
-      Args:
-        shape: A TensorSpec object.
-      """
-      self.shapes = List[Int]()
-      for i in range(shape.rank()):
-        self.shapes.append(shape[i])
-
-      self.ndim = shape.rank()
-      self.num_elements = shape.num_elements()
-      self.strides = calculate_strides(self.shapes)
-
+    fn __init__(inout self, shapes : TensorSpec):
+        if (shapes.rank() > self.maxrank):
+            print("number of elements must be equal or less then rank {26}")
+            exit(1)
+        self.shapes = StaticIntTuple[self.maxrank]()
+        for i in range(shapes.rank()):
+            self.shapes[i] = shapes[i]
+        self.strides = calculate_strides(self.shapes)
+        self.num_elements = shapes.num_elements()
+        self.rank = shapes.rank()
+    
     @always_inline("nodebug")
-    fn __copyinit__(inout self: Self, old: Self):
-      """Copy initializes a shape from another shape."""
-      self.ndim = old.ndim
-      self.num_elements = old.num_elements
-      self.shapes = old.shapes
-      self.strides = old.strides
-
-    @always_inline("nodebug")
-    fn __moveinit__(inout self: Self, owned existing: Self):
-      """Move initializes a shape, transferring ownership from another shape."""
-      self.ndim = existing.ndim
-      self.num_elements = existing.num_elements
-      self.shapes = existing.shapes
-      self.strides = existing.strides
-
-    @always_inline("nodebug")
-    fn __getitem__(self : Self, index : Int) -> Int:
-      """Retrieves the dimension size at the given index."""
-      return self.shapes[index if index>=0 else self.ndim + index]
-
-    @always_inline("nodebug")
-    fn __setitem__(inout self : Self, index : Int, value : Int):
-      """Sets the size of the dimension at the given index."""
-      if index>=0:
-        self.shapes.insert(index, value)
-      else:
-          self.shapes.insert(self.ndim + index, value)
-
-    @always_inline("nodebug")
-    fn __len__(self: Self) -> Int:
-      """Returns the rank (number of dimensions) of the shape."""
-      return self.ndim
-
-    @always_inline("nodebug")
-    fn __eq__(self : Self, other : Self) -> Bool:
-      """Checks if two shapes are equal."""
-      if self.rank() != other.rank():
-        return False
-      for i in range(self.rank()):
-        if self.shapes[i] != other.shapes[i]:
-          return False
-      return True
+    fn __eq__(self, other: Self) -> Bool:
+        if len(self) != len(other):
+            return False
+        for i in range(len(self)):
+            if self[i] != other[i]:
+                return False
+        return True
 
     @always_inline("nodebug")
     fn __eq__(self : Self, other : TensorShape) -> Bool:
       """Checks if two shapes are equal."""
-      if self.rank() != other.rank():
+      if self.rank != other.rank():
         return False
-      for i in range(self.rank()):
+      for i in range(self.rank):
         if self.shapes[i] != other[i]:
           return False
       return True
 
     @always_inline("nodebug")
-    fn __ne__(self : Self, other : Self) -> Bool:
-      """Checks if two shapes are not equal."""
-      return not self.__eq__(other)
+    fn __ne__(self, other: Self) -> Bool:
+        return not self.__eq__(other)
+
+    @always_inline("nodebug")
+    fn __contains__(self, value: Int) -> Bool:
+        for i in range(len(self)):
+            if self[i] == value:
+                return True
+        return False
+
+    @always_inline("nodebug")
+    fn __len__(self) -> Int:
+        return self.rank
+    
+    @always_inline("nodebug")
+    fn __getitem__(self, index: Int) -> Int:
+        if index > self.rank:
+            print("index is out of bounds")
+            exit(1)
+        return self.shapes[index if index >= 0 else self.rank + index]
+
+    @always_inline("nodebug")
+    fn __setitem__(inout self, index: Int, value: Int):
+        if index > self.rank:
+            print("index is out of bounds")
+            exit(1)
+        self.shapes[index if index >= 0 else self.rank + index] = value
 
     @always_inline("nodebug")
     fn __str__(self : Self) -> String:
       """Returns a string representation of the shape."""
       var buf = String("")
-      if len(self.shapes) != 1:
-        for i in range(len(self.shapes)):
+      if len(self) != 1:
+        for i in range(len(self)):
           if i:
             buf += "x"
           buf += str(self.shapes[i])
         return buf
-      if self.shapes.__len__() == 0 and self.num_elements == 0 and self.ndim == 0:
+      if self.rank == 0:
         buf+= 'none'
         return buf
       buf += "1x"
@@ -182,24 +142,33 @@ struct shape:
       return buf
 
     @always_inline("nodebug")
-    fn rank(self : Self) -> Int:
-      """Returns the rank (number of dimensions) of the shape."""
-      return self.ndim
-
-    @always_inline("nodebug")
     fn Strides(self : Self) -> List[Int]:
-      return calculate_strides(self.shapes)
+        var list = List[Int](capacity=self.rank)
+        for i in range(self.rank):
+            list.append(self.shapes[i])
+        return list
 
     @always_inline("nodebug")
-    fn size(self : Self) -> Int:
-      """Returns the total number of elements based on the given shape."""
-      return self.num_elements
+    fn Shapes(self) -> List[Int]:
+        var list = List[Int](capacity=self.rank)
+        for i in range(self.rank):
+            list.append(self.shapes[i])
+        return list
+    
+    @always_inline("nodebug")
+    fn Rank(self : Self) -> Int:
+      """Returns the rank (number of dimensions) of the shape."""
+        return self.rank
+    
+    @always_inline("nodebug")
+    fn numofelements(self : Self) -> Int:
+        return self.num_elements
 
     @always_inline("nodebug")
-    fn offset(self : Self, indices : List[Int]) -> Int:
+    fn offset(self : Self, *indices : Int) -> Int:
       """Calculates the flat index for a variadic list of multi-dimensional indices."""
-        if indices.__len__() > self.rank():
-          print(Error("Number of indices must not exceed tensor dimension"))
+        if indices.__len__() > self.__len__():
+          print("Number of indices must not exceed tensor dimension")
           exit(1)
         var offset = 0
         var strides = self.strides
@@ -208,23 +177,58 @@ struct shape:
         return offset
 
     @always_inline("nodebug")
-    fn indices(self : Self, index : Int) -> List[Int]:
-      """
-      Converts a linear index into its corresponding multi-dimensional indices based on the given shape. (i.e., its position in a flattened version of the tensor or array).
+    fn offset(self : Self, indices : List[Int]) -> Int:
+      """Calculates the flat index for a variadic list of multi-dimensional indices."""
+        if indices.__len__() > self.__len__():
+          print("Number of indices must not exceed tensor dimension")
+          exit(1)
+        var offset = 0
+        var strides = self.strides
+        for i in range(indices.__len__()):
+          offset += indices[i] * strides[i]
+        return offset
+    
+    @always_inline("nodebug")
+    fn indices(self : Self, idx : Int) -> List[Int]:
+        return calculate_indices(self.shapes, idx)
 
-      Args:
-          index: An Int representing the linear index of an element in the flattened tensor or array.
-      
-      Returns:
-          List[Int] containing the multi-dimensional indices corresponding to the given linear index.
-      """
-      return calculate_indices(self.shapes, index)
+
+@always_inline("nodebug")
+fn calculate_strides[size : Int](shapes : StaticIntTuple[size]) -> StaticIntTuple[size]:
+    var stride = 1
+    var strides = StaticIntTuple[size]()
+    for i in range(shapes.__len__() - 1, -1, -1):
+        strides[i] = stride
+        stride *= shapes[i]
+    return strides
+
+
+@always_inline("nodebug")
+fn calculate_indices[size: Int](shape: StaticIntTuple[size], index: Int) -> List[Int]:
+    """
+    Converts a linear index into its corresponding multi-dimensional indices based on the given shape.
+
+    This function is useful for determining the multi-dimensional indices of an element in a tensor or array,
+    given its linear index (i.e., its position in a flattened version of the tensor or array) and the shape of the tensor or array.
+
+    Args:
+        shape: StaticIntTuple[size] representing the dimensions of the tensor or array.
+        index: Int representing the linear index of an element in the flattened tensor or array.
+
+    Returns:
+        StaticIntTuple[size] containing the multi-dimensional indices corresponding to the given linear index.
+    """
+    var idx = index
+    var indices = List[Int](capacity=size)
+    @parameter
+    for i in reversed(range(0,size)):
+        indices[i] = idx % shape[i]
+        idx //= shape[i]
+    return indices
 
 
 @always_inline
-fn broadcast_shapes(s1: shape, s2: shape) -> shape:
-      var shape1 = s1
-      var shape2 = s2
+fn broadcast_shapes(shape1: shape, shape2: shape) -> shape:
       var max_rank = max(shape1.__len__(), shape2.__len__())
       var result_shape = List[Int](capacity=max_rank)
       for i in range(max_rank):
@@ -238,33 +242,17 @@ fn broadcast_shapes(s1: shape, s2: shape) -> shape:
 
 
 @always_inline("nodebug")
-fn calculate_strides(shapes : List[Int]) -> List[Int]:
-    var stride = 1
-    var strides = List[Int](capacity=shapes.__len__())
-    for i in range(shapes.__len__() - 1, -1, -1):
-        strides[i] = stride
-        stride *= shapes[i]
-    return strides
-
-
-@always_inline("nodebug")
 fn get_broadcast_index(index: Int, src_shape: shape, result_shape: shape) -> Int:
     var src_index = 0
     var stride = 1
-    for i in range(result_shape.ndim):
-        var result_dim = result_shape.ndim - 1 - i
-        var src_dim = src_shape.ndim - 1 - i
+    for i in range(result_shape.rank):
+        var result_dim = result_shape.rank - 1 - i
+        var src_dim = src_shape.rank - 1 - i
         var result_idx = (index // stride) % result_shape[result_dim]
         var src_idx = result_idx if src_dim >= 0 and src_shape[src_dim] != 1 else 0
-        src_index += src_idx * src_shape.strides[src_dim] if src_dim >= 0 else 0
+        src_index += src_idx * src_shape.Strides()[src_dim] if src_dim >= 0 else 0
         stride *= result_shape[result_dim]
     return src_index
-
-
-@always_inline("nodebug")
-fn Index(*Shapes : Int) -> StaticIntTuple[8]:
-  """Index Function which returns a StaticIntTuple of size 8."""
-  return StaticIntTuple[8](Shapes)
 
 
 @always_inline("nodebug")
@@ -305,10 +293,29 @@ fn flatten_index(shape: shape, indices: List[Int]) -> Int:
 
     var flat_index = 0
     var stride = 1
-    for i in range(shape.rank() - 1, -1, -1):
+    for i in range(shape.rank - 1, -1, -1):
         flat_index += indices[i] * stride
         stride *= shape[i]
     return flat_index
+
+
+@always_inline("nodebug")
+fn num_batches(shape: shape) -> Int:
+    """
+    Calculates the number of batches in a tensor based on its shape.
+
+    Args:
+        shape: The shape of the tensor.
+
+    Returns:
+        The number of batches.
+    """
+    if shape.rank <= 2:
+        return 1
+    var num_batches = 1
+    for i in range(shape.rank - 2):
+        num_batches *= shape[i]
+    return num_batches
 
 
 @always_inline("nodebug")
@@ -329,25 +336,6 @@ fn num_elements(shape : List[Int]) -> Int:
 
 
 @always_inline("nodebug")
-fn num_batches(shape: shape) -> Int:
-    """
-    Calculates the number of batches in a tensor based on its shape.
-
-    Args:
-        shape: The shape of the tensor.
-
-    Returns:
-        The number of batches.
-    """
-    if shape.rank() <= 2:
-        return 1
-    var num_batches = 1
-    for i in range(shape.rank() - 2):
-        num_batches *= shape[i]
-    return num_batches
-
-
-@always_inline("nodebug")
 fn list(shapes : VariadicList[Int])-> List[Int]:
     var list = List[Int](capacity=shapes.__len__())
     for i in shapes:
@@ -355,9 +343,9 @@ fn list(shapes : VariadicList[Int])-> List[Int]:
     return list
 
 @always_inline("nodebug")
-fn list[size : Int](shapes : StaticIntTuple[size])-> List[Int]:
-    var list = List[Int](capacity=shapes.__len__())
-    for i in range(shapes.__len__()):
+fn list[size : Int](shapes : StaticIntTuple[size], capacity : Int)-> List[Int]:
+    var list = List[Int](capacity=capacity)
+    for i in range(capacity):
         list.append(shapes[i])
     return list
 
@@ -375,7 +363,7 @@ fn fill_list(inout list : List[Int], val : Int)-> List[Int]:
   return list
 
 @always_inline("nodebug")
-fn _bytes[type : DType](num_elements : Int) -> Int:
+fn bytes[type : DType](num_elements : Int) -> Int:
   """
   Calculates the total number of bytes required to store the elements of an Tensor.
 
@@ -393,22 +381,10 @@ fn _bytes[type : DType](num_elements : Int) -> Int:
 
 
 @always_inline("nodebug")
-fn round(number : Float64, ndigits : Int)-> Float64:
-    """
-    Rounds a floating-point number to a specified number of decimal places.
-    
-    :param number: The number to be rounded.
-    :param ndigits: The number of decimal places to round to. If None, round to the nearest integer.
-    :return: The rounded number.
-    """
-    var factor = 10 ** ndigits
-    return int(number * factor + 0.5 if number > 0 else number * factor - 0.5) / factor
-
-
-@always_inline("nodebug")
 fn max_elems_row(shape: shape) -> Int:
     """
     Determines the maximum number of elements per row based on the shape of the tensor and the console printing limit.
+    Adjusts the elements per row to optimize for divisibility of the shape.
 
     Args:
         shape: The shape of the tensor.
@@ -420,55 +396,38 @@ fn max_elems_row(shape: shape) -> Int:
         return shape.num_elements
 
     var elements_per_row = 1
-    for i in range(shape.ndim - 1):
-        elements_per_row *= shape.shapes[i]
+    for i in range(shape.rank - 1):
+        elements_per_row *= shape.Shapes()[i]
 
-    return min(elements_per_row, 12)
+    var max_elements_per_row = 8 
+    for i in range(2, elements_per_row + 1):
+        if elements_per_row % i == 0:
+            max_elements_per_row = int(elements_per_row / i)
+            break
 
-fn tprint[T : Stringable](elem: T) capturing -> None:
-  print(elem, end="", flush=True)
-
-@always_inline("nodebug")
-fn _rank0(type : DType, shape : shape) -> String:
-  """
-  Generates a string representation for a rank-0 tensor (scalar).
-  
-  Args:
-    type: The data type of the tensor.
-    shape: The shape of the tensor.
-  
-  Returns:
-    A string representation of a rank-0 tensor including its type and shape.
-  """
-    return TensorStart+SquareBracketL+SquareBracketR+Comma+Strdtype+str(type)+Comma+Strshape+shape.__str__()+TensorEnd
+    return min(max_elements_per_row, 8)
 
 
 @always_inline("nodebug")
-fn complete(ptr: DTypePointer, len: Int) -> String:
+fn complete[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter):
     """
     Concatenates the elements of a tensor into a string, separated by commas, rounded, and formatted based on the specified width.
     
     Args:
         ptr: A pointer to the data of the tensor elements.
         len: The number of elements to include in the string.
-    
-    Returns:
-        A string representation of the tensor elements.
+        writer: A formatter to format the elements.
     """
-    var buf = String("")
     if len == 0:
-        return buf
-    
-    buf += ptr.load().__str__()
-    for i in range(1, len):
-        buf += ", "
-        buf += ptr.load(i).__str__()
-    
-    return buf
+        return
+    _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1]()))
+    for i in range(1,len):
+        writer.write_str(", ")
+        _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1](i)))
 
 
 @always_inline("nodebug")
-fn _serialize_elements(ptr: DTypePointer, len: Int,max_elements_per_row : Int) -> String:
+fn _serialize_elements[type : DType,](ptr: DTypePointer, len: Int,max_elements_per_row : Int, inout writer : Formatter):
     """
     Serializes the elements of a tensor into a string representation, including square brackets.
 
@@ -476,99 +435,156 @@ fn _serialize_elements(ptr: DTypePointer, len: Int,max_elements_per_row : Int) -
         ptr: A pointer to the data type of the tensor elements.
         len: The number of elements to serialize.
         max_elements_per_row: The maximum number of elements to serialize in the row.
-
-    Returns:
-        A string representation of the tensor elements, enclosed in square brackets.
+        writer: A formatter to format the elements.
     """
-    var buf = String("")
 
     if len == 0:
-        return String("")
-    buf += SquareBracketL
+        return
+    writer.write_str(SquareBracketL)
 
     var elements_in_row = 0
     for i in range(len):
         if i > 0:
-            buf += Comma
+            writer.write_str(Comma)
         if elements_in_row == max_elements_per_row:
-            buf += "\n\t "
+            writer.write_str("\n\t ")
             elements_in_row = 0
-        buf += complete(ptr + i, 1)
+        complete[type](ptr + i, 1, writer)
         elements_in_row += 1
 
-    buf += SquareBracketR
-    return buf
+    writer.write_str(SquareBracketR)
+    return
 
 
 @always_inline("nodebug")
-fn Tensorprinter[printer : fn[T : Stringable](T) capturing -> None, type : DType, print_dtype : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape) -> String:
-  """Generates a string representation of a tensor, including its data type and shape if specified.
+fn _format_scalar[
+    dtype: DType,
+    float_format: StringLiteral = "%.4f",
+](inout writer: Formatter, value: Scalar[dtype]):
+    alias size: Int = _calc_format_buffer_size[dtype]()
 
-  Parameters:
-      printer : A format function to print the tensor data.
-      type: The data type of the tensor.
-      print_dtype: A boolean indicating whether to include the data type in the string representation.
-      print_shape: A boolean indicating whether to include the shape in the string representation.
-  
-  Args:
-    ptr: A pointer to the data type of the tensor elements.
-    shape: The shape of the tensor.
-  
-  Returns:
-    A string representation of the tensor.
-  """
-    var buffer = ""
-    var rank = shape.ndim
+    var buf = InlineArray[UInt8, size](fill=0)
 
+    if dtype.is_floating_point():
+        var wrote = _snprintf_scalar[dtype, float_format](
+            buf.unsafe_ptr(),
+            size,
+            value,
+        )
+        var str_slice = StringSlice[False, __lifetime_of(buf)](
+            unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
+        )
+        writer.write_str(str_slice)
+    else:
+        var max_width = len(str(Scalar[dtype].MAX_FINITE))
+        var pad = str(" ")
+        var type_width = int(dtype.sizeof()/2) -1
+        if dtype.is_int64():
+            type_width = type_width + 6
+        var wrote = _snprintf_scalar[dtype, "%f"](
+            buf.unsafe_ptr(),
+            size,
+            value,
+        )
+        var str_slice = StringSlice[False, __lifetime_of(buf)](
+            unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
+        )
+
+        var str_len = str(str_slice).__len__()
+        if str_len < max_width:
+            var pad_len = (int(max_width) - str_len) - (type_width)
+            pad = pad * int(pad_len)
+            var pad_slice = StringSlice[False, __lifetime_of(pad)](
+                unsafe_from_utf8_ptr=pad.unsafe_uint8_ptr(), len=pad_len
+            )
+            writer.write_str(pad_slice)
+
+        writer.write_str(str_slice)
+
+
+@always_inline("nodebug")
+fn TensorPrinter[type : DType](ptr : DTypePointer[type], shape : shape, inout writer : Formatter):
+    var rank = shape.rank
     if rank == 0:
-        return _rank0(type, shape)
-    printer(TensorStart)
+        writer.write_str("\nTensor()")
+        return
+    writer.write_str(TensorStart)
 
-    var column_elem_count  = 1 if rank < 1 else shape.shapes[-1]
-    var row_elem_count = 1 if rank < 2 else shape.shapes[-2]
-    
+    var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
+    var row_elem_count = 1 if rank < 2 else shape.Shapes()[-2]
+
     var matrix_elem_count = column_elem_count * row_elem_count
     var max_elements_per_row = max_elems_row(shape)
     
     for _ in range(2,rank):
-        printer(SquareBracketL)
-    
+        writer.write_str(SquareBracketL)
+
     var num_matrices = 1
 
     for i in range(max(rank -2, 0)):
-        num_matrices *= shape.shapes[i]
+        num_matrices *= shape.Shapes()[i]
     
     var matrix_idx = 0
     while matrix_idx < num_matrices:
         if matrix_idx > 0:
-            printer(",\n\n\t")
-        printer(SquareBracketL)
+            writer.write_str(",\n\n\t")
+        writer.write_str(SquareBracketL)
 
         var row_idx = 0
         while row_idx < row_elem_count:
             if row_idx > 0:
-                printer("\n\t")
+                writer.write_str("\n\t")
 
-            printer(_serialize_elements(
+            _serialize_elements[type](
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count,max_elements_per_row))
+            column_elem_count,max_elements_per_row, writer)
             row_idx += 1
 
             if row_idx != row_elem_count:
-                printer(", ")
+                writer.write_str(", ")
             
-        printer(SquareBracketR)
+        writer.write_str(SquareBracketR)
         matrix_idx+=1
 
     for _ in range(2,rank):
-        printer(SquareBracketR)
+        writer.write_str(SquareBracketR)
+    writer.write_str(TensorEnd)
+    return
+
+
+@value
+struct __PrinterOptions:
+    var precision : Int
+    var threshold : FloatLiteral
+    var edgeitems : Int
+    var linewidth : Int
+    var sci_mode: Optional[Bool]
     
-    if print_dtype:
-        printer(Strdtype)
-        printer(type.__str__())
-    
-    if print_shape:
-        printer(Strshape)
-        printer(shape.__str__())
-    printer(TensorEnd)
-    return buffer
+    fn __init__(inout self):
+        self.precision = 4
+        self.threshold = 1000
+        self.edgeitems = 3
+        self.linewidth = 80
+        self.sci_mode = None
+
+alias PRINT_OPTS = __PrinterOptions()
+
+#TODO: still under construction...
+struct _TensorFormatter:
+    var floating_dtype : Bool
+    var int_mode : Bool
+    var sci_mode : Bool
+    var max_width : Int
+
+    fn __init__[T : DType](inout self, tensor : Tensor[T], sci_mode : Bool = False):
+        self.floating_dtype = tensor.type.is_floating_point()
+        self.int_mode = tensor.type.is_integral()
+        self.sci_mode = sci_mode
+        self.max_width = 1
+        
+        var tensor_view = tensor.list()
+
+        if not self.floating_dtype:
+            for value in tensor_view:
+                var value_str = str(value[])
+                self.max_width = max(self.max_width, len(value_str))

@@ -25,7 +25,7 @@ fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     Returns:
         Returns Tensor[dtype] output tensor.
     """
-    if not is_compatible(t1.shapes().shapes, t2.shapes().shapes): 
+    if not is_compatible(t1.shapes().Shapes(), t2.shapes().Shapes()): 
         print(Error("Tensors must be in same shape"))
         exit(1)
     alias nelts = simdwidthof[dtype]() * 2
@@ -122,17 +122,17 @@ fn check_shape(a: shape, b: shape) -> Bool:
     Returns:
         A Boolean value indicating whether the shapes are compatible for matrix multiplication.
     """
-    if a.rank() < 1 or b.rank() < 1:
+    if a.rank < 1 or b.rank < 1:
         return False
 
-    if a.rank() == 1 and b.rank() == 1:
+    if a.rank == 1 and b.rank == 1:
         return a[0] == b[0]
     
-    if a.rank() == 1 and b.rank() > 1:
-        return a[0] == b[b.rank() - 2]
+    if a.rank == 1 and b.rank > 1:
+        return a[0] == b[b.rank - 2]
 
-    if b.rank() == 1 and a.rank() > 1:
-        return a[a.rank() - 1] == b[0]
+    if b.rank == 1 and a.rank > 1:
+        return a[a.rank - 1] == b[0]
     
     if a[-1] != b[-2]:
         return False
@@ -157,23 +157,23 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         exit(1)
 
     var batch_dims = List[Int]()
-    var max_batch_rank = max(shape1.rank() - 2, shape2.rank() - 2)
+    var max_batch_rank = max(shape1.rank - 2, shape2.rank - 2)
     for i in range(max_batch_rank):
-        var dim1 = shape1[i] if i < shape1.rank() - 2 else 1
-        var dim2 = shape2[i] if i < shape2.rank() - 2 else 1
+        var dim1 = shape1[i] if i < shape1.rank - 2 else 1
+        var dim2 = shape2[i] if i < shape2.rank - 2 else 1
         if dim1 != dim2 and dim1 != 1 and dim2 != 1:
             print("Error: Incompatible dimensions at index", i, ":", dim1, "vs", dim2)
             exit(1)
 
         batch_dims.append(max(dim1, dim2))
 
-    if shape1.rank() > 1 and shape2.rank() > 1:
-        batch_dims.append(shape1[shape1.rank() - 2])
-        batch_dims.append(shape2[shape2.rank() - 1])
-    elif shape1.rank() > 1 and shape2.rank() == 1:
-        batch_dims.append(shape1[shape1.rank() - 2])
-    elif shape1.rank() ==1 and shape2.rank() > 1:
-        batch_dims.append(shape2[shape2.rank() - 1]) 
+    if shape1.rank > 1 and shape2.rank > 1:
+        batch_dims.append(shape1[shape1.rank - 2])
+        batch_dims.append(shape2[shape2.rank - 1])
+    elif shape1.rank > 1 and shape2.rank == 1:
+        batch_dims.append(shape1[shape1.rank - 2])
+    elif shape1.rank ==1 and shape2.rank > 1:
+        batch_dims.append(shape2[shape2.rank - 1]) 
 
     return shape(batch_dims)
 
@@ -234,7 +234,7 @@ struct randn:
             A random integer value of type Int8.
         """
         var val = UInt64(self._seed)
-        return Int8((self.u64(val) >> 2).cast[DType.int8]()) % Int8.MAX_FINITE
+        return Int8((self.u64(val) >> 1).cast[DType.int8]()) % Int8.MAX_FINITE
 
     @always_inline("nodebug")
     fn randint16(self) -> Int16:
@@ -245,7 +245,7 @@ struct randn:
             A random integer value of type Int16.
         """
         var val = UInt64(self._seed)
-        return Int16((self.u64(val) >> 4).cast[DType.int16]()) % Int16.MAX_FINITE
+        return Int16((self.u64(val) >> 2).cast[DType.int16]()) % Int16.MAX_FINITE
 
     @always_inline("nodebug")
     fn randint32(self) -> Int32:
@@ -256,7 +256,7 @@ struct randn:
             A random integer value of type Int32.
         """
         var val = UInt64(self._seed)
-        return Int32((self.u64(val) >> 8).cast[DType.int32]()) % Int32.MAX_FINITE
+        return Int32((self.u64(val) >> 4).cast[DType.int32]()) % Int32.MAX_FINITE
 
     @always_inline("nodebug")
     fn randint64(self) -> Int64:
@@ -267,7 +267,7 @@ struct randn:
             A random integer value of type Int64.
         """
         var val = UInt64(self._seed)
-        return Int64((self.u64(val) >> 16).cast[DType.int64]()) % Int64.MAX_FINITE
+        return Int64((self.u64(val)).cast[DType.int64]()) % Int64.MAX_FINITE
 
     @always_inline("nodebug")
     fn randf(self) -> Float32:
@@ -278,7 +278,7 @@ struct randn:
             A random floating-point number.
         """
         var val = UInt64(self._seed)
-        return Float32((self.u64(val) >> 8).cast[DType.float32]() % self.F32)
+        return Float32((self.u64(val) >> 16).cast[DType.float32]() % self.F32)
 
     @always_inline("nodebug")
     fn randf16(self) -> Float16:
@@ -340,5 +340,5 @@ fn rand[type : DType](ptr : DTypePointer[type], count : Int):
                 ptr[i] = randn().randf64().cast[type]()
 
         if type.is_bfloat16():
-                ptr[i] = randn().randf16().cast[type]()
+                ptr[i] = randn().randf32().cast[type]()
     parallelize[_rand](count, count)
