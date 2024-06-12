@@ -63,7 +63,7 @@ struct Tensor[type: DType = DType.float32](
     """
     The data is a pointer to a block of memory that holds the elements of the tensor.
     """
-    var grad: Variant[Tensor[type], NoneType]
+    var grad: Variant[Self.Type, NoneType]
     """
     The grad variable holds the gradient of the tensor. It is an optional instance of the TensorType struct.
     This gradient is computed during the backward pass if requires_grad is True.
@@ -88,6 +88,19 @@ struct Tensor[type: DType = DType.float32](
 
     fn __init__(
         inout self,
+        tensortype : TensorType[type],
+        requires_grad : Bool = False,
+        ):
+        self.tensor = tensortype
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = Tensor[type](self.tensor.shape, self.tensor.device).tensor
+        else:
+            self.grad = None
+
+    fn __init__(
+        inout self,
         *shapes: Int,
         device: String = "cpu",
         requires_grad : Bool = False,
@@ -96,7 +109,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -111,7 +124,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shapes, device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -126,7 +139,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -146,7 +159,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shapes, device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -166,7 +179,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shapes, device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -190,7 +203,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -205,7 +218,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shapes, device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
         self = self.fill(value)
@@ -220,7 +233,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -234,7 +247,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -248,7 +261,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shapes, device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -262,7 +275,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -276,7 +289,7 @@ struct Tensor[type: DType = DType.float32](
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = TensorType[type](shape(shapes), device)
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -888,13 +901,21 @@ struct Tensor[type: DType = DType.float32](
     fn zeros(self: Self):
         memset_zero(self.tensor.data, self.num_elements())
 
+    @always_inline("nodebug")
+    fn require_grad(inout self : Self):
+        self = Self(self.tensor, requires_grad=True)
+    
+    @always_inline("nodebug")
+    fn grads(inout self : Self) -> Self:
+        return Tensor[type](self.grad.take[TensorType[type]]())
+
     fn zero_grad(inout self):
         """
         Zeroes the gradient of the tensor if it requires gradients.
         """
         if self.requires_grad:
             if not self.grad.isa[NoneType]():
-                self.grad = self.grad.take[Tensor[type]]().fill(0)
+                self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
 
     @always_inline
     fn sgd_update(inout self: Self, learning_rate: Float64):
@@ -903,7 +924,7 @@ struct Tensor[type: DType = DType.float32](
         """
         if self.requires_grad:
             if not self.grad.isa[NoneType]():
-                self -= self.grad.take[Tensor[type]]() * learning_rate
+                self -= Self(self.grad.take[TensorType[type]]()) * learning_rate
 
     fn backward(inout self, owned grad_output: Optional[Tensor[type]] = None) raises:
         """
@@ -914,7 +935,7 @@ struct Tensor[type: DType = DType.float32](
         
         if grad_output is None:
             if not self.grad.isa[NoneType]():
-                self.grad = self.grad.take[Tensor[type]]().fill(0.0)
+                self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
         
         if not self.grad_fn.isa[NoneType]():
             var func = self.grad_fn.take[Function]()
