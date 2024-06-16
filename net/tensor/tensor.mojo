@@ -275,37 +275,6 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         self.grad_fn = None
         if self.requires_grad:
             self.grad = Tensor[type](self.tensor.shape, device).tensor
-<<<<<<< HEAD
-        else:
-            self.grad = None
-
-    fn __init__(
-        inout self: Self,
-        shapes: TensorShape,
-        device: String = "cpu",
-        requires_grad : Bool = False,
-    ):
-        self.tensor = TensorType[type](shape(shapes), device)
-        self.requires_grad = requires_grad
-        self.grad_fn = None
-        if self.requires_grad:
-            self.grad = Tensor[type](self.tensor.shape, device).tensor
-        else:
-            self.grad = None
-
-    fn __init__(
-        inout self: Self,
-        shapes: TensorSpec,
-        device: String = "cpu",
-        requires_grad : Bool = False,
-    ):
-        self.tensor = TensorType[type](shape(shapes), device)
-        self.requires_grad = requires_grad
-        self.grad_fn = None
-        if self.requires_grad:
-            self.grad = Tensor[type](self.tensor.shape, device).tensor
-=======
->>>>>>> ec8582f (	modified:   net/tensor/tensor.mojo "fixed recursive struct declaration in grad of Tensor")
         else:
             self.grad = None
 
@@ -940,21 +909,9 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         if self.requires_grad:
             if not self.grad.isa[NoneType]():
                 self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
     
     fn set_gradfn(inout self : Self, func : Function):
         self.grad_fn.set[Function](func)
->>>>>>> ec8582f (	modified:   net/tensor/tensor.mojo "fixed recursive struct declaration in grad of Tensor")
-=======
->>>>>>> b8d96ea (	modified:   net/tensor/tensor.mojo)
-=======
-    
-    fn set_gradfn(inout self : Self, func : Function):
-        self.grad_fn.set[Function](func)
->>>>>>> 3667032 (	modified:   net/tensor/tensor.mojo)
 
     @always_inline
     fn sgd_update(inout self: Self, learning_rate: Float64):
@@ -992,7 +949,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn random(self) -> Self:
-        random.rand[type](self.data(), self.tensor.shape.num_elements)
+        rfill[type](self.tensor.data, self.num_elements())
+        #random.rand[type](self.data(), self.tensor.shape.num_elements)
         return self
 
     @always_inline("nodebug")
