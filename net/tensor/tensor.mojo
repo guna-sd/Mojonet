@@ -588,15 +588,10 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         """The function to call when entering the context."""
         return self^
 
-    # TODO: write a fn for handling tensor Formatting with BUILTIN Formatter support and use here...
     fn __repr__(self: Self) -> String:
-        var output = String()
-        _ = output._unsafe_to_formatter()
-        return output
+        return String.format_sequence(self)
 
-    fn __str__[
-        print_dtype: Bool = True, print_shape: Bool = True
-    ](self: Self) -> String:
+    fn __str__(self: Self) -> String:
         return String.format_sequence(self)
     
     @always_inline("nodebug")
