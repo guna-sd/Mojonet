@@ -23,8 +23,8 @@ struct TensorType[T: DType]:
     fn __init__(inout self: Self, shapes: shape, device: String = "cpu"):
         self.shape = shapes
         self.device = device
-        self.data = DTypePointer[T]().alloc(self.shape.num_elements)
-        memset_zero(self.data, self.shape.num_elements)
+        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
+        memset_zero(self.data, self.shape.numofelements())
 
     fn __init__(
         inout self: Self,
@@ -34,14 +34,14 @@ struct TensorType[T: DType]:
     ):
         self.shape = shapes
         self.device = device
-        self.data = DTypePointer[T]().alloc(self.shape.num_elements)
-        memcpy(self.data, data, self.shape.num_elements)
+        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
+        memcpy(self.data, data, self.shape.numofelements())
 
     fn __copyinit__(inout self: Self, other: Self):
         self.shape = other.shape
-        self.data = DTypePointer[T]().alloc(self.shape.num_elements)
+        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
         self.device = other.device
-        memcpy(self.data, other.data, self.shape.num_elements)
+        memcpy(self.data, other.data, self.shape.numofelements())
 
     fn __moveinit__(inout self: Self, owned existing: Self):
         self.shape = existing.shape
@@ -50,9 +50,7 @@ struct TensorType[T: DType]:
 
 
 @value
-struct Tensor[type: DType = DType.float32](
-    AnyType, CollectionElement, EqualityComparable, Stringable
-):
+struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable, Stringable, Formattable):
     """
     A tensor is a multi-dimensional array of elements.
     """
@@ -151,8 +149,8 @@ struct Tensor[type: DType = DType.float32](
         requires_grad : Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
-        if shapes.num_elements == data.__len__():
-            for i in range(shapes.num_elements):
+        if shapes.numofelements() == data.__len__():
+            for i in range(shapes.numofelements()):
                 tensor_data[i] = data[i]
         self.tensor = TensorType[type](shapes, tensor_data, device)
         tensor_data.free()
@@ -171,8 +169,8 @@ struct Tensor[type: DType = DType.float32](
         requires_grad : Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
-        if shapes.num_elements == data.__len__():
-            for i in range(shapes.num_elements):
+        if shapes.numofelements() == data.__len__():
+            for i in range(shapes.numofelements()):
                 tensor_data[i] = data[i]
         self.tensor = TensorType[type](shapes, tensor_data, device)
         tensor_data.free()
@@ -192,8 +190,8 @@ struct Tensor[type: DType = DType.float32](
     ):
         var tensor_shape = shape(shapes)
         var tensor_data = DTypePointer[type]().alloc(tensor_shape.num_elements)
-        if tensor_shape.num_elements == data.__len__():
-            for i in range(tensor_shape.num_elements):
+        if tensor_shape.numofelements() == data.__len__():
+            for i in range(tensor_shape.numofelements()):
                 tensor_data[i] = data[i]
         else:
             for i in range(data.__len__()):
@@ -206,6 +204,21 @@ struct Tensor[type: DType = DType.float32](
             self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
+
+    fn __init__(
+        inout self,
+        value: Scalar[type],
+        device: String = "cpu",
+        requires_grad : Bool = False,
+    ):
+        self.tensor = TensorType[type](shape(1), device)
+        self.requires_grad = requires_grad
+        self.grad_fn = None
+        if self.requires_grad:
+            self.grad = Tensor[type](self.tensor.shape, device).tensor
+        else:
+            self.grad = None
+        self.store(0,value)
 
     fn __init__(
         inout self,
@@ -293,34 +306,6 @@ struct Tensor[type: DType = DType.float32](
             self.grad = Tensor[type](self.tensor.shape, device).tensor
 =======
 >>>>>>> ec8582f (	modified:   net/tensor/tensor.mojo "fixed recursive struct declaration in grad of Tensor")
-        else:
-            self.grad = None
-
-    fn __init__(
-        inout self: Self,
-        shapes: TensorShape,
-        device: String = "cpu",
-        requires_grad : Bool = False,
-    ):
-        self.tensor = TensorType[type](shape(shapes), device)
-        self.requires_grad = requires_grad
-        self.grad_fn = None
-        if self.requires_grad:
-            self.grad = Tensor[type](self.tensor.shape, device).tensor
-        else:
-            self.grad = None
-
-    fn __init__(
-        inout self: Self,
-        shapes: TensorSpec,
-        device: String = "cpu",
-        requires_grad : Bool = False,
-    ):
-        self.tensor = TensorType[type](shape(shapes), device)
-        self.requires_grad = requires_grad
-        self.grad_fn = None
-        if self.requires_grad:
-            self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
 
@@ -482,8 +467,14 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn __add__(self: Self, other: Self) -> Self:
+        var result : Tensor[type]
         if self.tensor.shape == other.tensor.shape:
-            return tensor_op[type, add](self, other)
+            var requires_grad = self.requires_grad or other.requires_grad
+            result = Tensor[type]((tensor_op[type, add](self, other)).tensor, requires_grad=requires_grad)
+            if result.requires_grad:
+                #result.set_gradfn(Function(GradientAdd[type](self, other)))
+                ...
+            return result
         else:
             return Broadcast_op[type, add](self, other)
 
@@ -637,9 +628,11 @@ struct Tensor[type: DType = DType.float32](
     fn __str__[
         print_dtype: Bool = True, print_shape: Bool = True
     ](self: Self) -> String:
-        return Tensorprinter[tprint, type, print_dtype, print_shape](
-            self.tensor.data, self.shapes()
-        )
+        return String.format_sequence(self)
+    
+    @always_inline("nodebug")
+    fn format_to(self, inout writer : Formatter):
+        TensorPrinter[type](self.tensor.data, self.shapes(), writer)
 
     @always_inline("nodebug")
     fn apply[
@@ -949,6 +942,7 @@ struct Tensor[type: DType = DType.float32](
                 self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
     
     fn set_gradfn(inout self : Self, func : Function):
@@ -956,6 +950,11 @@ struct Tensor[type: DType = DType.float32](
 >>>>>>> ec8582f (	modified:   net/tensor/tensor.mojo "fixed recursive struct declaration in grad of Tensor")
 =======
 >>>>>>> b8d96ea (	modified:   net/tensor/tensor.mojo)
+=======
+    
+    fn set_gradfn(inout self : Self, func : Function):
+        self.grad_fn.set[Function](func)
+>>>>>>> 3667032 (	modified:   net/tensor/tensor.mojo)
 
     @always_inline
     fn sgd_update(inout self: Self, learning_rate: Float64):
@@ -979,7 +978,7 @@ struct Tensor[type: DType = DType.float32](
         
         if not self.grad_fn.isa[NoneType]():
             var func = self.grad_fn.take[Function]()
-            func.invoke[type](self, grad_output.take())
+            func.functions[0].invoke[type](self, grad_output.take())
 
 
     @always_inline("nodebug")
@@ -993,7 +992,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn random(self) -> Self:
-        rfill(self.tensor.data, self.num_elements())
+        random.rand[type](self.data(), self.tensor.shape.num_elements)
         return self
 
     @always_inline("nodebug")
@@ -1096,7 +1095,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn rank(self: Self) -> Int:
-        return self.tensor.shape.ndim
+        return self.tensor.shape.rank
 
     @always_inline("nodebug")
     fn shapes(self: Self) -> shape:
@@ -1117,7 +1116,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn num_elements(self: Self) -> Int:
-        return self.tensor.shape.num_elements
+        return self.tensor.shape.numofelements()
 
     @always_inline("nodebug")
     fn astype[dtype: DType](self: Self) -> Tensor[dtype]:
