@@ -1,4 +1,5 @@
 @value
+@register_passable("trivial")
 struct TensorType[T: DType]:
     """A Underlying Storage that represents the Tensor."""
 
@@ -10,7 +11,7 @@ struct TensorType[T: DType]:
     """
     The shape is representing the dimensions of the tensor.
     """
-    var device: String
+    var device: StringLiteral
     """
     The name of the device the tensor is stored in (default cpu).
     """
@@ -20,7 +21,7 @@ struct TensorType[T: DType]:
         self.shape = shape()
         self.device = "cpu"
 
-    fn __init__(inout self: Self, shapes: shape, device: String = "cpu"):
+    fn __init__(inout self: Self, shapes: shape, device: StringLiteral = "cpu"):
         self.shape = shapes
         self.device = device
         self.data = DTypePointer[T]().alloc(self.shape.numofelements())
@@ -30,27 +31,143 @@ struct TensorType[T: DType]:
         inout self: Self,
         shapes: shape,
         data: DTypePointer[T],
-        device: String = "cpu",
+        device: StringLiteral = "cpu",
     ):
         self.shape = shapes
         self.device = device
         self.data = DTypePointer[T]().alloc(self.shape.numofelements())
         memcpy(self.data, data, self.shape.numofelements())
 
-    fn __copyinit__(inout self: Self, other: Self):
-        self.shape = other.shape
-        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
-        self.device = other.device
-        memcpy(self.data, other.data, self.shape.numofelements())
+    @always_inline("nodebug")
+    fn load[nelts: Int](self, owned index: Int) -> SIMD[T, nelts]:
+        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor data at the specified index.
 
-    fn __moveinit__(inout self: Self, owned existing: Self):
-        self.shape = existing.shape
-        self.data = existing.data
-        self.device = existing.device
+        Parameters:
+            nelts: The number of elements in the SIMD value to load.
+
+        Args:
+            index : The index in the tensor data from which to load the SIMD value. If negative, it is interpreted as an index from the end of the data.
+
+        Returns:
+            The SIMD value loaded from the tensor data at the specified index.
+        """
+        if index < 0:
+            index = self.shape.num_elements + index
+        return self.data.load[width=nelts](index)
+
+    @always_inline("nodebug")
+    fn store[nelts: Int](self, owned index: Int, value: SIMD[T, nelts]):
+        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor data at the specified index.
+
+        Parameters:
+            nelts: The number of elements in the SIMD value to store.
+
+        Args:
+            index : The index in the tensor data at which to store the SIMD value. If negative, it is interpreted as an index from the end of the data.
+            value : The SIMD value to store in the tensor data at the specified index.
+        """
+        if index < 0:
+            index = self.shape.num_elements + index
+        self.data.store[width=nelts](index, value)
+
+    @always_inline("nodebug")
+    fn load[nelts : Int = 1](self, *indices: Int) -> SIMD[T, nelts]:
+        var pos = self.shape.offset(list(indices))
+        return self.load[nelts](pos)
+
+    @always_inline("nodebug")
+    fn load[nelts : Int = 1](self, indices: List[Int]) -> SIMD[T, nelts]:
+        var pos = self.shape.offset(indices)
+        return self.load[nelts](pos)
+
+    @always_inline("nodebug")
+    fn store[nelts : Int = 1](self, indices: List[Int], val : SIMD[T, nelts]):
+        var pos = self.shape.offset(indices)
+        self.store[nelts](pos, val)
+
+    @always_inline("nodebug")
+    fn store[nelts : Int = 1](self, *indices: Int, val : SIMD[T, nelts]):
+        var pos = self.shape.offset(list(indices))
+        self.store[nelts](pos, val)
+
+    @always_inline("nodebug")
+    fn __getitem__(self: Self, index: Int) -> SIMD[T, 1]:
+        return self.load[1](index)
+
+    @always_inline("nodebug")
+    fn __getitem__(self, *indices: Int) -> SIMD[T, 1]:
+        var pos = self.shape.offset(list(indices))
+        return self.load[1](pos)
+
+    @always_inline("nodebug")
+    fn __getitem__(self, indices: List[Int]) -> SIMD[T, 1]:
+        var pos = self.shape.offset(indices)
+        return self.load[1](pos)
+
+    @always_inline("nodebug")
+    fn __setitem__(self: Self, index: Int, val: SIMD[T, 1]):
+        self.store(index, val)
+
+    @always_inline("nodebug")
+    fn __setitem__(self: Self, *indices: Int, val: SIMD[T, 1]):
+        var pos = self.shape.offset(list(indices))
+        self[pos] = val
+
+    @always_inline("nodebug")
+    fn __setitem__(self: Self, indices: List[Int], val: SIMD[T, 1]):
+        var pos = self.shape.offset(indices)
+        self[pos] = val
 
 
 @value
-struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable, Stringable, Formattable):
+struct _TensorIter[
+    T: DType,
+    forward: Bool = True,
+]:
+    """Iterator for Tensor.
+
+    Parameters:
+        T: The type of the elements in the tensor.
+        forward: The iteration direction. `False` is backwards.
+    """
+
+    alias type = Tensor[T]
+
+    var index: Int
+    var src: Self.type
+
+    fn __iter__(self) -> Self:
+        return self
+
+    fn __next__(
+        inout self,
+    ) -> Tensor[T]:
+        @parameter
+        if forward:
+            self.index += 1
+            return self.src[self.index - 1]
+        else:
+            self.index -= 1
+            return self.src[self.index]
+
+    fn __len__(self) -> Int:
+        @parameter
+        if forward:
+            return len(self.src) - self.index
+        else:
+            return self.index
+
+@value
+struct Tensor[type: DType = DType.float32](
+    Absable,
+    Sized, 
+    CollectionElement, 
+    EqualityComparable,
+    Powable,
+    Stringable,
+    Representable, 
+    Formattable
+):
     """
     A tensor is a multi-dimensional array of elements.
     """
@@ -66,7 +183,7 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     The grad variable holds the gradient of the tensor. It is an optional instance of the TensorType struct.
     This gradient is computed during the backward pass if requires_grad is True.
     """
-    
+
     var requires_grad: Bool
     """
     The requires_grad variable indicates whether the tensor requires gradient computation.
@@ -86,22 +203,24 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     fn __init__(
         inout self,
-        tensortype : TensorType[type],
-        requires_grad : Bool = False,
-        ):
+        tensortype: TensorType[type],
+        requires_grad: Bool = False,
+    ):
         self.tensor = tensortype
         self.requires_grad = requires_grad
         self.grad_fn = None
         if self.requires_grad:
-            self.grad = Tensor[type](self.tensor.shape, self.tensor.device).tensor
+            self.grad = Tensor[type](
+                self.tensor.shape, self.tensor.device
+            ).tensor
         else:
             self.grad = None
 
     fn __init__(
         inout self,
         *shapes: Int,
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
         self.requires_grad = requires_grad
@@ -115,8 +234,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         inout self,
         shapes: shape,
         data: DTypePointer[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shapes, data, device)
         self.requires_grad = requires_grad
@@ -130,8 +249,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         inout self,
         *shapes: Int,
         data: DTypePointer[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), data, device)
         self.requires_grad = requires_grad
@@ -145,8 +264,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         inout self,
         shapes: shape,
         data: List[Scalar[type]],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
         if shapes.numofelements() == data.__len__():
@@ -165,8 +284,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         inout self,
         shapes: shape,
         *data: Scalar[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
         if shapes.numofelements() == data.__len__():
@@ -185,8 +304,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         inout self,
         shapes: List[Int],
         *data: Scalar[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         var tensor_shape = shape(shapes)
         var tensor_data = DTypePointer[type]().alloc(tensor_shape.num_elements)
@@ -208,8 +327,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn __init__(
         inout self,
         value: Scalar[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(1), device)
         self.requires_grad = requires_grad
@@ -218,14 +337,14 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
             self.grad = Tensor[type](self.tensor.shape, device).tensor
         else:
             self.grad = None
-        self.store(0,value)
+        self.store(0, value)
 
     fn __init__(
         inout self,
         shapes: shape,
         value: Scalar[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shapes, device)
         self.requires_grad = requires_grad
@@ -239,8 +358,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn __init__(
         inout self,
         shapes: VariadicList[Int],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
         self.requires_grad = requires_grad
@@ -253,8 +372,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn __init__(
         inout self,
         shapes: List[Int],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(shapes), device)
         self.requires_grad = requires_grad
@@ -267,8 +386,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn __init__(
         inout self: Self,
         shapes: shape,
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shapes, device)
         self.requires_grad = requires_grad
@@ -281,8 +400,8 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn __init__(
         inout self: Self,
         data: MojoTensor[type],
-        device: String = "cpu",
-        requires_grad : Bool = False,
+        device: StringLiteral = "cpu",
+        requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shape(data._spec), data._ptr, device)
         self.requires_grad = requires_grad
@@ -304,99 +423,61 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         self.grad = existing.grad
         self.grad_fn = existing.grad_fn
 
-    @always_inline("nodebug")
-    fn load[nelts: Int](self, owned index: Int) -> SIMD[type, nelts]:
-        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor data at the specified index.
-
-        Parameters:
-            nelts: The number of elements in the SIMD value to load.
-
-        Args:
-            index : The index in the tensor data from which to load the SIMD value. If negative, it is interpreted as an index from the end of the data.
-
-        Returns:
-            The SIMD value loaded from the tensor data at the specified index.
-        """
-        if index < 0:
-            index = self.num_elements() + index
-        return self.tensor.data.load[width=nelts](index)
+    fn __iter__(
+        self,
+    ) -> _TensorIter[type, _]:
+        """Iterate over elements of the tensor."""
+        return _TensorIter(0, self)
+    
+    fn __reversed__(
+        self,
+    ) -> _TensorIter[type, False]:
+        """Iterate backwards over the tensor."""
+        return _TensorIter[type, False](len(self), self)
 
     @always_inline("nodebug")
-    fn store[nelts: Int](self, owned index: Int, value: SIMD[type, nelts]):
-        """Loads a SIMD (Single Instruction, Multiple Data) value from the tensor data at the specified index.
-
-        Parameters:
-            nelts: The number of elements in the SIMD value to store.
-
-        Args:
-            index : The index in the tensor data at which to store the SIMD value. If negative, it is interpreted as an index from the end of the data.
-            value : The SIMD value to store in the tensor data at the specified index.
-        """
-        if index < 0:
-            index = self.num_elements() + index
-        self.tensor.data.store[width=nelts](index, value)
+    fn load[nelts: Int = 1](self, index: Int) -> SIMD[type, nelts]:
+        return self.tensor.load[nelts](index)
 
     @always_inline("nodebug")
-    fn load(self, index: Int) -> SIMD[type, 1]:
-        return self.load[1](index)
-
-    @always_inline("nodebug")
-    fn load[nelts: Int](self, *indices: Int) -> SIMD[type, nelts]:
-        var pos = self.tensor.shape.offset(list(indices))
-        return self.load[nelts](pos)
-
-    @always_inline("nodebug")
-    fn load(self, *indices: Int) -> SIMD[type, 1]:
-        var pos = self.tensor.shape.offset(list(indices))
-        return self.load[1](pos)
-
-    @always_inline("nodebug")
-    fn store(self: Self, index: Int, val: SIMD[type, 1]):
-        self.store[1](index, val)
+    fn load[nelts : Int](self, *indices: Int) -> SIMD[type, nelts]:
+        return self.tensor.load[nelts](list(indices))
 
     @always_inline("nodebug")
     fn store[nelts: Int](self: Self, *indices: Int, val: SIMD[type, nelts]):
-        var pos = self.tensor.shape.offset(list(indices))
-        self.store[nelts](pos, val)
+        self.tensor.store[nelts](list(indices), val)
 
     @always_inline("nodebug")
-    fn store(self: Self, *indices: Int, val: SIMD[type, 1]):
-        var pos = self.tensor.shape.offset(list(indices))
-        self.store(pos, val)
+    fn store[nelts: Int](self: Self, indices: List[Int], val: SIMD[type, nelts]):
+        self.tensor.store[nelts](indices, val)
 
     @always_inline("nodebug")
-    fn store(self: Self, indices: List[Int], val: SIMD[type, 1]):
-        var pos = self.tensor.shape.offset(indices)
-        self.store(pos, val)
+    fn store[nelts: Int = 1](self: Self, index: Int, val: SIMD[type, nelts]):
+        self.tensor.store[nelts](index, val)
 
+    @always_inline("nodebug")
     fn __getitem__(self: Self, index: Int) -> SIMD[type, 1]:
-        return self.load[1](index)
+        return self.tensor[index]
 
-    fn __getattr__[index: Int](self: Self) -> SIMD[type, 1]:
-        return self.load[1](index)
-
+    @always_inline("nodebug")
     fn __getitem__(self, *indices: Int) -> SIMD[type, 1]:
-        var pos = self.tensor.shape.offset(list(indices))
-        return self.load[1](pos)
+        return self.tensor[list(indices)]
 
-    fn __getitem__[*indices: Int](self) -> SIMD[type, 1]:
-        var pos = self.tensor.shape.offset(list(indices))
-        return self.load[1](pos)
-
+    @always_inline("nodebug")
     fn __getitem__(self, indices: List[Int]) -> SIMD[type, 1]:
-        var pos = self.tensor.shape.offset(indices)
-        return self.load[1](pos)
+        return self.tensor[indices]
 
+    @always_inline("nodebug")
     fn __setitem__(self: Self, index: Int, val: SIMD[type, 1]):
-        self.store(index, val)
+        self.tensor[index] = val
 
+    @always_inline("nodebug")
     fn __setitem__(self: Self, *indices: Int, val: SIMD[type, 1]):
-        var pos = self.tensor.shape.offset(list(indices))
-        self[pos] = val
+        self.tensor[list(indices)] = val
 
+    @always_inline("nodebug")
     fn __setitem__(self: Self, indices: List[Int], val: SIMD[type, 1]):
-        var pos = self.tensor.shape.offset(indices)
-        self[pos] = val
+        self.tensor[indices] = val
 
     @always_inline("nodebug")
     fn __eq__(self: Self, other: Self) -> Bool:
@@ -436,12 +517,16 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __add__(self: Self, other: Self) -> Self:
-        var result : Tensor[type]
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+        var result: Tensor[type]
         if self.tensor.shape == other.tensor.shape:
             var requires_grad = self.requires_grad or other.requires_grad
-            result = Tensor[type]((tensor_op[type, add](self, other)).tensor, requires_grad=requires_grad)
+            result = Tensor[type](
+                (tensor_op[type, add](self, other)).tensor,
+                requires_grad=requires_grad,
+            )
             if result.requires_grad:
-                #result.set_gradfn(Function(GradientAdd[type](self, other)))
+                # result.set_gradfn(Function(GradientAdd[type](self, other)))
                 ...
             return result
         else:
@@ -449,14 +534,17 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __add__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, add](self, other)
 
     @always_inline("nodebug")
     fn __radd__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, add](self, other)
 
     @always_inline("nodebug")
     fn __iadd__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             self = tensor_op[type, add](self, other)
         else:
@@ -464,10 +552,12 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __iadd__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = scalar_op[type, add](self, other)
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             return tensor_op[type, sub](self, other)
         else:
@@ -475,14 +565,17 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, sub](self, other)
 
     @always_inline("nodebug")
     fn __rsub__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, sub](self, other)
 
     @always_inline("nodebug")
     fn __isub__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             self = tensor_op[type, sub](self, other)
         else:
@@ -490,10 +583,12 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __isub__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = scalar_op[type, sub](self, other)
 
     @always_inline("nodebug")
     fn __mul__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             return tensor_op[type, mul](self, other)
         else:
@@ -501,14 +596,17 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __mul__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, mul](self, other)
 
     @always_inline("nodebug")
     fn __rmul__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, mul](self, other)
 
     @always_inline("nodebug")
     fn __imul__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             self = tensor_op[type, mul](self, other)
         else:
@@ -516,10 +614,12 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __imul__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = scalar_op[type, mul](self, other)
 
     @always_inline("nodebug")
     fn __truediv__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             return tensor_op[type, div](self, other)
         else:
@@ -527,14 +627,17 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __truediv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, div](self, other)
 
     @always_inline("nodebug")
     fn __rtruediv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         return scalar_op[type, div](self, other)
 
     @always_inline("nodebug")
     fn __itruediv__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
             self = tensor_op[type, div](self, other)
         else:
@@ -542,6 +645,7 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
     @always_inline("nodebug")
     fn __itruediv__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = scalar_op[type, div](self, other)
 
     @always_inline("nodebug")
@@ -549,25 +653,80 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         return self.multiply(Scalar[type](-1))
 
     @always_inline("nodebug")
+    fn __pow__(self: Self, exponent: Tensor[type]) -> Self:
+        """
+        Exponentiation of each element in the tensor by the given exponent.
+        """
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if not is_compatible(self.shapes().Shapes(), exponent.shapes().Shapes()): 
+            print(Error("Tensors must be in same shape"))
+            exit(1)
+        alias nelts = simdwidthof[type]() * 2
+        var result = Tensor[type](self.shapes())
+
+        @parameter
+        fn operation[nelts: Int](idx: Int):
+            result.store(idx, pow(self.load(idx), self.load(idx)))
+        vectorize[operation, nelts, unroll_factor=4](self.num_elements())
+
+        for i in range(result.num_elements() - (result.num_elements() % nelts)):
+            if i >= result.num_elements():
+                break
+            if i % nelts == 0:
+                continue
+            result.store(i, pow(self.load(i), exponent.load(i)))
+        return result
+
+    @always_inline("nodebug")
     fn __pow__(self: Self, exponent: Int) -> Self:
         """
         Exponentiation of each element in the tensor by the given exponent.
         """
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         var result = self
-
+        alias nelts = simdwidthof[type]() * 2
+        
         @parameter
-        fn power[nelts: Int](i: Int):
-            result.tensor.data[i] = pow(self.tensor.data[i], exponent)
+        fn power[nelts : Int](idx : Int):
+            result.tensor.data[idx] = pow(result.load(idx), exponent)
 
-        vectorize[power, 1](self.num_elements())
+        vectorize[power, nelts](result.num_elements())
+        for index in range(
+            self.num_elements() - (self.num_elements() % nelts),
+            self.num_elements(),
+        ):
+            result.store(index, pow(result.load(index), exponent))
         return result
+
 
     @always_inline("nodebug")
     fn __ipow__(inout self: Self, exponent: Int):
         """
         In-place exponentiation of each element in the tensor by the given exponent.
         """
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = self.__pow__(exponent)
+
+    @always_inline
+    fn __abs__(self) -> Self:
+        var result = self
+        alias nelts = simdwidthof[type]() * 2
+
+        @parameter
+        if type.is_unsigned() or type.is_bool():
+            return result
+        
+        @parameter
+        fn absolute[nelts : Int](idx : Int):
+            result.tensor.data[idx] = abs(result.load(idx))
+
+        vectorize[absolute, nelts](result.num_elements())
+        for index in range(
+            self.num_elements() - (self.num_elements() % nelts),
+            self.num_elements(),
+        ):
+            result.store(index, abs(result.load(index)))
+        return result
 
     @always_inline
     fn __matmul__(self: Self, other: Self) -> Self:
@@ -588,15 +747,29 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         """The function to call when entering the context."""
         return self^
 
+    fn __len__(self) -> Int:
+        return self.tensor.shape[0]
+
     fn __repr__(self: Self) -> String:
-        return String.format_sequence(self)
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to[True, True](writer)
+        return output^
 
     fn __str__(self: Self) -> String:
         return String.format_sequence(self)
-    
+
     @always_inline("nodebug")
-    fn format_to(self, inout writer : Formatter):
+    fn format_to(self, inout writer: Formatter):
         TensorPrinter[type](self.tensor.data, self.shapes(), writer)
+
+    @always_inline("nodebug")
+    fn format_to[
+        print_type: Bool, print_shape: Bool
+    ](self, inout writer: Formatter):
+        TensorPrinter[type, print_type, print_shape](
+            self.tensor.data, self.shapes(), writer
+        )
 
     @always_inline("nodebug")
     fn apply[
@@ -740,14 +913,14 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
         @parameter
         fn _sum[nelts: Int](i: Int):
-            result += self[i].reduce_add()
+            result += self.load(i).reduce_add()
 
         vectorize[_sum, nelts](self.num_elements())
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            result += self[i]
+            result += self.load(i)
 
         return result
 
@@ -764,14 +937,14 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
         @parameter
         fn _max[nelts: Int](i: Int):
-            result = max(result, self[i])
+            result = max(result, self.load(i))
 
         vectorize[_max, nelts](self.num_elements())
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            result = max(result, self[i])
+            result = max(result, self.load(i))
 
         return result
 
@@ -788,14 +961,14 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
         @parameter
         fn _min[nelts: Int](i: Int):
-            result = min(result, self[i])
+            result = min(result, self.load(i))
 
         vectorize[_min, nelts](self.num_elements())
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            result = min(result, self[i])
+            result = min(result, self.load(i))
 
         return result
 
@@ -822,31 +995,66 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
         @parameter
         fn _prod[nelts: Int](i: Int):
-            result *= self[i].reduce_mul()
+            result *= self.load(i).reduce_mul()
 
         vectorize[_prod, nelts](self.num_elements())
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            result *= self[i]
+            result *= self.load(i)
         return result
 
     @always_inline("nodebug")
-    fn relu(inout self : Self) -> Self:
+    fn relu(inout self: Self) -> Self:
+        """
+        Function `relu`: apply ReLU activation to given Tensor.
+        ReLU activation is defined as `max(0, x)` for each element x in the Tensor.
+
+        Returns:
+            Tensor: New Tensor with ReLU applied element-wise.
+        """
         return relu[type](self)
 
     @always_inline("nodebug")
-    fn tanh(inout self : Self) -> Self:
+    fn tanh(inout self: Self) -> Self:
+        """ Function `tanh`: apply hyperbolic tangent activation to given Tensor.
+
+        Returns:
+            A new Tensor with the hyperbolic tangent of the input tensor elements applied.
+        """
         return tanh[type](self)
 
     @always_inline("nodebug")
-    fn gelu(inout self : Self) -> Self:
+    fn gelu(inout self: Self) -> Self:
+        """
+        Function `gelu`: apply GELU activation to given Tensor.
+        GELU activation is defined as `x * Φ(x), where Φ(x)` is the CDF of the standard normal distribution.
+
+        Returns:
+            Tensor: New Tensor with GELU applied element-wise.
+        """
         return gelu[type](self)
 
     @always_inline("nodebug")
-    fn silu(inout self : Self) -> Self:
+    fn silu(inout self: Self) -> Self:
+        """
+        Function `silu`: apply SiLU (Swish) activation to given Tensor.
+        SiLU activation is defined as `x * sigmoid(x)` for each element x in the Tensor.
+
+        Returns:
+            Tensor: New Tensor with SiLU applied element-wise.
+        """
         return silu[type](self)
+    
+    @always_inline("nodebug")
+    fn sigmoid(inout self: Self) -> Self:
+        """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+
+        Returns:
+            A new Tensor where each element is transformed by the sigmoid function.
+        """
+        return sigmoid[type](self)
 
     @always_inline("nodebug")
     fn list(self) -> List[Scalar[type]]:
@@ -873,7 +1081,7 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
 
         @parameter
         fn arng[nelts: Int](i: Int):
-            result[i] = value
+            result.store(i, value)
             value += step
 
         if end == 0:
@@ -890,11 +1098,11 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         memset_zero(self.tensor.data, self.num_elements())
 
     @always_inline("nodebug")
-    fn require_grad(inout self : Self):
+    fn require_grad(inout self: Self):
         self = Self(self.tensor, requires_grad=True)
-    
+
     @always_inline("nodebug")
-    fn grads(inout self : Self) -> Self:
+    fn grads(inout self: Self) -> Self:
         return Tensor[type](self.grad.take[TensorType[type]]())
 
     fn zero_grad(inout self):
@@ -903,9 +1111,11 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         """
         if self.requires_grad:
             if not self.grad.isa[NoneType]():
-                self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
-    
-    fn set_gradfn(inout self : Self, func : Function):
+                self.grad = (
+                    Self(self.grad.take[TensorType[type]]()).fill(0)
+                ).tensor
+
+    fn set_gradfn(inout self: Self, func: Function):
         self.grad_fn.set[Function](func)
 
     @always_inline
@@ -917,21 +1127,26 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
             if not self.grad.isa[NoneType]():
                 self -= Self(self.grad.take[TensorType[type]]()) * learning_rate
 
-    fn backward(inout self, owned grad_output: Optional[Tensor[type]] = None) raises:
+    fn backward(
+        inout self, owned grad_output: Optional[Tensor[type]] = None
+    ) raises:
         """
         Perform the backward pass starting from this tensor, propagating gradients using the grad_fn if present.
         """
         if not self.requires_grad:
-            print("Backward called on a tensor that does not require gradients.")
-        
+            print(
+                "Backward called on a tensor that does not require gradients."
+            )
+
         if grad_output is None:
             if not self.grad.isa[NoneType]():
-                self.grad = (Self(self.grad.take[TensorType[type]]()).fill(0)).tensor
-        
+                self.grad = (
+                    Self(self.grad.take[TensorType[type]]()).fill(0)
+                ).tensor
+
         if not self.grad_fn.isa[NoneType]():
             var func = self.grad_fn.take[Function]()
             func.functions[0].invoke[type](self, grad_output.take())
-
 
     @always_inline("nodebug")
     fn ones(self: Self):
@@ -945,7 +1160,7 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     @always_inline("nodebug")
     fn random(self) -> Self:
         rfill[type](self.tensor.data, self.num_elements())
-        #random.rand[type](self.data(), self.tensor.shape.num_elements)
+        # random.rand[type](self.data(), self.tensor.shape.num_elements)
         return self
 
     @always_inline("nodebug")
@@ -1062,7 +1277,7 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
     fn dtype(self: Self) -> String:
         return type.__str__()
 
-    #TODO: Add support for CUDA
+    # TODO: Add support for CUDA
     @always_inline("nodebug")
     fn device(self: Self) -> String:
         return self.tensor.device
@@ -1072,21 +1287,27 @@ struct Tensor[type: DType = DType.float32](CollectionElement, EqualityComparable
         return self.tensor.shape.numofelements()
 
     @always_inline("nodebug")
-    fn astype[dtype: DType](self: Self) -> Tensor[dtype]:
-        var casted = Tensor[dtype](self.tensor.shape)
-        alias nelts = simdwidthof[dtype]() * 2
+    fn astype[des: DType](self: Self) -> Tensor[des]:
+        var casted = Tensor[des](self.tensor.shape)
+        alias nelts = simdwidthof[des]() * 2
 
         @parameter
         fn cast_single_element[nelts: Int](index: Int):
-            casted.store[nelts](index, self[index].cast[dtype]())
+            casted.tensor.store[nelts](
+                index, self.tensor.load[nelts](index).cast[des]()
+            )
 
         vectorize[cast_single_element, nelts](self.num_elements())
         for index in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            casted[index] = self[index].cast[dtype]()
+            casted.store(index, self.load(index).cast[des]())
         return casted
+
+    @always_inline("nodebug")    
+    fn cast[dest : DType](self : Self) -> Tensor[dest]:
+        return self.astype[dest]()
 
     @always_inline("nodebug")
     fn num_bytes(self: Self) -> Int:

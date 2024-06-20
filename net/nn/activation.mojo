@@ -59,7 +59,7 @@ fn tanh[type : DType](Input: Tensor[type]) -> Tensor[type]:
         for n in range(num_elements - (num_elements % nelts), num_elements):
             Output[n] = math.tanh(Input[n])
 
-    parallelize[calc_row](num_elements // nelts)
+    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
@@ -79,7 +79,7 @@ fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(`_` : Int):
+    fn calc_row(`_` : Int):
         @parameter
         fn sigmoid_op[nelts: Int](n: Int):
             Output.store[nelts](n, sigmoid[type,nelts](Input.load[nelts](n)))
@@ -89,7 +89,7 @@ fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
         for n in range(num_elements - (num_elements % nelts), num_elements):
             Output[n] = sigmoid(Input[n])
 
-    parallelize[calc_elem](num_elements // nelts)
+    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
@@ -110,7 +110,7 @@ fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(`_` : Int):
+    fn calc_row(`_` : Int):
         @parameter
         fn relu_op[nelts: Int](n: Int):
             Output.store[nelts](n, relu[type,nelts](Input.load[nelts](n)))
@@ -118,9 +118,9 @@ fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
         vectorize[relu_op, nelts](num_elements - (num_elements % nelts))
 
         for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = relu(Input[n])
+            Output[n] = relu[type, 1](Input[n])
 
-    parallelize[calc_elem](num_elements // nelts)
+    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
@@ -141,7 +141,7 @@ fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(`_` : Int):
+    fn calc_row(`_` : Int):
         @parameter
         fn gelu_op[nelts: Int](n: Int):
             Output.store[nelts](n, gelu[type, nelts](Input.load[nelts](n)))
@@ -150,9 +150,9 @@ fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
         for n in range(num_elements - (num_elements % nelts), num_elements):
             Output[n] = gelu(Input[n])
 
-    parallelize[calc_elem](num_elements // nelts)
-
+    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
+
 
 
 @always_inline("nodebug")
@@ -172,7 +172,7 @@ fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_elem(`_` : Int):
+    fn calc_row(`_` : Int):
         @parameter
         fn silu_op[nelts: Int](n: Int):
             Output.store[nelts](n,(Input.load[nelts](n) * sigmoid[type,nelts](Input.load[nelts](n))))
@@ -181,9 +181,9 @@ fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
         for n in range(num_elements - (num_elements % nelts), num_elements):
             Output[n] = Input[n] * sigmoid(Input[n])
 
-    parallelize[calc_elem](num_elements // nelts)
-
+    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
+
 
 
 @value
@@ -294,15 +294,14 @@ struct ReLU[type : DType]:
         var num_elements = Input.num_elements()
 
         @parameter
-        fn calc_elem(index: Int):
+        fn calc(index: Int):
             var grad_val = GradOutput.load(index)
             if Input.load(index) > 0:
                 grad.store(index, grad_val)
             else:
                 grad.store(index, 0)
 
-        parallelize[calc_elem](num_elements)
-
+        parallelize[calc](num_elements)
         return grad
 
 @value

@@ -1,11 +1,10 @@
-alias TensorStart = "\nTensor("
-alias TensorEnd = ")\n"
+alias TensorStart = "Tensor("
+alias TensorEnd = ")"
 alias SquareBracketL = "["
 alias SquareBracketR = "]"
-alias Truncation = "...,"
-alias Strdtype = ",  dtype="
-alias Strshape = ", shape="
-alias Comma = ", "
+alias Truncation = " ..., "
+alias CompactMaxElemsToPrint = 19
+alias CompactElemPerSide = 3
 
 @register_passable("trivial")
 struct shape:
@@ -18,6 +17,13 @@ struct shape:
     """`rank` : The number of dimensions in the tensor, also known as its rank."""
     var num_elements : Int
     """`num_elements:` The total number of elements that the tensor can hold, calculated as the product of its dimensions."""
+
+    @always_inline("nodebug")
+    fn __init__(inout self):
+        self.shapes = StaticIntTuple[self.maxrank]()
+        self.strides = calculate_strides(self.shapes)
+        self.num_elements = num_elements(list(self.shapes, 0))
+        self.rank = 0
 
     @always_inline("nodebug")
     fn __init__[*element_types : Intable](inout self, owned *elements : *element_types):
@@ -381,34 +387,6 @@ fn bytes[type : DType](num_elements : Int) -> Int:
 
 
 @always_inline("nodebug")
-fn max_elems_row(shape: shape) -> Int:
-    """
-    Determines the maximum number of elements per row based on the shape of the tensor and the console printing limit.
-    Adjusts the elements per row to optimize for divisibility of the shape.
-
-    Args:
-        shape: The shape of the tensor.
-
-    Returns:
-        The maximum number of elements per row.
-    """
-    if shape.num_elements <= 1:
-        return shape.num_elements
-
-    var elements_per_row = 1
-    for i in range(shape.rank - 1):
-        elements_per_row *= shape.Shapes()[i]
-
-    var max_elements_per_row = 8 
-    for i in range(2, elements_per_row + 1):
-        if elements_per_row % i == 0:
-            max_elements_per_row = int(elements_per_row / i)
-            break
-
-    return min(max_elements_per_row, 8)
-
-
-@always_inline("nodebug")
 fn complete[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter):
     """
     Concatenates the elements of a tensor into a string, separated by commas, rounded, and formatted based on the specified width.
@@ -427,30 +405,31 @@ fn complete[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter
 
 
 @always_inline("nodebug")
-fn _serialize_elements[type : DType,](ptr: DTypePointer, len: Int,max_elements_per_row : Int, inout writer : Formatter):
+fn _serialize_elements[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter):
     """
     Serializes the elements of a tensor into a string representation, including square brackets.
 
     Args:
         ptr: A pointer to the data type of the tensor elements.
         len: The number of elements to serialize.
-        max_elements_per_row: The maximum number of elements to serialize in the row.
         writer: A formatter to format the elements.
     """
 
-    if len == 0:
-        return
     writer.write_str(SquareBracketL)
 
-    var elements_in_row = 0
-    for i in range(len):
-        if i > 0:
-            writer.write_str(Comma)
-        if elements_in_row == max_elements_per_row:
-            writer.write_str("\n\t ")
-            elements_in_row = 0
-        complete[type](ptr + i, 1, writer)
-        elements_in_row += 1
+    if len == 0:
+        writer.write_str(SquareBracketR)
+        return
+
+    if len < CompactMaxElemsToPrint:
+        complete[type](ptr, len, writer)
+        writer.write_str(SquareBracketR)
+        return
+
+    complete[type](ptr, CompactElemPerSide, writer)
+    writer.write_str(", ")
+    writer.write_str(Truncation)
+    complete[type](ptr + len - CompactElemPerSide, CompactElemPerSide, writer)
 
     writer.write_str(SquareBracketR)
     return
@@ -503,18 +482,15 @@ fn _format_scalar[
 
 
 @always_inline("nodebug")
-fn TensorPrinter[type : DType](ptr : DTypePointer[type], shape : shape, inout writer : Formatter):
+fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape, inout writer : Formatter):
     var rank = shape.rank
-    if rank == 0:
-        writer.write_str("\nTensor()")
-        return
+
     writer.write_str(TensorStart)
 
     var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
     var row_elem_count = 1 if rank < 2 else shape.Shapes()[-2]
 
     var matrix_elem_count = column_elem_count * row_elem_count
-    var max_elements_per_row = max_elems_row(shape)
     
     for _ in range(2,rank):
         writer.write_str(SquareBracketL)
@@ -532,22 +508,45 @@ fn TensorPrinter[type : DType](ptr : DTypePointer[type], shape : shape, inout wr
 
         var row_idx = 0
         while row_idx < row_elem_count:
-            if row_idx > 0:
+            if row_idx > 0 and row_elem_count > CompactMaxElemsToPrint:
+                writer.write_str("\n\t ")
+
+            if row_idx > 0 and row_elem_count <= CompactMaxElemsToPrint:
                 writer.write_str("\n\t")
 
             _serialize_elements[type](
             ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count,max_elements_per_row, writer)
+            column_elem_count, writer)
             row_idx += 1
 
             if row_idx != row_elem_count:
                 writer.write_str(", ")
+
+            if (row_elem_count >= CompactMaxElemsToPrint and row_idx == CompactElemPerSide):
+                writer.write_str("\n\t")
+                writer.write_str(Truncation)
+                row_idx = row_elem_count - CompactElemPerSide
             
         writer.write_str(SquareBracketR)
         matrix_idx+=1
+        if (num_matrices >= CompactMaxElemsToPrint and matrix_idx == CompactElemPerSide):
+            writer.write_str("\n\n\t ")
+            writer.write_str("...")
+            matrix_idx = num_matrices - CompactElemPerSide
 
     for _ in range(2,rank):
         writer.write_str(SquareBracketR)
+
+    if print_type:
+        var buf = (",  dtype: " + type.__repr__())
+        var typeslice = StringSlice[False, __lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_uint8_ptr(), len=len(buf))
+        writer.write_str(typeslice)
+
+    if print_shape:
+        var buf = (",  shape: "+shape.__str__())
+        var shapeslice = StringSlice[False, __lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_uint8_ptr(), len=len(buf))
+        writer.write_str(shapeslice)
+
     writer.write_str(TensorEnd)
     return
 
