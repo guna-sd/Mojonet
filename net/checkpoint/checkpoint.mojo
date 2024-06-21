@@ -18,9 +18,9 @@ struct Serialize:
         self = Serialize()
         self.storage.append(data)
 
-struct ckpt:
-    var filename : String
-    var path : String
-    var steps : Int
-    var type : String
-    var model : Module
+# struct ckpt:
+#     var filename : String
+#     var path : String
+#     var steps : Int
+#     var type : String
+#     var model : Module
