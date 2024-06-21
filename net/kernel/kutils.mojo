@@ -1,16 +1,27 @@
 @always_inline("nodebug")
-fn is_compatible(A : List[Int], B : List[Int]) -> Bool:
+fn is_compatible(A: List[Int], B: List[Int]) -> Bool:
     for i in range(len(A)):
         if A[i] != B[i]:
-            print("Incompatible Shapes: Tensors must have the same shape got [",A[i],"] and [",B[i],"] at [",i,"]")
+            print(
+                "Incompatible Shapes: Tensors must have the same shape got [",
+                A[i],
+                "] and [",
+                B[i],
+                "] at [",
+                i,
+                "]",
+            )
             return False
     return True
 
 
 @always_inline("nodebug")
-fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
-        SIMD[dtype, nelts], SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
-            t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
+fn tensor_op[
+    dtype: DType,
+    func: fn[dtype: DType, nelts: Int] (
+        SIMD[dtype, nelts], SIMD[dtype, nelts]
+    ) -> SIMD[dtype, nelts],
+](t1: Tensor[dtype], t2: Tensor[dtype]) -> Tensor[dtype]:
     """
     Performs an element-wise operation on two tensors of equal shape.
 
@@ -25,31 +36,33 @@ fn tensor_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     Returns:
         Returns Tensor[dtype] output tensor.
     """
-    if not is_compatible(t1.shapes().Shapes(), t2.shapes().Shapes()): 
+    if not is_compatible(t1.shapes().Shapes(), t2.shapes().Shapes()):
         print(Error("Tensors must be in same shape"))
         exit(1)
     alias nelts = simdwidthof[dtype]() * 2
     var result = Tensor[dtype](t1.shapes())
+    var num_elements = result.num_elements()
 
     @parameter
     fn operation[nelts: Int](idx: Int):
-        result.store(idx, func(t1.load(idx), t2.load(idx)))
-    vectorize[operation, nelts, unroll_factor=4](t1.num_elements())
+        result.store[nelts](
+            idx, func[dtype, nelts](t1.load[nelts](idx), t2.load[nelts](idx))
+        )
 
-    for i in range(result.num_elements() - (result.num_elements() % nelts)):
-        if i >= result.num_elements():
-            break
-        if i % nelts == 0:
-            continue
+    vectorize[operation, nelts](num_elements - (num_elements % nelts))
+
+    for i in range(num_elements - (num_elements % nelts), num_elements):
         result.store(i, func(t1.load(i), t2.load(i)))
-    
     return result
 
 
 @always_inline("nodebug")
-fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
-        SIMD[dtype, nelts], SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
-    Input : Tensor[dtype], value : SIMD[dtype,1]) -> Tensor[dtype]:
+fn scalar_op[
+    dtype: DType,
+    func: fn[dtype: DType, nelts: Int] (
+        SIMD[dtype, nelts], SIMD[dtype, nelts]
+    ) -> SIMD[dtype, nelts],
+](Input: Tensor[dtype], value: SIMD[dtype, 1]) -> Tensor[dtype]:
     """
     This function performs a scalar operation on a tensor.
 
@@ -66,49 +79,59 @@ fn scalar_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
     """
     alias nelts = simdwidthof[dtype]() * 2
     var Output = Tensor[dtype](Input.shapes())
+    var num_elements = Output.num_elements()
 
     @parameter
-    fn operation[nelts : Int](idx : Int):
-        Output.store(idx,func(Input[idx], value))
-    vectorize[operation, nelts, unroll_factor=4](Input.num_elements())
+    fn operation[nelts: Int](idx: Int):
+        Output.store(idx, func(Input[idx], value))
 
-    for i in range(Output.num_elements() - (Output.num_elements() % nelts)):
-        if i >= Output.num_elements():
-            break
-        if i % nelts == 0:
-            continue
+    vectorize[operation, nelts, unroll_factor=4](
+        num_elements - (num_elements % nelts)
+    )
+
+    for i in range(num_elements - (num_elements % nelts), num_elements):
         Output.store(i, func(Input.load(i), value))
-    
+
     return Output
 
 
 @always_inline("nodebug")
-fn Broadcast_op[dtype : DType, func: fn[dtype: DType, nelts: Int] (
-        SIMD[dtype, nelts], SIMD[dtype, nelts]) -> SIMD[dtype, nelts]](
-            tensor1: Tensor[dtype], tensor2: Tensor[dtype]) -> Tensor[dtype]:
+fn Broadcast_op[
+    dtype: DType,
+    func: fn[dtype: DType, nelts: Int] (
+        SIMD[dtype, nelts], SIMD[dtype, nelts]
+    ) -> SIMD[dtype, nelts],
+](tensor1: Tensor[dtype], tensor2: Tensor[dtype]) -> Tensor[dtype]:
     """Performs an element-wise operation on two tensors using broadcasting."""
     var result_shape = broadcast_shapes(tensor1.shapes(), tensor2.shapes())
     var result = Tensor[dtype](result_shape)
+    var num_elements = result.num_elements()
     alias nelts = simdwidthof[dtype]() * 2
 
     @parameter
     fn vec_op[nelts: Int](i: Int):
-        var flat_index1 = get_broadcast_index(i,tensor1.shapes(), result_shape)
-        var flat_index2 = get_broadcast_index(i,tensor2.shapes(), result_shape)
-        
-        result.store[nelts](i,func[dtype, nelts](tensor1.load[nelts](flat_index1), tensor2.load[nelts](flat_index2)),)
-    vectorize[vec_op, nelts](result.num_elements())
-
-    for i in range(result.num_elements() - (result.num_elements() % nelts)):
-        if i >= result.num_elements():
-            break
-        if i % nelts == 0:
-            continue
         var flat_index1 = get_broadcast_index(i, tensor1.shapes(), result_shape)
         var flat_index2 = get_broadcast_index(i, tensor2.shapes(), result_shape)
-        result.store(i, func(tensor1.load(flat_index1), tensor2.load(flat_index2)))
-    
+
+        result.store[nelts](
+            i,
+            func[dtype, nelts](
+                tensor1.load[nelts](flat_index1),
+                tensor2.load[nelts](flat_index2),
+            ),
+        )
+
+    vectorize[vec_op, nelts](num_elements - (num_elements % nelts))
+
+    for i in range(num_elements - (num_elements % nelts), num_elements):
+        var flat_index1 = get_broadcast_index(i, tensor1.shapes(), result_shape)
+        var flat_index2 = get_broadcast_index(i, tensor2.shapes(), result_shape)
+        result.store(
+            i, func(tensor1.load(flat_index1), tensor2.load(flat_index2))
+        )
+
     return result
+
 
 @always_inline("nodebug")
 fn check_shape(a: shape, b: shape) -> Bool:
@@ -127,13 +150,13 @@ fn check_shape(a: shape, b: shape) -> Bool:
 
     if a.rank == 1 and b.rank == 1:
         return a[0] == b[0]
-    
+
     if a.rank == 1 and b.rank > 1:
         return a[0] == b[b.rank - 2]
 
     if b.rank == 1 and a.rank > 1:
         return a[a.rank - 1] == b[0]
-    
+
     if a[-1] != b[-2]:
         return False
 
@@ -162,7 +185,14 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         var dim1 = shape1[i] if i < shape1.rank - 2 else 1
         var dim2 = shape2[i] if i < shape2.rank - 2 else 1
         if dim1 != dim2 and dim1 != 1 and dim2 != 1:
-            print("Error: Incompatible dimensions at index", i, ":", dim1, "vs", dim2)
+            print(
+                "Error: Incompatible dimensions at index",
+                i,
+                ":",
+                dim1,
+                "vs",
+                dim2,
+            )
             exit(1)
 
         batch_dims.append(max(dim1, dim2))
@@ -172,17 +202,18 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         batch_dims.append(shape2[shape2.rank - 1])
     elif shape1.rank > 1 and shape2.rank == 1:
         batch_dims.append(shape1[shape1.rank - 2])
-    elif shape1.rank ==1 and shape2.rank > 1:
-        batch_dims.append(shape2[shape2.rank - 1]) 
+    elif shape1.rank == 1 and shape2.rank > 1:
+        batch_dims.append(shape2[shape2.rank - 1])
 
     return shape(batch_dims)
 
-struct randn:
-    alias F16 : Float16 = Float16.MAX_FINITE
-    alias F32 : Float32 = 3.4028234481811523
-    alias F64 : Float64 = 3.1415926535897931
 
-    var _seed : Int
+struct randn:
+    alias F16: Float16 = Float16.MAX_FINITE
+    alias F32: Float32 = 3.4028234481811523
+    alias F64: Float64 = 3.1415926535897931
+
+    var _seed: Int
 
     fn __init__(inout self):
         self._seed = time.now()
@@ -204,7 +235,7 @@ struct randn:
         self._seed = time.now()
 
     @always_inline("nodebug")
-    fn seed(inout self, seed : Int):
+    fn seed(inout self, seed: Int):
         """
         Seeds the random number generator with the specified seed.
 
@@ -219,7 +250,7 @@ struct randn:
 
     @staticmethod
     @always_inline("nodebug")
-    fn u64(inout state : UInt64) -> UInt64:
+    fn u64(inout state: UInt64) -> UInt64:
         state ^= state >> 12
         state ^= state << 25
         state ^= state >> 27
@@ -245,7 +276,9 @@ struct randn:
             A random integer value of type Int16.
         """
         var val = UInt64(self._seed)
-        return Int16((self.u64(val) >> 2).cast[DType.int16]()) % Int16.MAX_FINITE
+        return (
+            Int16((self.u64(val) >> 2).cast[DType.int16]()) % Int16.MAX_FINITE
+        )
 
     @always_inline("nodebug")
     fn randint32(self) -> Int32:
@@ -256,7 +289,9 @@ struct randn:
             A random integer value of type Int32.
         """
         var val = UInt64(self._seed)
-        return Int32((self.u64(val) >> 4).cast[DType.int32]()) % Int32.MAX_FINITE
+        return (
+            Int32((self.u64(val) >> 4).cast[DType.int32]()) % Int32.MAX_FINITE
+        )
 
     @always_inline("nodebug")
     fn randint64(self) -> Int64:
@@ -311,34 +346,34 @@ struct randn:
         """
         var val = UInt64(self._seed)
         return Float64((self.u64(val) >> 16).cast[DType.float64]() % self.F64)
-    
+
 
 @always_inline("nodebug")
-fn rand[type : DType](ptr : DTypePointer[type], count : Int):
-
+fn rand[type: DType](ptr: DTypePointer[type], count: Int):
     @parameter
-    fn _rand(i : Int):
+    fn _rand(i: Int):
         if type.is_int8():
-                ptr[i] = randn().randint8().cast[type]()
+            ptr[i] = randn().randint8().cast[type]()
 
         if type.is_int16():
-                ptr[i] = randn().randint16().cast[type]()
+            ptr[i] = randn().randint16().cast[type]()
 
         if type.is_int32():
-                ptr[i] = randn().randint32().cast[type]()
+            ptr[i] = randn().randint32().cast[type]()
 
         if type.is_int64():
-                ptr[i] = randn().randint64().cast[type]()
+            ptr[i] = randn().randint64().cast[type]()
 
         if type.is_float16():
-                ptr[i] = randn().randf16().cast[type]()
+            ptr[i] = randn().randf16().cast[type]()
 
         if type.is_float32():
-                ptr[i] = randn().randf32().cast[type]()
+            ptr[i] = randn().randf32().cast[type]()
 
         if type.is_float64():
-                ptr[i] = randn().randf64().cast[type]()
+            ptr[i] = randn().randf64().cast[type]()
 
         if type.is_bfloat16():
-                ptr[i] = randn().randf32().cast[type]()
+            ptr[i] = randn().randf32().cast[type]()
+
     parallelize[_rand](count, count)

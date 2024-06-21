@@ -1,10 +1,10 @@
 @value
-struct Emmbedding[T : DType = DType.float32]:
-    var num_vocab : Int
-    var num_embeddings : Int
-    var weights : Tensor[T]
+struct Emmbedding[T: DType = DType.float32]:
+    var num_vocab: Int
+    var num_embeddings: Int
+    var weights: Tensor[T]
 
-    fn __init__(inout self, num_vocab : Int, num_embeddings : Int):
+    fn __init__(inout self, num_vocab: Int, num_embeddings: Int):
         self.num_vocab = num_vocab
         self.num_embeddings = num_embeddings
 

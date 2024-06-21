@@ -1,98 +1,59 @@
-fn add[type : DType](owned first: Scalar[type], owned second: Scalar[type]) -> Scalar[type]:
-    """
-    Implementation of addition of integer.
-    """
-
-    while second != 0:
-        var c = first & second
-        first ^= second
-        second = c << 1
-    return first
-
-fn add[type : DType, nelts : Int](first: SIMD[type,nelts], second : SIMD[type,nelts]) -> SIMD[type,nelts]:
-    var result = SIMD[type,nelts]()
-    @parameter
-    fn addition[nelts : Int](i : Int):
-        result[i] = first[i] + second[i]
-    vectorize[addition,nelts](nelts)
-    return result
-
-fn sub[type : DType, nelts : Int](first: SIMD[type,nelts], second : SIMD[type,nelts]) -> SIMD[type,nelts]:
-    var result = SIMD[type,nelts]()
-    @parameter
-    fn subtract[nelts : Int](i : Int):
-        result[i] = first[i] - second[i]
-    vectorize[subtract,nelts](nelts)
-    return result
-
-fn mul[type : DType, nelts : Int](first: SIMD[type,nelts], second : SIMD[type,nelts]) -> SIMD[type,nelts]:
-    var result = SIMD[type,nelts]()
-    @parameter
-    fn multiply[nelts : Int](i : Int):
-        result[i] = first[i] * second[i]
-    vectorize[multiply,nelts](nelts)
-    return result
-
-fn div[type : DType, nelts : Int](first: SIMD[type,nelts], second : SIMD[type,nelts]) -> SIMD[type,nelts]:
-    var result = SIMD[type,nelts]()
-    @parameter
-    fn divide[nelts : Int](i : Int):
-        result[i] = first[i] / second[i]
-    vectorize[divide,nelts](nelts)
-    return result
-
-fn multiply[type : DType](owned a: SIMD[type,1], owned b: SIMD[type,1]) -> SIMD[type,1]:
-    """
-    Multiply 'a' and 'b' using bitwise multiplication.
-    """
-    var res : SIMD[type,1] = 0
-    while b > 0:
-        if b & 1:
-            res += a
-
-        a += a
-        b >>= 1
-
-    return res
-
 @always_inline("nodebug")
-fn relu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return max[type,nelts](value, 0)
+fn relu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return max[type, nelts](value, 0)
 
 
 @always_inline("nodebug")
-fn sigmoid[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return 1.0 / (1.0 + math.exp[type,nelts](-value))
+fn sigmoid[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return 1.0 / (1.0 + math.exp[type, nelts](-value))
 
 
 @always_inline("nodebug")
-fn softplus[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+fn softplus[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return math.log[type, nelts](1.0 + math.exp[type, nelts](value))
 
 
 @always_inline("nodebug")
-fn swish[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+fn swish[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return value * sigmoid[type, nelts](value)
 
 
 @always_inline("nodebug")
-fn tanh[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+fn tanh[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return (2 / (1 + math.exp[type, nelts]((-2 * value)))) - 1
 
 
 @always_inline("nodebug")
-fn gelu[type : DType, nelts : Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return 0.5 * value * (1.0 + math.tanh[type, nelts](math.sqrt[type,nelts](2.0 / pi) * (value + 0.044715 * pow(value, 3))))
+fn gelu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return (
+        0.5
+        * value
+        * (
+            1.0
+            + math.tanh[type, nelts](
+                math.sqrt[type, nelts](2.0 / pi)
+                * (value + 0.044715 * pow(value, 3))
+            )
+        )
+    )
 
 
 @always_inline("nodebug")
-fn squareplus[type : DType, nelts : Int](value: SIMD[type, nelts], beta : SIMD[type,1]) -> SIMD[type, nelts]:
+fn squareplus[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts], beta: SIMD[type, 1]) -> SIMD[type, nelts]:
     return (value + math.sqrt[type, nelts](value**2 + beta)) / 2
 
 
 @always_inline("nodebug")
-fn tanh[type : DType](Input: Tensor[type]) -> Tensor[type]:
-    """ Function `tanh`: apply hyperbolic tangent activation to given Tensor.
+fn tanh[type: DType](Input: Tensor[type]) -> Tensor[type]:
+    """Function `tanh`: apply hyperbolic tangent activation to given Tensor.
 
     Args:
         Input: Input Tensor.
@@ -106,23 +67,20 @@ fn tanh[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(`_` : Int):
-        @parameter
-        fn tanh_op[nelts: Int](n: Int):
-            Output.store[nelts](n, math.tanh[type,nelts](Input.load[nelts](n)))
+    fn op[nelts: Int](n: Int):
+        Output.store[nelts](n, math.tanh[type, nelts](Input.load[nelts](n)))
 
-        vectorize[tanh_op, nelts](num_elements - (num_elements % nelts))
+    vectorize[op, nelts](num_elements - (num_elements % nelts))
 
-        for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = math.tanh(Input[n])
+    for n in range(num_elements - (num_elements % nelts), num_elements):
+        Output[n] = math.tanh(Input[n])
 
-    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
 @always_inline("nodebug")
-fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
-    """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+fn sigmoid[type: DType](Input: Tensor[type]) -> Tensor[type]:
+    """Function `sigmoid`: apply sigmoid activation to given Tensor.
 
     Args:
         Input: Input Tensor.
@@ -136,22 +94,19 @@ fn sigmoid[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(`_` : Int):
-        @parameter
-        fn sigmoid_op[nelts: Int](n: Int):
-            Output.store[nelts](n, sigmoid[type,nelts](Input.load[nelts](n)))
+    fn op[nelts: Int](n: Int):
+        Output.store[nelts](n, sigmoid[type, nelts](Input.load[nelts](n)))
 
-        vectorize[sigmoid_op, nelts](num_elements - (num_elements % nelts))
+    vectorize[op, nelts](num_elements - (num_elements % nelts))
 
-        for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = sigmoid(Input[n])
+    for n in range(num_elements - (num_elements % nelts), num_elements):
+        Output[n] = sigmoid(Input[n])
 
-    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
 @always_inline("nodebug")
-fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+fn relu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `relu`: apply ReLU activation to given Tensor.
     ReLU activation is defined as `max(0, x)` for each element x in the Tensor.
@@ -167,22 +122,19 @@ fn relu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(`_` : Int):
-        @parameter
-        fn relu_op[nelts: Int](n: Int):
-            Output.store[nelts](n, relu[type,nelts](Input.load[nelts](n)))
+    fn op[nelts: Int](n: Int):
+        Output.store[nelts](n, relu[type, nelts](Input.load[nelts](n)))
 
-        vectorize[relu_op, nelts](num_elements - (num_elements % nelts))
+    vectorize[op, nelts](num_elements - (num_elements % nelts))
 
-        for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = relu[type, 1](Input[n])
+    for n in range(num_elements - (num_elements % nelts), num_elements):
+        Output[n] = relu(Input[n])
 
-    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
     return Output
 
 
 @always_inline("nodebug")
-fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+fn gelu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `gelu`: apply GELU activation to given Tensor.
     GELU activation is defined as `x * Φ(x), where Φ(x)` is the CDF of the standard normal distribution.
@@ -198,22 +150,19 @@ fn gelu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(`_` : Int):
-        @parameter
-        fn gelu_op[nelts: Int](n: Int):
-            Output.store[nelts](n, gelu[type, nelts](Input.load[nelts](n)))
-        vectorize[gelu_op, nelts](num_elements - (num_elements % nelts))
+    fn op[nelts: Int](n: Int):
+        Output.store[nelts](n, gelu[type, nelts](Input.load[nelts](n)))
 
-        for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = gelu(Input[n])
+    vectorize[op, nelts](num_elements - (num_elements % nelts))
 
-    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
+    for n in range(num_elements - (num_elements % nelts), num_elements):
+        Output[n] = gelu(Input[n])
+
     return Output
 
 
-
 @always_inline("nodebug")
-fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
+fn silu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     """
     Function `silu`: apply SiLU (Swish) activation to given Tensor.
     SiLU activation is defined as `x * sigmoid(x)` for each element x in the Tensor.
@@ -229,14 +178,12 @@ fn silu[type : DType](Input: Tensor[type]) -> Tensor[type]:
     var Output = Tensor[type](Input.shapes())
 
     @parameter
-    fn calc_row(`_` : Int):
-        @parameter
-        fn silu_op[nelts: Int](n: Int):
-            Output.store[nelts](n,(Input.load[nelts](n) * sigmoid[type,nelts](Input.load[nelts](n))))
-        vectorize[silu_op, nelts](num_elements - (num_elements % nelts))
+    fn op[nelts: Int](n: Int):
+        Output.store[nelts](n, swish[type, nelts](Input.load[nelts](n)))
 
-        for n in range(num_elements - (num_elements % nelts), num_elements):
-            Output[n] = Input[n] * sigmoid(Input[n])
+    vectorize[op, nelts](num_elements - (num_elements % nelts))
 
-    parallelize[calc_row](Output.shapes()[-2], Output.shapes()[-2])
+    for n in range(num_elements - (num_elements % nelts), num_elements):
+        Output[n] = swish(Input[n])
+
     return Output

@@ -71,22 +71,22 @@ struct TensorType[T: DType]:
         self.data.store[width=nelts](index, value)
 
     @always_inline("nodebug")
-    fn load[nelts : Int = 1](self, *indices: Int) -> SIMD[T, nelts]:
+    fn load[nelts: Int = 1](self, *indices: Int) -> SIMD[T, nelts]:
         var pos = self.shape.offset(list(indices))
         return self.load[nelts](pos)
 
     @always_inline("nodebug")
-    fn load[nelts : Int = 1](self, indices: List[Int]) -> SIMD[T, nelts]:
+    fn load[nelts: Int = 1](self, indices: List[Int]) -> SIMD[T, nelts]:
         var pos = self.shape.offset(indices)
         return self.load[nelts](pos)
 
     @always_inline("nodebug")
-    fn store[nelts : Int = 1](self, indices: List[Int], val : SIMD[T, nelts]):
+    fn store[nelts: Int = 1](self, indices: List[Int], val: SIMD[T, nelts]):
         var pos = self.shape.offset(indices)
         self.store[nelts](pos, val)
 
     @always_inline("nodebug")
-    fn store[nelts : Int = 1](self, *indices: Int, val : SIMD[T, nelts]):
+    fn store[nelts: Int = 1](self, *indices: Int, val: SIMD[T, nelts]):
         var pos = self.shape.offset(list(indices))
         self.store[nelts](pos, val)
 
@@ -157,16 +157,17 @@ struct _TensorIter[
         else:
             return self.index
 
+
 @value
 struct Tensor[type: DType = DType.float32](
     Absable,
-    Sized, 
-    CollectionElement, 
+    Sized,
+    CollectionElement,
     EqualityComparable,
     Powable,
     Stringable,
-    Representable, 
-    Formattable
+    Representable,
+    Formattable,
 ):
     """
     A tensor is a multi-dimensional array of elements.
@@ -428,7 +429,7 @@ struct Tensor[type: DType = DType.float32](
     ) -> _TensorIter[type, _]:
         """Iterate over elements of the tensor."""
         return _TensorIter(0, self)
-    
+
     fn __reversed__(
         self,
     ) -> _TensorIter[type, False]:
@@ -440,7 +441,7 @@ struct Tensor[type: DType = DType.float32](
         return self.tensor.load[nelts](index)
 
     @always_inline("nodebug")
-    fn load[nelts : Int](self, *indices: Int) -> SIMD[type, nelts]:
+    fn load[nelts: Int](self, *indices: Int) -> SIMD[type, nelts]:
         return self.tensor.load[nelts](list(indices))
 
     @always_inline("nodebug")
@@ -448,7 +449,9 @@ struct Tensor[type: DType = DType.float32](
         self.tensor.store[nelts](list(indices), val)
 
     @always_inline("nodebug")
-    fn store[nelts: Int](self: Self, indices: List[Int], val: SIMD[type, nelts]):
+    fn store[
+        nelts: Int
+    ](self: Self, indices: List[Int], val: SIMD[type, nelts]):
         self.tensor.store[nelts](indices, val)
 
     @always_inline("nodebug")
@@ -516,13 +519,20 @@ struct Tensor[type: DType = DType.float32](
         return True
 
     @always_inline("nodebug")
+    fn __bool__(self: Self) -> Bool:
+        if self.num_elements() > 0:
+            return True
+        else:
+            return False
+
+    @always_inline("nodebug")
     fn __add__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the SIMD type must be numeric"]()
         var result: Tensor[type]
         if self.tensor.shape == other.tensor.shape:
             var requires_grad = self.requires_grad or other.requires_grad
             result = Tensor[type](
-                (tensor_op[type, add](self, other)).tensor,
+                (tensor_op[type, SIMD.__add__](self, other)).tensor,
                 requires_grad=requires_grad,
             )
             if result.requires_grad:
@@ -530,127 +540,47 @@ struct Tensor[type: DType = DType.float32](
                 ...
             return result
         else:
-            return Broadcast_op[type, add](self, other)
-
-    @always_inline("nodebug")
-    fn __add__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, add](self, other)
-
-    @always_inline("nodebug")
-    fn __radd__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, add](self, other)
-
-    @always_inline("nodebug")
-    fn __iadd__(inout self: Self, other: Self):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        if self.tensor.shape == other.tensor.shape:
-            self = tensor_op[type, add](self, other)
-        else:
-            self = Broadcast_op[type, add](self, other)
-
-    @always_inline("nodebug")
-    fn __iadd__(inout self: Self, other: SIMD[type, 1]):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        self = scalar_op[type, add](self, other)
+            return Broadcast_op[type, SIMD.__add__](self, other)
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
-            return tensor_op[type, sub](self, other)
+            return tensor_op[type, SIMD.__sub__](self, other)
         else:
-            return Broadcast_op[type, sub](self, other)
-
-    @always_inline("nodebug")
-    fn __sub__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, sub](self, other)
-
-    @always_inline("nodebug")
-    fn __rsub__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, sub](self, other)
-
-    @always_inline("nodebug")
-    fn __isub__(inout self: Self, other: Self):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        if self.tensor.shape == other.tensor.shape:
-            self = tensor_op[type, sub](self, other)
-        else:
-            self = Broadcast_op[type, sub](self, other)
-
-    @always_inline("nodebug")
-    fn __isub__(inout self: Self, other: SIMD[type, 1]):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        self = scalar_op[type, sub](self, other)
+            return Broadcast_op[type, SIMD.__sub__](self, other)
 
     @always_inline("nodebug")
     fn __mul__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
-            return tensor_op[type, mul](self, other)
+            return tensor_op[type, SIMD.__mul__](self, other)
         else:
-            return Broadcast_op[type, mul](self, other)
-
-    @always_inline("nodebug")
-    fn __mul__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, mul](self, other)
-
-    @always_inline("nodebug")
-    fn __rmul__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, mul](self, other)
-
-    @always_inline("nodebug")
-    fn __imul__(inout self: Self, other: Self):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        if self.tensor.shape == other.tensor.shape:
-            self = tensor_op[type, mul](self, other)
-        else:
-            self = Broadcast_op[type, mul](self, other)
-
-    @always_inline("nodebug")
-    fn __imul__(inout self: Self, other: SIMD[type, 1]):
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        self = scalar_op[type, mul](self, other)
+            return Broadcast_op[type, SIMD.__mul__](self, other)
 
     @always_inline("nodebug")
     fn __truediv__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
-            return tensor_op[type, div](self, other)
+            return tensor_op[type, SIMD.__truediv__](self, other)
         else:
-            return Broadcast_op[type, div](self, other)
+            return Broadcast_op[type, SIMD.__truediv__](self, other)
 
     @always_inline("nodebug")
-    fn __truediv__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, div](self, other)
-
-    @always_inline("nodebug")
-    fn __rtruediv__(self: Self, other: SIMD[type, 1]) -> Self:
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        return scalar_op[type, div](self, other)
-
-    @always_inline("nodebug")
-    fn __itruediv__(inout self: Self, other: Self):
+    fn __floordiv__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         if self.tensor.shape == other.tensor.shape:
-            self = tensor_op[type, div](self, other)
+            return tensor_op[type, SIMD.__floordiv__](self, other)
         else:
-            self = Broadcast_op[type, div](self, other)
+            return Broadcast_op[type, SIMD.__floordiv__](self, other)
 
     @always_inline("nodebug")
-    fn __itruediv__(inout self: Self, other: SIMD[type, 1]):
+    fn __mod__(self: Self, other: Self) -> Self:
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        self = scalar_op[type, div](self, other)
-
-    @always_inline("nodebug")
-    fn __neg__(self: Self) -> Self:
-        return self.multiply(Scalar[type](-1))
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__mod__](self, other)
+        else:
+            return Broadcast_op[type, SIMD.__mod__](self, other)
 
     @always_inline("nodebug")
     fn __pow__(self: Self, exponent: Tensor[type]) -> Self:
@@ -658,7 +588,9 @@ struct Tensor[type: DType = DType.float32](
         Exponentiation of each element in the tensor by the given exponent.
         """
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        if not is_compatible(self.shapes().Shapes(), exponent.shapes().Shapes()): 
+        if not is_compatible(
+            self.shapes().Shapes(), exponent.shapes().Shapes()
+        ):
             print(Error("Tensors must be in same shape"))
             exit(1)
         alias nelts = simdwidthof[type]() * 2
@@ -667,6 +599,7 @@ struct Tensor[type: DType = DType.float32](
         @parameter
         fn operation[nelts: Int](idx: Int):
             result.store(idx, pow(self.load(idx), self.load(idx)))
+
         vectorize[operation, nelts, unroll_factor=4](self.num_elements())
 
         for i in range(result.num_elements() - (result.num_elements() % nelts)):
@@ -678,6 +611,36 @@ struct Tensor[type: DType = DType.float32](
         return result
 
     @always_inline("nodebug")
+    fn __add__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__add__](self, other)
+
+    @always_inline("nodebug")
+    fn __sub__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__sub__](self, other)
+
+    @always_inline("nodebug")
+    fn __mul__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__mul__](self, other)
+
+    @always_inline("nodebug")
+    fn __truediv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__truediv__](self, other)
+
+    @always_inline("nodebug")
+    fn __floordiv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__floordiv__](self, other)
+
+    @always_inline("nodebug")
+    fn __mod__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__mod__](self, other)
+
+    @always_inline("nodebug")
     fn __pow__(self: Self, exponent: Int) -> Self:
         """
         Exponentiation of each element in the tensor by the given exponent.
@@ -685,9 +648,9 @@ struct Tensor[type: DType = DType.float32](
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         var result = self
         alias nelts = simdwidthof[type]() * 2
-        
+
         @parameter
-        fn power[nelts : Int](idx : Int):
+        fn power[nelts: Int](idx: Int):
             result.tensor.data[idx] = pow(result.load(idx), exponent)
 
         vectorize[power, nelts](result.num_elements())
@@ -698,6 +661,91 @@ struct Tensor[type: DType = DType.float32](
             result.store(index, pow(result.load(index), exponent))
         return result
 
+    @always_inline("nodebug")
+    fn __iadd__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__add__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__add__](self, other)
+
+    @always_inline("nodebug")
+    fn __isub__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__sub__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__sub__](self, other)
+
+    @always_inline("nodebug")
+    fn __imul__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__mul__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__mul__](self, other)
+
+    @always_inline("nodebug")
+    fn __itruediv__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__truediv__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__truediv__](self, other)
+
+    @always_inline("nodebug")
+    fn __ifloordiv__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__floordiv__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__floordiv__](self, other)
+
+    @always_inline("nodebug")
+    fn __imod__(inout self: Self, other: Self):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            self = tensor_op[type, SIMD.__mod__](self, other)
+        else:
+            self = Broadcast_op[type, SIMD.__mod__](self, other)
+
+    @always_inline("nodebug")
+    fn __ipow__(inout self: Self, exponent: Self):
+        """
+        In-place exponentiation of each element in the tensor by the given exponent.
+        """
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = self.__pow__(exponent)
+
+    @always_inline("nodebug")
+    fn __iadd__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__add__](self, other)
+
+    @always_inline("nodebug")
+    fn __isub__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__sub__](self, other)
+
+    @always_inline("nodebug")
+    fn __imul__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__mul__](self, other)
+
+    @always_inline("nodebug")
+    fn __itruediv__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__truediv__](self, other)
+
+    @always_inline("nodebug")
+    fn __ifloordiv__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__floordiv__](self, other)
+
+    @always_inline("nodebug")
+    fn __imod__(inout self: Self, other: SIMD[type, 1]):
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        self = scalar_op[type, SIMD.__mod__](self, other)
 
     @always_inline("nodebug")
     fn __ipow__(inout self: Self, exponent: Int):
@@ -707,25 +755,120 @@ struct Tensor[type: DType = DType.float32](
         constrained[type.is_numeric(), "the Tensor type must be numeric"]()
         self = self.__pow__(exponent)
 
+    @always_inline("nodebug")
+    fn __radd__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the SIMD type must be numeric"]()
+        var result: Tensor[type]
+        if self.tensor.shape == other.tensor.shape:
+            var requires_grad = self.requires_grad or other.requires_grad
+            result = Tensor[type](
+                (tensor_op[type, SIMD.__add__](other, self)).tensor,
+                requires_grad=requires_grad,
+            )
+            if result.requires_grad:
+                # result.set_gradfn(Function(GradientAdd[type](self, other)))
+                ...
+            return result
+        else:
+            return Broadcast_op[type, SIMD.__add__](self, other)
+
+    @always_inline("nodebug")
+    fn __rsub__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__sub__](other, self)
+        else:
+            return Broadcast_op[type, SIMD.__sub__](other, self)
+
+    @always_inline("nodebug")
+    fn __rmul__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__mul__](other, self)
+        else:
+            return Broadcast_op[type, SIMD.__mul__](other, self)
+
+    @always_inline("nodebug")
+    fn __rtruediv__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__truediv__](other, self)
+        else:
+            return Broadcast_op[type, SIMD.__truediv__](other, self)
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__floordiv__](other, self)
+        else:
+            return Broadcast_op[type, SIMD.__floordiv__](other, self)
+
+    @always_inline("nodebug")
+    fn __rmod__(self: Self, other: Self) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        if self.tensor.shape == other.tensor.shape:
+            return tensor_op[type, SIMD.__mod__](other, self)
+        else:
+            return Broadcast_op[type, SIMD.__mod__](other, self)
+
+    @always_inline("nodebug")
+    fn __radd__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__add__](self, other)
+
+    @always_inline("nodebug")
+    fn __rsub__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__sub__](self, other)
+
+    @always_inline("nodebug")
+    fn __rmul__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__mul__](self, other)
+
+    @always_inline("nodebug")
+    fn __rtruediv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__truediv__](self, other)
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__floordiv__](self, other)
+
+    @always_inline("nodebug")
+    fn __rmod__(self: Self, other: SIMD[type, 1]) -> Self:
+        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+        return scalar_op[type, SIMD.__mod__](self, other)
+
+    @always_inline("nodebug")
+    fn __neg__(self: Self) -> Self:
+        return self * -1.0
+
+    @always_inline("nodebug")
+    fn __pos__(self: Self) -> Self:
+        return self
+
     @always_inline
     fn __abs__(self) -> Self:
         var result = self
         alias nelts = simdwidthof[type]() * 2
+        var num_elements = self.num_elements()
 
         @parameter
         if type.is_unsigned() or type.is_bool():
             return result
-        
+
         @parameter
-        fn absolute[nelts : Int](idx : Int):
+        fn absolute[nelts: Int](idx: Int):
             result.tensor.data[idx] = abs(result.load(idx))
 
-        vectorize[absolute, nelts](result.num_elements())
-        for index in range(
-            self.num_elements() - (self.num_elements() % nelts),
-            self.num_elements(),
-        ):
-            result.store(index, abs(result.load(index)))
+        vectorize[absolute, nelts, unroll_factor=4](
+            num_elements - (num_elements % nelts)
+        )
+        for i in range(num_elements - (num_elements % nelts), num_elements):
+            result.store(i, abs(result.load(i)))
         return result
 
     @always_inline
@@ -795,18 +938,17 @@ struct Tensor[type: DType = DType.float32](
         ```
         """
         alias nelts = simdwidthof[type]() * 2
+        var num_elements = self.num_elements()
 
         @parameter
         fn operation[nelts: Int](idx: Int):
             self.store(idx, func(self.load(idx)))
 
-        vectorize[operation, nelts, unroll_factor=4](self.num_elements())
+        vectorize[operation, nelts, unroll_factor=4](
+            num_elements - (num_elements % nelts)
+        )
 
-        for i in range(self.num_elements() - (self.num_elements() % nelts)):
-            if i >= self.num_elements():
-                break
-            if i % nelts == 0:
-                continue
+        for i in range(num_elements - (num_elements % nelts), num_elements):
             self.store(i, func(self.load(i)))
         return self
 
@@ -850,18 +992,17 @@ struct Tensor[type: DType = DType.float32](
             print("shapes mismatch should not be different shapes")
             exit(1)
         alias nelts = simdwidthof[type]() * 2
+        var num_elements = self.num_elements()
 
         @parameter
         fn operation[nelts: Int](idx: Int):
             self.store(idx, func(self.load(idx), other.load(idx)))
 
-        vectorize[operation, nelts, unroll_factor=4](self.num_elements())
+        vectorize[operation, nelts, unroll_factor=4](
+            num_elements - (num_elements % nelts)
+        )
 
-        for i in range(self.num_elements() - (self.num_elements() % nelts)):
-            if i >= self.num_elements():
-                break
-            if i % nelts == 0:
-                continue
+        for i in range(num_elements - (num_elements % nelts), num_elements):
             self.store(i, func(self.load(i), other.load(i)))
         return self
 
@@ -915,7 +1056,9 @@ struct Tensor[type: DType = DType.float32](
         fn _sum[nelts: Int](i: Int):
             result += self.load(i).reduce_add()
 
-        vectorize[_sum, nelts](self.num_elements())
+        vectorize[_sum, nelts](
+            self.num_elements() - (self.num_elements() % nelts)
+        )
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
@@ -939,7 +1082,9 @@ struct Tensor[type: DType = DType.float32](
         fn _max[nelts: Int](i: Int):
             result = max(result, self.load(i))
 
-        vectorize[_max, nelts](self.num_elements())
+        vectorize[_max, nelts](
+            self.num_elements() - (self.num_elements() % nelts)
+        )
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
@@ -963,7 +1108,9 @@ struct Tensor[type: DType = DType.float32](
         fn _min[nelts: Int](i: Int):
             result = min(result, self.load(i))
 
-        vectorize[_min, nelts](self.num_elements())
+        vectorize[_min, nelts](
+            self.num_elements() - (self.num_elements() % nelts)
+        )
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
@@ -997,7 +1144,9 @@ struct Tensor[type: DType = DType.float32](
         fn _prod[nelts: Int](i: Int):
             result *= self.load(i).reduce_mul()
 
-        vectorize[_prod, nelts](self.num_elements())
+        vectorize[_prod, nelts](
+            self.num_elements() - (self.num_elements() % nelts)
+        )
         for i in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
@@ -1018,7 +1167,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn tanh(inout self: Self) -> Self:
-        """ Function `tanh`: apply hyperbolic tangent activation to given Tensor.
+        """Function `tanh`: apply hyperbolic tangent activation to given Tensor.
 
         Returns:
             A new Tensor with the hyperbolic tangent of the input tensor elements applied.
@@ -1046,10 +1195,10 @@ struct Tensor[type: DType = DType.float32](
             Tensor: New Tensor with SiLU applied element-wise.
         """
         return silu[type](self)
-    
+
     @always_inline("nodebug")
     fn sigmoid(inout self: Self) -> Self:
-        """ Function `sigmoid`: apply sigmoid activation to given Tensor.
+        """Function `sigmoid`: apply sigmoid activation to given Tensor.
 
         Returns:
             A new Tensor where each element is transformed by the sigmoid function.
@@ -1230,7 +1379,7 @@ struct Tensor[type: DType = DType.float32](
     fn broadcast_to(inout self: Self, other: shape):
         var temp = Tensor[type](other)
         temp.zeros()
-        self = Broadcast_op[type, add](self, temp)
+        self = Broadcast_op[type, SIMD.__add__](self, temp)
 
     @always_inline("nodebug")
     fn reshape(self: Self, *new: Int) -> Self:
@@ -1297,7 +1446,9 @@ struct Tensor[type: DType = DType.float32](
                 index, self.tensor.load[nelts](index).cast[des]()
             )
 
-        vectorize[cast_single_element, nelts](self.num_elements())
+        vectorize[cast_single_element, nelts](
+            self.num_elements() - (self.num_elements() % nelts),
+        )
         for index in range(
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
@@ -1305,8 +1456,8 @@ struct Tensor[type: DType = DType.float32](
             casted.store(index, self.load(index).cast[des]())
         return casted
 
-    @always_inline("nodebug")    
-    fn cast[dest : DType](self : Self) -> Tensor[dest]:
+    @always_inline("nodebug")
+    fn cast[dest: DType](self: Self) -> Tensor[dest]:
         return self.astype[dest]()
 
     @always_inline("nodebug")
@@ -1387,21 +1538,6 @@ fn zeros[
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](0))
     return tensor
-
-
-@always_inline("nodebug")
-fn fill[
-    dtype: DType = DType.float32
-](shape: shape, val: Scalar[dtype]) -> Tensor[dtype]:
-    var result = Tensor[dtype](shape)
-    alias nelts = simdwidthof[dtype]()
-
-    @parameter
-    fn fill_vec[nelts: Int](idx: Int):
-        result.store[nelts](idx, result.load[nelts](idx).splat(val))
-
-    vectorize[fill_vec, nelts](result.num_elements())
-    return result
 
 
 @always_inline("nodebug")

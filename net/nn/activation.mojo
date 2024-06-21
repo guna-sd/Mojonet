@@ -1,8 +1,7 @@
 @value
-struct Sigmoid[type : DType]:
-
+struct Sigmoid[type: DType]:
     @always_inline("nodebug")
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn forward(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the sigmoid activation function to the input tensor.
 
@@ -18,7 +17,9 @@ struct Sigmoid[type : DType]:
         return sigmoid[type](Input)
 
     @always_inline("nodebug")
-    fn backward(inout self, Input : Tensor[type], GradOutput : Tensor[type]) -> Tensor[type]:
+    fn backward(
+        inout self, Input: Tensor[type], GradOutput: Tensor[type]
+    ) -> Tensor[type]:
         """
         Compute the gradient of the Sigmoid function with respect to the input tensor.
 
@@ -30,14 +31,13 @@ struct Sigmoid[type : DType]:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
         var SigmoidOutput = self.forward(Input)
-        return GradOutput * (SigmoidOutput * (1 - SigmoidOutput))
+        return GradOutput * (SigmoidOutput * (Scalar[type](1) - SigmoidOutput))
 
 
 @value
-struct GeLU[type : DType]:
-
+struct GeLU[type: DType]:
     @always_inline("nodebug")
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn forward(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
 
@@ -53,7 +53,9 @@ struct GeLU[type : DType]:
         return gelu[type](Input)
 
     @always_inline("nodebug")
-    fn backward(inout self, Input : Tensor[type], GradOutput : Tensor[type]) -> Tensor[type]:
+    fn backward(
+        inout self, Input: Tensor[type], GradOutput: Tensor[type]
+    ) -> Tensor[type]:
         """
         Compute the gradient of the GeLU function with respect to the input tensor.
 
@@ -65,17 +67,22 @@ struct GeLU[type : DType]:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
         var x = Input
-        var sqrt2 : Scalar[type] = math.sqrt(2)
+        var sqrt2: Scalar[type] = math.sqrt(2)
         var erf_comp = (x / sqrt2).apply[math.erf]()
-        var exp_comp = ((-(x * x) / Scalar[type](2)).apply[math.exp]())        
-        return GradOutput * (0.5 * (1 + erf_comp) + x * (pi * 0.5) * exp_comp / (sqrt2 * sqrt2 * sqrt2 * sqrt2))
+        var exp_comp = ((-(x * x) / Scalar[type](2)).apply[math.exp]())
+        return GradOutput * (
+            Scalar[type](0.5) * (Scalar[type](1) + erf_comp)
+            + x
+            * (pi * Scalar[type](0.5))
+            * exp_comp
+            / (sqrt2 * sqrt2 * sqrt2 * sqrt2)
+        )
 
 
 @value
-struct ReLU[type : DType]:
-
+struct ReLU[type: DType]:
     @always_inline("nodebug")
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn forward(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
 
@@ -91,7 +98,9 @@ struct ReLU[type : DType]:
         return relu[type](Input)
 
     @always_inline("nodebug")
-    fn backward(inout self, Input : Tensor[type], GradOutput : Tensor[type]) -> Tensor[type]:
+    fn backward(
+        inout self, Input: Tensor[type], GradOutput: Tensor[type]
+    ) -> Tensor[type]:
         """
         Compute the gradient of the ReLU function with respect to the input tensor.
 
@@ -116,11 +125,11 @@ struct ReLU[type : DType]:
         parallelize[calc](num_elements)
         return grad
 
-@value
-struct Tanh[type : DType]:
 
+@value
+struct Tanh[type: DType]:
     @always_inline("nodebug")
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn forward(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
 
@@ -136,7 +145,9 @@ struct Tanh[type : DType]:
         return tanh[type](Input)
 
     @always_inline("nodebug")
-    fn backward(inout self, Input : Tensor[type], GradOutput : Tensor[type]) -> Tensor[type]:
+    fn backward(
+        inout self, Input: Tensor[type], GradOutput: Tensor[type]
+    ) -> Tensor[type]:
         """
         Compute the gradient of the Tanh function with respect to the input tensor.
 
@@ -148,14 +159,13 @@ struct Tanh[type : DType]:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
         var tanh_x = tanh[type](Input)
-        return (1 - tanh_x * tanh_x) * GradOutput
+        return (Scalar[type](1) - tanh_x * tanh_x) * GradOutput
 
 
 @value
-struct SiLU[type : DType]:
-
+struct SiLU[type: DType]:
     @always_inline("nodebug")
-    fn forward(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn forward(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
 
@@ -171,7 +181,9 @@ struct SiLU[type : DType]:
         return silu[type](Input)
 
     @always_inline("nodebug")
-    fn backward(inout self, Input : Tensor[type], GradOutput : Tensor[type]) -> Tensor[type]:
+    fn backward(
+        inout self, Input: Tensor[type], GradOutput: Tensor[type]
+    ) -> Tensor[type]:
         """
         Compute the gradient of the SiLU function with respect to the input tensor.
 
@@ -183,37 +195,40 @@ struct SiLU[type : DType]:
             Tensor[type]: The gradient of the loss function with respect to the input tensor.
         """
         var sigmoid_x = sigmoid[type](Input)
-        return GradOutput * (Input + sigmoid_x * (1 + Input * (1 - sigmoid_x)))
+        return GradOutput * (
+            Input
+            + sigmoid_x
+            * (Scalar[type](1) + Input * (Scalar[type](1) - sigmoid_x))
+        )
 
 
 @value
-struct Fuctional[type : DType]:
-
-    fn GeLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+struct Fuctional[type: DType]:
+    fn GeLU(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the GELU (Gaussian Error Linear Unit) activation function to the input tensor.
         """
         return gelu[type](Input)
 
-    fn ReLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn ReLU(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the ReLU (Rectified Linear Unit) activation function to the input tensor.
         """
         return relu[type](Input)
 
-    fn SiLU(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn SiLU(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the SiLU (Sigmoid-Weighted Linear Unit) activation function to the input tensor.
         """
         return silu[type](Input)
 
-    fn TanH(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn TanH(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the Tanh (Hyperbolic Tangent) activation function to the input tensor.
         """
         return tanh[type](Input)
 
-    fn Sigmoid(inout self, Input : Tensor[type]) -> Tensor[type]:
+    fn Sigmoid(inout self, Input: Tensor[type]) -> Tensor[type]:
         """
         Apply the sigmoid activation function to the input tensor.
         """
