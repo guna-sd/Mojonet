@@ -1,4 +1,49 @@
 @always_inline("nodebug")
+fn erfc[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.erfc(arg)
+
+
+@always_inline("nodebug")
+fn erf[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.erf(arg)
+
+
+@always_inline("nodebug")
+fn j0[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.j0(arg)
+
+
+@always_inline("nodebug")
+fn sin[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.sin(arg)
+
+
+@always_inline("nodebug")
+fn sinh[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.sinh(arg)
+
+
+@always_inline("nodebug")
+fn cosh[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.cosh(arg)
+
+
+@always_inline("nodebug")
+fn cos[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.cos(arg)
+
+
+@always_inline("nodebug")
+fn atan[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.atan(arg)
+
+
+@always_inline("nodebug")
+fn tan[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return math.tan(arg)
+
+
+@always_inline("nodebug")
 fn relu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return max[type, nelts](value, 0)
 
@@ -11,10 +56,22 @@ fn sigmoid[
 
 
 @always_inline("nodebug")
+fn hard_sigmoid[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return ((value + 1) / 2).clamp(0, 1)
+
+
+@always_inline("nodebug")
 fn softplus[
     type: DType, nelts: Int
 ](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return math.log[type, nelts](1.0 + math.exp[type, nelts](value))
+
+
+@always_inline("nodebug")
+fn mish[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return value * (tanh[type, nelts](softplus[type, nelts](value)))
 
 
 @always_inline("nodebug")
@@ -25,8 +82,31 @@ fn swish[
 
 
 @always_inline("nodebug")
+fn hard_swish[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    var offset = 3.0
+    var scale = 1.0 / 6.0
+    return value * ((value + offset).clamp(0, offset)) * scale
+
+
+@always_inline("nodebug")
 fn tanh[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    return (2 / (1 + math.exp[type, nelts]((-2 * value)))) - 1
+    return (2.0 / (1.0 + math.exp[type, nelts]((-2.0 * value)))) - 1.0
+
+
+@always_inline("nodebug")
+fn hard_tanh[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return value.clamp(-1, 1)
+
+
+@always_inline("nodebug")
+fn arctan[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return atan[type, nelts](value)
 
 
 @always_inline("nodebug")
@@ -36,7 +116,7 @@ fn gelu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
         * value
         * (
             1.0
-            + math.tanh[type, nelts](
+            + tanh[type, nelts](
                 math.sqrt[type, nelts](2.0 / pi)
                 * (value + 0.044715 * pow(value, 3))
             )
@@ -45,10 +125,31 @@ fn gelu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
 
 
 @always_inline("nodebug")
-fn squareplus[
+fn softmax[
     type: DType, nelts: Int
-](value: SIMD[type, nelts], beta: SIMD[type, 1]) -> SIMD[type, nelts]:
-    return (value + math.sqrt[type, nelts](value**2 + beta)) / 2
+](logits: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    var max_val = max[type, nelts](logits, 0)
+    var exp = math.exp[type, nelts](logits - max_val)
+    return exp / exp.reduce_add()
+
+
+@always_inline("nodebug")
+fn elu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return max[type, nelts](value, (alpha * (math.exp[type, nelts](value) - 1)))
+
+
+@always_inline("nodebug")
+fn leaky_relu[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts], alpha: Scalar[type]) -> SIMD[type, nelts]:
+    return max[type, nelts](value, (value * alpha))
+
+
+@always_inline("nodebug")
+fn selu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    return max[type, nelts](
+        value, (scale * alpha * (math.exp[type, nelts](value) - 1))
+    )
 
 
 @always_inline("nodebug")
@@ -68,12 +169,12 @@ fn tanh[type: DType](Input: Tensor[type]) -> Tensor[type]:
 
     @parameter
     fn op[nelts: Int](n: Int):
-        Output.store[nelts](n, math.tanh[type, nelts](Input.load[nelts](n)))
+        Output.store[nelts](n, tanh[type, nelts](Input.load[nelts](n)))
 
     vectorize[op, nelts](num_elements - (num_elements % nelts))
 
     for n in range(num_elements - (num_elements % nelts), num_elements):
-        Output[n] = math.tanh(Input[n])
+        Output[n] = tanh(Input[n])
 
     return Output
 

@@ -83,7 +83,7 @@ fn scalar_op[
 
     @parameter
     fn operation[nelts: Int](idx: Int):
-        Output.store(idx, func(Input[idx], value))
+        Output.store[nelts](idx, func(Input.load[nelts](idx), value))
 
     vectorize[operation, nelts, unroll_factor=4](
         num_elements - (num_elements % nelts)

@@ -6,7 +6,7 @@ alias Truncation = " ..., "
 alias CompactMaxElemsToPrint = 19
 alias CompactElemPerSide = 3
 
-@register_passable("trivial")
+
 struct shape:
     alias maxrank = 26
     alias shape_type = StaticIntTuple[Self.maxrank]
@@ -129,6 +129,20 @@ struct shape:
             print("index is out of bounds")
             exit(1)
         self.shapes[index if index >= 0 else self.rank + index] = value
+
+    @always_inline("nodebug")
+    fn __copyinit__(inout self, other: Self):
+        self.shapes = other.shapes
+        self.strides = other.strides
+        self.rank = other.rank
+        self.num_elements = other.num_elements
+        
+    @always_inline("nodebug")
+    fn __moveinit__(inout self, owned other: Self):
+        self.shapes = other.shapes
+        self.strides = other.strides
+        self.rank = other.rank
+        self.num_elements = other.num_elements
 
     @always_inline("nodebug")
     fn __str__(self : Self) -> String:
