@@ -58,6 +58,119 @@ fn mm[
 
     parallelize[calc_row](m, m)
 
+@always_inline("nodebug")
+fn fusedmm[
+    T: DType,
+    func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]
+](
+    A: DTypePointer[T],
+    B: DTypePointer[T],
+    C: DTypePointer[T],
+    m: Int,
+    n: Int,
+    p: Int,
+):
+    """
+    Performs matrix multiplication on matrices A and B and stores the result in matrix C with vectorization and parallelization.
+
+    Args:
+        A: Pointer to the first matrix.
+        B: Pointer to the second matrix.
+        C: Pointer to the result matrix.
+        m: Number of rows in matrix A.
+        n: Number of columns in matrix A and number of rows in matrix B.
+        p: Number of columns in matrix B.
+    """
+    alias nelts = simdwidthof[T]() * 2
+    alias unroll = 4
+
+    @parameter
+    fn calc_row(i: Int):
+        for k in range(n):
+
+            @parameter
+            fn dot[nelts: Int](n_idx: Int):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                DTypePointer.prefetch[PREFETCH_READ](
+                    B + (k * p + n_idx + nelts)
+                )
+                DTypePointer.prefetch[PREFETCH_WRITE](
+                    C + (i * p + n_idx + nelts)
+                )
+                C.store[width=nelts](
+                    i * p + n_idx,
+                    func[T, nelts](A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx),C.load[width=nelts](i * p + n_idx),),))
+
+            vectorize[dot, nelts, unroll_factor=unroll](size=p - (p % nelts))
+
+        for j in range(p - (p % nelts), p):
+            var acc_sum = Scalar[T](0)
+            for k in range(n):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
+            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            C[i * p + j] = func[T,1](acc_sum)
+
+    parallelize[calc_row](m, m)
+
+@always_inline("nodebug")
+fn fusedscalarmm[
+    T: DType,
+    func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]
+](
+    A: DTypePointer[T],
+    B: DTypePointer[T],
+    C: DTypePointer[T],
+    Scalar_value : Scalar[T],
+    m: Int,
+    n: Int,
+    p: Int,
+):
+    """
+    Performs matrix multiplication on matrices A and B and stores the result in matrix C with vectorization and parallelization.
+
+    Args:
+        A: Pointer to the first matrix.
+        B: Pointer to the second matrix.
+        C: Pointer to the result matrix.
+        Scalar_value: Scalar value to be fused.
+        m: Number of rows in matrix A.
+        n: Number of columns in matrix A and number of rows in matrix B.
+        p: Number of columns in matrix B.
+    """
+    alias nelts = simdwidthof[T]() * 2
+    alias unroll = 4
+
+    @parameter
+    fn calc_row(i: Int):
+        for k in range(n):
+
+            @parameter
+            fn dot[nelts: Int](n_idx: Int):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                DTypePointer.prefetch[PREFETCH_READ](
+                    B + (k * p + n_idx + nelts)
+                )
+                DTypePointer.prefetch[PREFETCH_WRITE](
+                    C + (i * p + n_idx + nelts)
+                )
+                C.store[width=nelts](
+                    i * p + n_idx,
+                    func(A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx),C.load[width=nelts](i * p + n_idx),),Scalar_value))
+
+            vectorize[dot, nelts, unroll_factor=unroll](size=p - (p % nelts))
+
+        for j in range(p - (p % nelts), p):
+            var acc_sum = Scalar[T](0)
+            for k in range(n):
+                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
+            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            C[i * p + j] = func(acc_sum, Scalar_value)
+
+    parallelize[calc_row](m, m)
 
 @always_inline("nodebug")
 fn mm3d2d[
@@ -262,6 +375,78 @@ fn bmm[
 
     parallelize[MM](b, b)
 
+fn fusedbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]](
+    A: DTypePointer[T],
+    B: DTypePointer[T],
+    inout C: DTypePointer[T],
+    b: Int,
+    m: Int,
+    n: Int,
+    p: Int,
+):
+    """
+    Performs batch matrix multiplication on batches of matrices A and B and stores the result in matrix C.
+
+    Args:
+        A: Pointer to the first batch of matrices.
+        B: Pointer to the second batch of matrices.
+        C: Pointer to the result batch of matrices.
+        b: Number of batches.
+        m: Number of rows in each matrix of A.
+        n: Number of columns in each matrix of A and number of rows in each matrix of B.
+        p: Number of columns in each matrix of B.
+    """
+
+    @parameter
+    fn MM(batch: Int):
+        fusedmm[T, func](
+            A + batch * (m * n),
+            B + batch * (n * p),
+            C + batch * (m * p),
+            m,
+            n,
+            p,
+        )
+
+    parallelize[MM](b, b)
+
+fn fusedScalarbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]](
+    A: DTypePointer[T],
+    B: DTypePointer[T],
+    inout C: DTypePointer[T],
+    Scalar_value : SIMD[T,1],
+    b: Int,
+    m: Int,
+    n: Int,
+    p: Int,
+):
+    """
+    Performs batch matrix multiplication on batches of matrices A and B and stores the result in matrix C.
+
+    Args:
+        A: Pointer to the first batch of matrices.
+        B: Pointer to the second batch of matrices.
+        C: Pointer to the result batch of matrices.
+        Scalar_value: Scalar value to be fused.
+        b: Number of batches.
+        m: Number of rows in each matrix of A.
+        n: Number of columns in each matrix of A and number of rows in each matrix of B.
+        p: Number of columns in each matrix of B.
+    """
+
+    @parameter
+    fn MM(batch: Int):
+        fusedscalarmm[T, func](
+            A + batch * (m * n),
+            B + batch * (n * p),
+            C + batch * (m * p),
+            Scalar_value,
+            m,
+            n,
+            p,
+        )
+
+    parallelize[MM](b, b)
 
 @always_inline("nodebug")
 fn matmul[
@@ -346,5 +531,119 @@ fn batch_matmul[
     var p = result.tensor.shape[-1]
 
     bmm[dtype](A, B, C, b, m, n, p)
+
+    return result
+
+@always_inline("nodebug")
+fn bmm[
+    dtype: DType
+](tensor1: Tensor[dtype], tensor2: Tensor[dtype]) -> Tensor[dtype]:
+    """
+    Performs batch matrix multiplication on two tensors and returns the resulting tensor.
+
+    Args:
+        tensor1: The first tensor in the multiplication.
+        tensor2: The second tensor in the multiplication.
+
+    Returns:
+        A new tensor resulting from the batch matrix multiplication of the two input tensors.
+    """
+    if tensor1.rank() <= 2 and tensor2.rank() <= 2:
+        print("Error: batch matrix multiplication requires a rank >= 3")
+        exit(1)
+
+    var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
+
+    var result = Tensor[dtype](result_shape)
+    var tensorA = tensor1
+    var tensorB = tensor2
+
+    var A = tensorA.tensor.data
+    var B = tensorB.tensor.data
+    var C = result.tensor.data
+
+    var b = result.tensor.shape[0]
+    var m = tensorA.tensor.shape[-2]
+    var n = tensorA.tensor.shape[-1]
+    var p = result.tensor.shape[-1]
+
+    bmm[dtype](A, B, C, b, m, n, p)
+
+    return result
+
+@always_inline("nodebug")
+fn fusedbmm[
+    dtype: DType,
+    func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]
+](tensor1: Tensor[dtype], tensor2: Tensor[dtype]) -> Tensor[dtype]:
+    """
+    Performs batch matrix multiplication on two tensors and returns the resulting tensor.
+
+    Args:
+        tensor1: The first tensor in the multiplication.
+        tensor2: The second tensor in the multiplication.
+
+    Returns:
+        A new tensor resulting from the batch matrix multiplication of the two input tensors.
+    """
+    if tensor1.rank() <= 2 and tensor2.rank() <= 2:
+        print("Error: batch matrix multiplication requires a rank >= 3")
+        exit(1)
+
+    var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
+
+    var result = Tensor[dtype](result_shape)
+    var tensorA = tensor1
+    var tensorB = tensor2
+
+    var A = tensorA.tensor.data
+    var B = tensorB.tensor.data
+    var C = result.tensor.data
+
+    var b = result.tensor.shape[0]
+    var m = tensorA.tensor.shape[-2]
+    var n = tensorA.tensor.shape[-1]
+    var p = result.tensor.shape[-1]
+
+    fusedbmm[dtype,func](A, B, C, b, m, n, p)
+
+    return result
+
+@always_inline("nodebug")
+fn fusedScalarbmm[
+    dtype: DType,
+    func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]
+](tensor1: Tensor[dtype], tensor2: Tensor[dtype], Scalar_value : SIMD[dtype,1]) -> Tensor[dtype]:
+    """
+    Performs batch matrix multiplication on two tensors and returns the resulting tensor.
+
+    Args:
+        tensor1: The first tensor in the multiplication.
+        tensor2: The second tensor in the multiplication.
+        Scalar_value: The scalar value to be fused.
+
+    Returns:
+        A new tensor resulting from the batch matrix multiplication of the two input tensors.
+    """
+    if tensor1.rank() <= 2 and tensor2.rank() <= 2:
+        print("Error: batch matrix multiplication requires a rank >= 3")
+        exit(1)
+
+    var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
+
+    var result = Tensor[dtype](result_shape)
+    var tensorA = tensor1
+    var tensorB = tensor2
+
+    var A = tensorA.tensor.data
+    var B = tensorB.tensor.data
+    var C = result.tensor.data
+
+    var b = result.tensor.shape[0]
+    var m = tensorA.tensor.shape[-2]
+    var n = tensorA.tensor.shape[-1]
+    var p = result.tensor.shape[-1]
+
+    fusedScalarbmm[dtype,func](A, B, C, Scalar_value, b, m, n, p)
 
     return result

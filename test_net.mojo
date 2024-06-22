@@ -3,7 +3,9 @@ from net.checkpoint import *
 
 
 fn main() raises:
-    ...
+    var a = Tensor(4,4).random()
+    print(a)
+    print(a[0])
 
 
 def test_mkdir():

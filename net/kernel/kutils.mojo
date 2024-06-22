@@ -77,6 +77,7 @@ fn scalar_op[
     Returns:
         Returns Tensor[dtype] output tensor.
     """
+    constrained[dtype.is_numeric(), "the Tensor type must be numeric"]()
     alias nelts = simdwidthof[dtype]() * 2
     var Output = Tensor[dtype](Input.shapes())
     var num_elements = Output.num_elements()
@@ -131,6 +132,13 @@ fn Broadcast_op[
         )
 
     return result
+
+fn operate[type : DType, func : fn[type : DType, nelts : Int](SIMD[type,nelts],SIMD[type,nelts]) -> SIMD[type,nelts]](self : Tensor[type], other : Tensor[type]) -> Tensor[type]:
+    constrained[type.is_numeric(), "the Tensor type must be numeric"]()
+    if is_compatible(self.shapes().Shapes(), other.shapes().Shapes()):
+        return tensor_op[type, func](self, other)
+    else:
+        return Broadcast_op[type, func](self, other)
 
 
 @always_inline("nodebug")
