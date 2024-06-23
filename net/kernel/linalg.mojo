@@ -58,10 +58,10 @@ fn mm[
 
     parallelize[calc_row](m, m)
 
+
 @always_inline("nodebug")
 fn fusedmm[
-    T: DType,
-    func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]
+    T: DType, func: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[T, nelts]
 ](
     A: DTypePointer[T],
     B: DTypePointer[T],
@@ -99,7 +99,13 @@ fn fusedmm[
                 )
                 C.store[width=nelts](
                     i * p + n_idx,
-                    func[T, nelts](A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx),C.load[width=nelts](i * p + n_idx),),))
+                    func[T, nelts](
+                        A.load[width=nelts](i * n + k).fma(
+                            B.load[width=nelts](k * p + n_idx),
+                            C.load[width=nelts](i * p + n_idx),
+                        ),
+                    ),
+                )
 
             vectorize[dot, nelts, unroll_factor=unroll](size=p - (p % nelts))
 
@@ -110,19 +116,22 @@ fn fusedmm[
                 DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
                 acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
             DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
-            C[i * p + j] = func[T,1](acc_sum)
+            C[i * p + j] = func[T, 1](acc_sum)
 
     parallelize[calc_row](m, m)
+
 
 @always_inline("nodebug")
 fn fusedscalarmm[
     T: DType,
-    func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]
+    func: fn[T: DType, nelts: Int] (SIMD[T, nelts], SIMD[T, nelts]) -> SIMD[
+        T, nelts
+    ],
 ](
     A: DTypePointer[T],
     B: DTypePointer[T],
     C: DTypePointer[T],
-    Scalar_value : Scalar[T],
+    Scalar_value: Scalar[T],
     m: Int,
     n: Int,
     p: Int,
@@ -157,7 +166,14 @@ fn fusedscalarmm[
                 )
                 C.store[width=nelts](
                     i * p + n_idx,
-                    func(A.load[width=nelts](i * n + k).fma(B.load[width=nelts](k * p + n_idx),C.load[width=nelts](i * p + n_idx),),Scalar_value))
+                    func(
+                        A.load[width=nelts](i * n + k).fma(
+                            B.load[width=nelts](k * p + n_idx),
+                            C.load[width=nelts](i * p + n_idx),
+                        ),
+                        Scalar_value,
+                    ),
+                )
 
             vectorize[dot, nelts, unroll_factor=unroll](size=p - (p % nelts))
 
@@ -171,6 +187,7 @@ fn fusedscalarmm[
             C[i * p + j] = func(acc_sum, Scalar_value)
 
     parallelize[calc_row](m, m)
+
 
 @always_inline("nodebug")
 fn mm3d2d[
@@ -375,7 +392,10 @@ fn bmm[
 
     parallelize[MM](b, b)
 
-fn fusedbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]](
+
+fn fusedbmm[
+    T: DType, func: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[T, nelts]
+](
     A: DTypePointer[T],
     B: DTypePointer[T],
     inout C: DTypePointer[T],
@@ -410,11 +430,17 @@ fn fusedbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[
 
     parallelize[MM](b, b)
 
-fn fusedScalarbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]](
+
+fn fusedScalarbmm[
+    T: DType,
+    func: fn[T: DType, nelts: Int] (SIMD[T, nelts], SIMD[T, nelts]) -> SIMD[
+        T, nelts
+    ],
+](
     A: DTypePointer[T],
     B: DTypePointer[T],
     inout C: DTypePointer[T],
-    Scalar_value : SIMD[T,1],
+    Scalar_value: SIMD[T, 1],
     b: Int,
     m: Int,
     n: Int,
@@ -447,6 +473,7 @@ fn fusedScalarbmm[T : DType, func : fn[T : DType, nelts : Int](SIMD[T,nelts], SI
         )
 
     parallelize[MM](b, b)
+
 
 @always_inline("nodebug")
 fn matmul[
@@ -534,6 +561,7 @@ fn batch_matmul[
 
     return result
 
+
 @always_inline("nodebug")
 fn bmm[
     dtype: DType
@@ -571,10 +599,11 @@ fn bmm[
 
     return result
 
+
 @always_inline("nodebug")
 fn fusedbmm[
     dtype: DType,
-    func : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]
+    func: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[T, nelts],
 ](tensor1: Tensor[dtype], tensor2: Tensor[dtype]) -> Tensor[dtype]:
     """
     Performs batch matrix multiplication on two tensors and returns the resulting tensor.
@@ -605,15 +634,20 @@ fn fusedbmm[
     var n = tensorA.tensor.shape[-1]
     var p = result.tensor.shape[-1]
 
-    fusedbmm[dtype,func](A, B, C, b, m, n, p)
+    fusedbmm[dtype, func](A, B, C, b, m, n, p)
 
     return result
+
 
 @always_inline("nodebug")
 fn fusedScalarbmm[
     dtype: DType,
-    func : fn[T : DType, nelts : Int](SIMD[T,nelts], SIMD[T,nelts]) -> SIMD[T,nelts]
-](tensor1: Tensor[dtype], tensor2: Tensor[dtype], Scalar_value : SIMD[dtype,1]) -> Tensor[dtype]:
+    func: fn[T: DType, nelts: Int] (SIMD[T, nelts], SIMD[T, nelts]) -> SIMD[
+        T, nelts
+    ],
+](
+    tensor1: Tensor[dtype], tensor2: Tensor[dtype], Scalar_value: SIMD[dtype, 1]
+) -> Tensor[dtype]:
     """
     Performs batch matrix multiplication on two tensors and returns the resulting tensor.
 
@@ -644,6 +678,6 @@ fn fusedScalarbmm[
     var n = tensorA.tensor.shape[-1]
     var p = result.tensor.shape[-1]
 
-    fusedScalarbmm[dtype,func](A, B, C, Scalar_value, b, m, n, p)
+    fusedScalarbmm[dtype, func](A, B, C, Scalar_value, b, m, n, p)
 
     return result
