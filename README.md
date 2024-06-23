@@ -8,7 +8,7 @@ Mojonet is a ML/DL framework written in Mojo🔥.
 
 -   [x] Tensors and Tensor Operations are fully implemented.
 -   [x] Broadcasting is supported.
--   [x] Tensor batch_matmul is operational.
+-   [x] Tensor bmm and fusedbmm is operational.
 -   [x] Activations and math operations are supported.
 -   [x] Tensor Serialization and Deserialization
 -   [ ] Autograd
