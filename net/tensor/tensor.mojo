@@ -196,8 +196,8 @@ struct Tensor[type: DType = DType.float32](
 
     fn __init__(
         inout self,
-        tensortype: TensorType[type],
-        requires_grad: Bool = False,
+        owned tensortype: TensorType[type],
+        owned requires_grad: Bool = False,
     ):
         self.tensor = tensortype
         self.requires_grad = requires_grad
@@ -740,7 +740,7 @@ struct Tensor[type: DType = DType.float32](
         Implements matrix multiplication for Tensor.
         The operation is defined as self @ other.
         """
-        if self.rank() >= 2 and other.rank() >= 2:
+        if self.rank() <= 2 and other.rank() <= 2:
             return matmul(self, other)
         if self.rank() > 2 and other.rank() > 2:
             return bmm[type](self, other)
@@ -1031,7 +1031,7 @@ struct Tensor[type: DType = DType.float32](
         return result
 
     @always_inline("nodebug")
-    fn relu(inout self: Self) -> Self:
+    fn relu(self: Self) -> Self:
         """
         Function `relu`: apply ReLU activation to given Tensor.
         ReLU activation is defined as `max(0, x)` for each element x in the Tensor.
@@ -1042,7 +1042,7 @@ struct Tensor[type: DType = DType.float32](
         return relu[type](self)
 
     @always_inline("nodebug")
-    fn tanh(inout self: Self) -> Self:
+    fn tanh(self: Self) -> Self:
         """Function `tanh`: apply hyperbolic tangent activation to given Tensor.
 
         Returns:
@@ -1051,7 +1051,7 @@ struct Tensor[type: DType = DType.float32](
         return tanh[type](self)
 
     @always_inline("nodebug")
-    fn gelu(inout self: Self) -> Self:
+    fn gelu(self: Self) -> Self:
         """
         Function `gelu`: apply GELU activation to given Tensor.
         GELU activation is defined as `x * Φ(x), where Φ(x)` is the CDF of the standard normal distribution.
@@ -1062,7 +1062,7 @@ struct Tensor[type: DType = DType.float32](
         return gelu[type](self)
 
     @always_inline("nodebug")
-    fn silu(inout self: Self) -> Self:
+    fn silu(self: Self) -> Self:
         """
         Function `silu`: apply SiLU (Swish) activation to given Tensor.
         SiLU activation is defined as `x * sigmoid(x)` for each element x in the Tensor.
@@ -1073,7 +1073,7 @@ struct Tensor[type: DType = DType.float32](
         return silu[type](self)
 
     @always_inline("nodebug")
-    fn sigmoid(inout self: Self) -> Self:
+    fn sigmoid(self: Self) -> Self:
         """Function `sigmoid`: apply sigmoid activation to given Tensor.
 
         Returns:
@@ -1082,27 +1082,27 @@ struct Tensor[type: DType = DType.float32](
         return sigmoid[type](self)
 
     @always_inline("nodebug")
-    fn acos(inout self: Self) -> Self:
+    fn acos(self: Self) -> Self:
         return self.apply[math.acos]()
 
     @always_inline("nodebug")
-    fn acosh(inout self: Self) -> Self:
+    fn acosh(self: Self) -> Self:
         return self.apply[math.acosh]()
 
     @always_inline("nodebug")
-    fn cos(inout self: Self) -> Self:
+    fn cos(self: Self) -> Self:
         return self.apply[cos]()
 
     @always_inline("nodebug")
-    fn exp(inout self: Self) -> Self:
+    fn exp(self: Self) -> Self:
         return self.apply[math.exp]()
 
     @always_inline("nodebug")
-    fn exp2(inout self: Self) -> Self:
+    fn exp2(self: Self) -> Self:
         return self.apply[math.exp2]()
 
     @always_inline("nodebug")
-    fn erf(inout self: Self) -> Self:
+    fn erf(self: Self) -> Self:
         return self.apply[erf]()
 
     @always_inline("nodebug")
@@ -1110,23 +1110,23 @@ struct Tensor[type: DType = DType.float32](
         return self.apply[erfc]()
 
     @always_inline("nodebug")
-    fn sin(inout self: Self) -> Self:
+    fn sin(self: Self) -> Self:
         return self.apply[sin]()
 
     @always_inline("nodebug")
-    fn sinh(inout self: Self) -> Self:
+    fn sinh(self: Self) -> Self:
         return self.apply[sinh]()
 
     @always_inline("nodebug")
-    fn tan(inout self: Self) -> Self:
+    fn tan(self: Self) -> Self:
         return self.apply[math.tan]()
 
     @always_inline("nodebug")
-    fn j0(inout self: Self) -> Self:
+    fn j0(self: Self) -> Self:
         return self.apply[j0]()
 
     @always_inline("nodebug")
-    fn mish(inout self: Self) -> Self:
+    fn mish(self: Self) -> Self:
         return self.apply[mish]()
 
     @always_inline("nodebug")
@@ -1134,7 +1134,7 @@ struct Tensor[type: DType = DType.float32](
         var result = List[Scalar[type]]()
         for i in range(self.num_elements()):
             result.append(self.load(i))
-        return result
+        return result^
 
     @always_inline("nodebug")
     fn arange(self, start: Int, end: Int = 0, step: Int = 1) -> Tensor[type]:
@@ -1160,14 +1160,14 @@ struct Tensor[type: DType = DType.float32](
         if end == 0:
             vectorize[arng, 1](self.num_elements())
         vectorize[arng, 1](end)
-        return result
+        return result^
 
     @always_inline("nodebug")
     fn arange(inout self):
         self = self.arange(0, self.num_elements())
 
     @always_inline("nodebug")
-    fn zeros(self: Self):
+    fn zeros(inout self: Self):
         memset_zero(self.tensor.data, self.num_elements())
 
     @always_inline("nodebug")
@@ -1175,19 +1175,19 @@ struct Tensor[type: DType = DType.float32](
         self = Self(self.tensor, requires_grad=requires_grad)
 
     @always_inline("nodebug")
-    fn ones(self: Self):
+    fn ones(inout self: Self):
         memset[type](self.tensor.data, 1, self.num_elements())
 
     @always_inline("nodebug")
-    fn rand(self):
+    fn rand(inout self):
         rfill[type](self.tensor.data, self.num_elements())
         # random.randn[type](self.data, self.shape.num_elements, 2, self.num_elements())
 
     @always_inline("nodebug")
     fn random(self) -> Self:
-        rfill[type](self.tensor.data, self.num_elements())
-        # random.rand[type](self.data(), self.tensor.shape.num_elements)
-        return self
+        var rand = self
+        rand.rand()
+        return rand^
 
     @always_inline("nodebug")
     fn fill(self: Self, value: Scalar[type]) -> Self:
@@ -1227,7 +1227,7 @@ struct Tensor[type: DType = DType.float32](
             tindices[dim1], tindices[dim2] = _indices[dim2], _indices[dim1]
             ttensor.store(tindices, self.load(index))
 
-        return ttensor
+        return ttensor^
 
     @always_inline("nodebug")
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
@@ -1315,7 +1315,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn dtype(self: Self) -> String:
-        return type.__str__()
+        return str(type)
 
     # TODO: Add support for GPU
     @always_inline("nodebug")
@@ -1345,7 +1345,7 @@ struct Tensor[type: DType = DType.float32](
             self.num_elements(),
         ):
             casted.store(index, self.load(index).cast[des]())
-        return casted
+        return casted^
 
     @always_inline("nodebug")
     fn cast[dest: DType](self: Self) -> Tensor[dest]:
@@ -1377,7 +1377,7 @@ fn tensor[
         tensor.rand()
         return tensor
     tensor.zeros()
-    return tensor
+    return tensor^
 
 
 fn tensor[
@@ -1388,7 +1388,7 @@ fn tensor[
         tensor.rand()
         return tensor
     tensor.zeros()
-    return tensor
+    return tensor^
 
 
 fn ones[
@@ -1396,7 +1396,7 @@ fn ones[
 ](Shape: List[Int],) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](1))
-    return tensor
+    return tensor^
 
 
 fn ones[
@@ -1404,7 +1404,7 @@ fn ones[
 ](*Shape: Int,) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](1))
-    return tensor
+    return tensor^
 
 
 fn zeros[
@@ -1412,7 +1412,7 @@ fn zeros[
 ](Shape: List[Int],) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](0))
-    return tensor
+    return tensor^
 
 
 fn zeros[
@@ -1420,7 +1420,7 @@ fn zeros[
 ](*Shape: Int,) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](0))
-    return tensor
+    return tensor^
 
 
 @always_inline("nodebug")
@@ -1435,7 +1435,7 @@ fn fill[
 ](*Shape: Int, val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, val)
-    return tensor
+    return tensor^
 
 
 fn fill[
@@ -1443,7 +1443,7 @@ fn fill[
 ](Shape: List[Int], val: Scalar[dtype]) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, val)
-    return tensor
+    return tensor^
 
 
 fn rand[
@@ -1453,7 +1453,7 @@ fn rand[
     if seed:
         tensor.rand()
     tensor.rand()
-    return tensor
+    return tensor^
 
 
 fn rand[
@@ -1463,7 +1463,7 @@ fn rand[
     if seed:
         tensor.rand()
     tensor.rand()
-    return tensor
+    return tensor^
 
 
 fn empty[dtype: DType = DType.float32](*Shape: Int) -> Tensor[dtype]:
@@ -1489,4 +1489,4 @@ fn arange[
     for i in range(num_elements):
         result[i] = current
         current += step
-    return result
+    return result^

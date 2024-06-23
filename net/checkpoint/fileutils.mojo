@@ -81,7 +81,6 @@ fn rmdir[pathlike: PathLike](path: pathlike):
         print(result)
 
 
-@register_passable
 struct FILE:
     ...
 
@@ -114,7 +113,7 @@ struct File:
             print("read failed")
         return String(buffer, ssize)
 
-    fn read_bytes(self, size: Int = -1) -> List[UInt8]:
+    fn readbytes(self, size: Int = -1) -> Bytes:
         var ssize = size
         if ssize == -1:
             ssize = self.size()
@@ -129,7 +128,7 @@ struct File:
         ](buffer, 1, ssize, self.fd)
         if ret == -1:
             print("read failed")
-        return List[UInt8](unsafe_pointer=buffer, size=ssize, capacity=ssize)
+        return Bytes(buffer)
 
     fn size(self) -> Int:
         var result = external_call[
@@ -162,19 +161,7 @@ struct File:
         if ret == -1:
             print("write failed")
 
-    fn write_bytes(self, buffer: Bytes):
-        var ret = external_call[
-            "fwrite",
-            Int32,
-            UnsafePointer[UInt8],
-            Int32,
-            Int32,
-            UnsafePointer[FILE],
-        ](buffer.unsafe_ptr(), 1, len(buffer), self.fd)
-        if ret == -1:
-            print("write failed")
-
-    fn write_bytes(self, buffer: List[UInt8]):
+    fn writebytes(self, buffer: Bytes):
         var ret = external_call[
             "fwrite",
             Int32,
@@ -218,21 +205,30 @@ struct Bytes(Sized, Stringable, Representable):
         self.data = StaticTuple[UInt8, NBytes]()
 
     @always_inline("nodebug")
-    fn __init__(inout self, s: String):
-        var data = StaticTuple[UInt8, NBytes]()
-
-        @parameter
-        for i in range(NBytes):
-            data[i] = s._buffer[i]
-        self.data = data
-
-    @always_inline("nodebug")
-    fn __init__(inout self, bytes: List[UInt8]):
+    fn __init__(inout self, bytes: UnsafePointer[UInt8]):
         var data = StaticTuple[UInt8, NBytes]()
 
         @parameter
         for i in range(NBytes):
             data[i] = bytes[i]
+        self.data = data
+
+    @always_inline("nodebug")
+    fn __init__(inout self, owned bytes: List[UInt8]):
+        var data = StaticTuple[UInt8, NBytes]()
+
+        @parameter
+        for i in range(NBytes):
+            data[i] = bytes[i]
+        self.data = data
+
+    @always_inline("nodebug")
+    fn __init__(inout self, string: String):
+        var data = StaticTuple[UInt8, NBytes]()
+
+        @parameter
+        for i in range(NBytes):
+            data[i] = string._buffer[i]
         self.data = data
 
     @always_inline("nodebug")
@@ -269,16 +265,21 @@ struct Bytes(Sized, Stringable, Representable):
             result += str(self[i])
             if i != self.__len__() - 1:
                 result += ", "
-        return result + "]"
+        return (result + "]")
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
         var result: String = ""
-
         @parameter
         for i in range(NBytes):
             result += chr(int(self[i]))
         return result
+
+    @always_inline("nodebug")
+    fn clear(inout self):
+        @parameter
+        for i in range(NBytes):
+            self[i] = 0
 
     @always_inline("nodebug")
     fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
@@ -298,6 +299,12 @@ struct Bytes(Sized, Stringable, Representable):
             data[i] = self[i]
         return data
 
+    @always_inline("nodebug")
+    fn reverse(self) -> Self:
+        var prev = self.list()
+        prev.reverse()
+        return Bytes(prev^)
+
 
 fn tobytes[dtype: DType](value: Scalar[dtype]) -> Bytes:
     var bits = bitcast[DType.uint64](value.cast[type64[dtype]()]())
@@ -310,7 +317,7 @@ fn tobytes[dtype: DType](value: Scalar[dtype]) -> Bytes:
 
 
 fn frombytes[dtype: DType](data: Bytes) -> Scalar[dtype]:
-    if not data.__len__() >= NBytes:
+    if not len(data) >= NBytes:
         print("Invalid byte length")
         exit(1)
 

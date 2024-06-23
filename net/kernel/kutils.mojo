@@ -53,7 +53,7 @@ fn tensor_op[
 
     for i in range(num_elements - (num_elements % nelts), num_elements):
         result.store(i, func(t1.load(i), t2.load(i)))
-    return result
+    return result^
 
 
 @always_inline("nodebug")
@@ -93,7 +93,7 @@ fn scalar_op[
     for i in range(num_elements - (num_elements % nelts), num_elements):
         Output.store(i, func(Input.load(i), value))
 
-    return Output
+    return Output^
 
 
 @always_inline("nodebug")
@@ -131,9 +131,15 @@ fn Broadcast_op[
             i, func(tensor1.load(flat_index1), tensor2.load(flat_index2))
         )
 
-    return result
+    return result^
 
-fn operate[type : DType, func : fn[type : DType, nelts : Int](SIMD[type,nelts],SIMD[type,nelts]) -> SIMD[type,nelts]](self : Tensor[type], other : Tensor[type]) -> Tensor[type]:
+
+fn operate[
+    type: DType,
+    func: fn[type: DType, nelts: Int] (
+        SIMD[type, nelts], SIMD[type, nelts]
+    ) -> SIMD[type, nelts],
+](self: Tensor[type], other: Tensor[type]) -> Tensor[type]:
     constrained[type.is_numeric(), "the Tensor type must be numeric"]()
     if is_compatible(self.shapes().Shapes(), other.shapes().Shapes()):
         return tensor_op[type, func](self, other)

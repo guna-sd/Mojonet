@@ -47,7 +47,7 @@ struct shape:
         self.rank = len(elements)
 
     @always_inline("nodebug")
-    fn __init__(inout self, shapes : List[Int]):
+    fn __init__(inout self, owned shapes : List[Int]):
         if (len(shapes) > self.maxrank):
             print("number of elements must be equal or less then rank {26}")
             exit(1)
@@ -59,7 +59,7 @@ struct shape:
         self.rank = len(shapes)
 
     @always_inline("nodebug")
-    fn __init__(inout self, shapes : VariadicList[Int]):
+    fn __init__(inout self, owned shapes : VariadicList[Int]):
         if (len(shapes) > self.maxrank):
             print("number of elements must be equal or less then rank {26}")
             exit(1)
@@ -71,7 +71,7 @@ struct shape:
         self.rank = len(shapes)
     
     @always_inline("nodebug")
-    fn __init__(inout self, shapes : TensorSpec):
+    fn __init__(inout self, owned shapes : TensorSpec):
         if (shapes.rank() > self.maxrank):
             print("number of elements must be equal or less then rank {26}")
             exit(1)
@@ -149,21 +149,21 @@ struct shape:
         return buf
       buf += "1x"
       buf += str(self.shapes[0])
-      return buf
+      return buf^
 
     @always_inline("nodebug")
     fn Strides(self : Self) -> List[Int]:
         var list = List[Int](capacity=self.rank)
         for i in range(self.rank):
             list.append(self.shapes[i])
-        return list
+        return list^
 
     @always_inline("nodebug")
     fn Shapes(self) -> List[Int]:
         var list = List[Int](capacity=self.rank)
         for i in range(self.rank):
             list.append(self.shapes[i])
-        return list
+        return list^
     
     @always_inline("nodebug")
     fn Rank(self : Self) -> Int:
@@ -234,7 +234,7 @@ fn calculate_indices[size: Int](shape: StaticIntTuple[size], index: Int) -> List
     for i in reversed(range(0,size)):
         indices[i] = idx % shape[i]
         idx //= shape[i]
-    return indices
+    return indices^
 
 
 @always_inline
@@ -285,7 +285,7 @@ fn calculate_indices(shape: List[Int], index: Int) -> List[Int]:
     for dim in reversed(shape):
         indices.insert(0, idx % dim[])
         idx //= dim[]
-    return indices
+    return indices^
 
 
 @always_inline("nodebug")
@@ -350,27 +350,21 @@ fn list(shapes : VariadicList[Int])-> List[Int]:
     var list = List[Int](capacity=shapes.__len__())
     for i in shapes:
         list.append(i)
-    return list
+    return list^
 
 @always_inline("nodebug")
 fn list[size : Int](shapes : StaticIntTuple[size], capacity : Int)-> List[Int]:
     var list = List[Int](capacity=capacity)
     for i in range(capacity):
         list.append(shapes[i])
-    return list
+    return list^
 
 @always_inline("nodebug")
 fn list(*shapes : Int)-> List[Int]:
     var list = List[Int](capacity=shapes.__len__())
     for i in shapes:
         list.append(i)
-    return list
-
-@always_inline("nodebug")
-fn fill_list(inout list : List[Int], val : Int)-> List[Int]:
-  for i in range(list.__len__()):
-    list[i] = val
-  return list
+    return list^
 
 @always_inline("nodebug")
 fn bytes[type : DType](num_elements : Int) -> Int:

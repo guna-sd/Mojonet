@@ -52,4 +52,4 @@ struct Linear[dtype: DType]:
         if self.bias:
             return y.add(self.bias.take())
 
-        return y
+        return y^

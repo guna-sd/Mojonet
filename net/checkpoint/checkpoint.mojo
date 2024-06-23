@@ -4,7 +4,9 @@ struct Serialize:
     var shapes: List[Int]
 
     fn __init__(
-        inout self, shapes: List[Int], storage: InlinedFixedVector[Bytes]
+        inout self,
+        owned shapes: List[Int],
+        owned storage: InlinedFixedVector[Bytes],
     ):
         self.storage = storage
         self.shapes = shapes
@@ -35,8 +37,7 @@ struct Serialize:
             var value = tensor.load(i)
             var bytes = tobytes[type](value)
             storage[i + 2 + len(shapes)] = bytes
-        self.shapes = shapes
-        self.storage = storage
+        self = Self(shapes^, storage^)
 
     fn totensor[type: DType](inout self: Self) -> Tensor[type]:
         var shapes = shape(self.shapes)
@@ -49,11 +50,11 @@ struct Serialize:
     fn write(self, path: String):
         with fopen(path, "wb") as file:
             for i in range(self.storage.capacity):
-                file.write_bytes(self.storage[i])
+                file.writebytes(self.storage[i])
 
     fn read(inout self, path: String):
         with fopen(path, "rb") as file:
-            var magic_buffer = Bytes(file.read_bytes(NBytes))
+            var magic_buffer = file.readbytes(NBytes)
             var magic_number = frombytes[DType.uint64](magic_buffer)
             if magic_number != Self.MAGIC_NUMBER:
                 print("Invalid magic number")
@@ -61,7 +62,7 @@ struct Serialize:
 
             var shapes = List[Int](capacity=26)
             while True:
-                var shape_buffer = Bytes(file.read_bytes(NBytes))
+                var shape_buffer = file.readbytes(NBytes)
                 var shape_value = frombytes[DType.uint64](shape_buffer)
                 if shape_value == 0x1A:
                     break
@@ -72,7 +73,7 @@ struct Serialize:
                 num_elements *= shapes[i]
 
             var storage = InlinedFixedVector[Bytes](
-                capacity=num_elements + shapes.__len__() + 2
+                capacity=num_elements + len(shapes) + 2
             )
             storage[0] = tobytes[DType.uint64](Self.MAGIC_NUMBER)
             for i in range(len(shapes)):
@@ -80,14 +81,14 @@ struct Serialize:
             storage[len(shapes) + 1] = tobytes[DType.uint64](0x1A)
 
             for i in range(num_elements):
-                var element_buffer = Bytes(file.read_bytes(NBytes))
+                var element_buffer = file.readbytes(NBytes)
                 storage[i + 2 + len(shapes)] = element_buffer
-            self = Self(shapes, storage)
+            self = Self(shapes^, storage^)
 
     @staticmethod
     fn read(path: String) -> Serialize:
         with fopen(path, "rb") as file:
-            var magic_buffer = Bytes(file.read_bytes(NBytes))
+            var magic_buffer = file.readbytes(NBytes)
             var magic_number = frombytes[DType.uint64](magic_buffer)
             if magic_number != Self.MAGIC_NUMBER:
                 print("Invalid magic number")
@@ -95,7 +96,7 @@ struct Serialize:
 
             var shapes = List[Int](capacity=26)
             while True:
-                var shape_buffer = Bytes(file.read_bytes(NBytes))
+                var shape_buffer = file.readbytes(NBytes)
                 var shape_value = frombytes[DType.uint64](shape_buffer)
                 if shape_value == 0x1A:
                     break
@@ -114,9 +115,9 @@ struct Serialize:
             storage[len(shapes) + 1] = tobytes[DType.uint64](0x1A)
 
             for i in range(num_elements):
-                var element_buffer = Bytes(file.read(NBytes))
+                var element_buffer = file.readbytes(NBytes)
                 storage[i + 2 + len(shapes)] = element_buffer
-            return Self(shapes, storage)
+            return Self(shapes^, storage^)
 
     @staticmethod
     fn fromtensor[type: DType](tensor: Tensor[type]) -> Self:
@@ -138,7 +139,7 @@ struct Serialize:
             var value = tensor.load(i)
             var bytes = tobytes[type](value)
             storage[i + 2 + len(shapes)] = bytes
-        return Self(shapes, storage)
+        return Self(shapes^, storage^)
 
     @staticmethod
     fn totensor[type: DType](bytes: Serialize) -> Tensor[type]:
@@ -154,6 +155,7 @@ struct Serialize:
         for i in range(self.storage.capacity):
             list_bytes[i] = self.storage[i]
         return list_bytes
+
 
 # struct ckpt:
 #     var filename : String

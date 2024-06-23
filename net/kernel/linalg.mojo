@@ -521,7 +521,7 @@ fn matmul[
         )
 
     mm[dtype](A, B, C, m, n, p)
-    return result
+    return result^
 
 
 @always_inline("nodebug")
@@ -559,7 +559,7 @@ fn batch_matmul[
 
     bmm[dtype](A, B, C, b, m, n, p)
 
-    return result
+    return result^
 
 
 @always_inline("nodebug")
@@ -597,7 +597,7 @@ fn bmm[
 
     bmm[dtype](A, B, C, b, m, n, p)
 
-    return result
+    return result^
 
 
 @always_inline("nodebug")
@@ -636,7 +636,7 @@ fn fusedbmm[
 
     fusedbmm[dtype, func](A, B, C, b, m, n, p)
 
-    return result
+    return result^
 
 
 @always_inline("nodebug")
@@ -680,4 +680,4 @@ fn fusedScalarbmm[
 
     fusedScalarbmm[dtype, func](A, B, C, Scalar_value, b, m, n, p)
 
-    return result
+    return result^

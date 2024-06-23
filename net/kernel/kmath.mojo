@@ -116,10 +116,7 @@ fn gelu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
         * value
         * (
             1.0
-            + tanh[type, nelts](
-                math.sqrt[type, nelts](2.0 / pi)
-                * (value + 0.044715 * pow(value, 3))
-            )
+            + tanh[type, nelts](sqrthfpi * (value + 0.044715 * pow(value, 3)))
         )
     )
 
@@ -134,7 +131,9 @@ fn softmax[
 
 
 @always_inline("nodebug")
-fn elu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+fn elu[
+    type: DType, nelts: Int
+](value: SIMD[type, nelts], alpha: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return max[type, nelts](value, (alpha * (math.exp[type, nelts](value) - 1)))
 
 
@@ -147,6 +146,8 @@ fn leaky_relu[
 
 @always_inline("nodebug")
 fn selu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
+    alias alpha = 1.6732632423543772848170429916717
+    alias scale = 1.0507009873554804934193349852946
     return max[type, nelts](
         value, (scale * alpha * (math.exp[type, nelts](value) - 1))
     )
@@ -176,7 +177,7 @@ fn tanh[type: DType](Input: Tensor[type]) -> Tensor[type]:
     for n in range(num_elements - (num_elements % nelts), num_elements):
         Output[n] = tanh(Input[n])
 
-    return Output
+    return Output^
 
 
 @always_inline("nodebug")
@@ -203,7 +204,7 @@ fn sigmoid[type: DType](Input: Tensor[type]) -> Tensor[type]:
     for n in range(num_elements - (num_elements % nelts), num_elements):
         Output[n] = sigmoid(Input[n])
 
-    return Output
+    return Output^
 
 
 @always_inline("nodebug")
@@ -231,7 +232,7 @@ fn relu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     for n in range(num_elements - (num_elements % nelts), num_elements):
         Output[n] = relu(Input[n])
 
-    return Output
+    return Output^
 
 
 @always_inline("nodebug")
@@ -259,7 +260,7 @@ fn gelu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     for n in range(num_elements - (num_elements % nelts), num_elements):
         Output[n] = gelu(Input[n])
 
-    return Output
+    return Output^
 
 
 @always_inline("nodebug")
@@ -287,4 +288,4 @@ fn silu[type: DType](Input: Tensor[type]) -> Tensor[type]:
     for n in range(num_elements - (num_elements % nelts), num_elements):
         Output[n] = swish(Input[n])
 
-    return Output
+    return Output^
