@@ -1,4 +1,5 @@
 @value
+@register_passable("trivial")
 struct TensorType[T: DType]:
     """A Underlying Storage that represents the Tensor."""
 
@@ -36,16 +37,6 @@ struct TensorType[T: DType]:
         self.device = device
         self.data = DTypePointer[T]().alloc(self.shape.numofelements())
         memcpy(self.data, data, self.shape.numofelements())
-    
-    fn __copyinit__(inout self: Self, other: Self):
-        self.shape = other.shape
-        self.data = other.data
-        self.device = other.device
-
-    fn __moveinit__(inout self: Self, owned other: Self):
-        self.shape = other.shape
-        self.data = other.data
-        self.device = other.device
 
     @always_inline("nodebug")
     fn load[nelts: Int](self, owned index: Int) -> SIMD[T, nelts]:
@@ -363,8 +354,8 @@ struct Tensor[type: DType = DType.float32](
     fn store[nelts: Int = 1](self: Self, index: Int, val: SIMD[type, nelts]):
         self.tensor.store[nelts](index, val)
 
-    #TODO: based on the experience from pytorch the __getitem__ should probably return Tensor instead of a SIMD
-    #working on it
+    # TODO: based on the experience from pytorch the __getitem__ should probably return Tensor instead of a SIMD
+    # working on it
     # @always_inline("nodebug")
     # fn __getitem__(self: Self, index: Int) -> Tensor[type]:
     #     var offset = self.tensor.shape.indices(index)
@@ -391,7 +382,7 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn __getitem__(self, indices: List[Int]) -> SIMD[type, 1]:
         return self.tensor[indices]
-      
+
     @always_inline("nodebug")
     fn __setitem__(self: Self, index: Int, val: SIMD[type, 1]):
         self.tensor[index] = val
@@ -406,39 +397,35 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn __eq__(self: Self, other: Self) -> Bool:
-        var val = False
         if (
-            self.num_elements() == other.num_elements()
-            and self.tensor.shape == other.tensor.shape
+            self.num_elements() != other.num_elements()
+            or self.tensor.shape != other.tensor.shape
         ):
-            for i in range(self.num_elements()):
-                if self.tensor.data[i] == other.tensor.data[i]:
-                    val = True
-        return val
+            return False
+        for i in range(self.num_elements()):
+            if self.tensor.data[i] != other.tensor.data[i]:
+                return False
+        return True
 
     @always_inline("nodebug")
     fn __eq__(self: Self, other: MojoTensor[type]) -> Bool:
-        var val = False
         if (
-            self.num_elements() == other.num_elements()
-            and self.tensor.shape == other.shape()
+            self.num_elements() != other.num_elements()
+            or self.tensor.shape != other.shape()
         ):
-            for i in range(self.num_elements()):
-                if self.load(i) == other.load(i):
-                    val = True
-        return val
+            return False
+        for i in range(self.num_elements()):
+            if self.load(i) != other.load(i):
+                return False
+        return True
 
     @always_inline("nodebug")
     fn __ne__(self: Self, other: Self) -> Bool:
-        if self.__eq__(other):
-            return False
-        return True
+        return not self.__eq__(other)
 
     @always_inline("nodebug")
     fn __ne__(self: Self, other: MojoTensor[type]) -> Bool:
-        if self.__eq__(other):
-            return False
-        return True
+        return not self.__eq__(other)
 
     @always_inline("nodebug")
     fn __bool__(self: Self) -> Bool:
@@ -454,7 +441,8 @@ struct Tensor[type: DType = DType.float32](
 
         return Tensor(
             result.tensor,
-            requires_grad=requires_grad,)
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: Self) -> Self:
@@ -495,7 +483,9 @@ struct Tensor[type: DType = DType.float32](
         fn operation[nelts: Int](idx: Int):
             result.store(idx, pow(self.load(idx), self.load(idx)))
 
-        vectorize[operation, nelts, unroll_factor=4](num_elements - (num_elements % nelts))
+        vectorize[operation, nelts, unroll_factor=4](
+            num_elements - (num_elements % nelts)
+        )
 
         for i in range(num_elements - (num_elements % nelts), num_elements):
             result.store(i, pow(self.load(i), exponent.load(i)))
@@ -617,7 +607,8 @@ struct Tensor[type: DType = DType.float32](
 
         return Tensor(
             result.tensor,
-            requires_grad=requires_grad,)
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __rsub__(self: Self, other: Self) -> Self:
@@ -670,7 +661,7 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn __pos__(self: Self) -> Self:
         return self
-    
+
     @always_inline("nodebug")
     fn __floor__(self: Self) -> Self:
         alias nelts = simdwidthof[type]() * 2
@@ -866,7 +857,9 @@ struct Tensor[type: DType = DType.float32](
 
         @parameter
         fn operation[nelts: Int](idx: Int):
-            self.store[nelts](idx, func(self.load[nelts](idx), other.load[nelts](idx)))
+            self.store[nelts](
+                idx, func(self.load[nelts](idx), other.load[nelts](idx))
+            )
 
         vectorize[operation, nelts, unroll_factor=4](
             num_elements - (num_elements % nelts)
@@ -913,11 +906,15 @@ struct Tensor[type: DType = DType.float32](
         return self.__truediv__(other)
 
     @always_inline("nodebug")
-    fn bmm(self: Self, other : Self) -> Self:
+    fn bmm(self: Self, other: Self) -> Self:
         return bmm(self, other)
 
     @always_inline("nodebug")
-    fn fusedbmm[fuse_operation : fn[T : DType, nelts : Int](SIMD[T,nelts]) -> SIMD[T,nelts]](self: Self, other : Self) -> Self:
+    fn fusedbmm[
+        fuse_operation: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[
+            T, nelts
+        ]
+    ](self: Self, other: Self) -> Self:
         return fusedbmm[type, fuse_operation](self, other)
 
     @always_inline("nodebug")
@@ -1123,7 +1120,7 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn tan(inout self: Self) -> Self:
         return self.apply[math.tan]()
-    
+
     @always_inline("nodebug")
     fn j0(inout self: Self) -> Self:
         return self.apply[j0]()
@@ -1174,7 +1171,7 @@ struct Tensor[type: DType = DType.float32](
         memset_zero(self.tensor.data, self.num_elements())
 
     @always_inline("nodebug")
-    fn require_grad(inout self, requires_grad : Bool = True):
+    fn require_grad(inout self, requires_grad: Bool = True):
         self = Self(self.tensor, requires_grad=requires_grad)
 
     @always_inline("nodebug")
@@ -1303,11 +1300,18 @@ struct Tensor[type: DType = DType.float32](
         return self.tensor.data
 
     @always_inline("nodebug")
-    fn data(self, shapes : shape, offset : Int) -> DTypePointer[type]:
+    fn data(self, shapes: shape, offset: Int) -> DTypePointer[type]:
         var num_elements = shapes.num_elements
         var new_data = DTypePointer[type]().alloc(num_elements)
         memcpy(new_data, self.tensor.data + (offset), num_elements)
         return new_data
+
+    @always_inline("nodebug")
+    fn unsafe_ptr(self) -> UnsafePointer[Scalar[type]]:
+        var data = UnsafePointer[Scalar[type]]().alloc(self.num_elements())
+        for i in range(self.num_elements()):
+            data[i] = self.tensor.data[i]
+        return data
 
     @always_inline("nodebug")
     fn dtype(self: Self) -> String:
@@ -1355,22 +1359,14 @@ struct Tensor[type: DType = DType.float32](
     fn itemsize(self: Self) -> Int:
         return sizeof[type]()
 
-    # TODO: Add support for seralizing and deserializing tensors
     @always_inline("nodebug")
-    fn serialize(self) -> List[Bytes]:
-        var bytes = List[Bytes](capacity=self.num_elements())
-        for i in range(self.num_elements()):
-            bytes.append(tobytes[type](self.tensor.data[i]))
-        return bytes
+    fn serialize(self) -> Serialize:
+        return Serialize(self)
 
     @always_inline("nodebug")
-    fn deserialize(self, data: List[Bytes], shape: List[Int]) -> Tensor[type]:
-        var num_elements = num_elements(shape)
-        var tensor_data = List[Scalar[type]](capacity=num_elements)
-        for i in range(num_elements):
-            var value = frombytes[type](data[i])
-            tensor_data.append(value)
-        return Tensor[type](shape, tensor_data)
+    @staticmethod
+    fn deserialize(data: Serialize) -> Tensor[type]:
+        return Serialize.totensor[type](data)
 
 
 fn tensor[
@@ -1477,7 +1473,10 @@ fn empty[dtype: DType = DType.float32](*Shape: Int) -> Tensor[dtype]:
 fn empty[dtype: DType = DType.float32](Shape: List[Int]) -> Tensor[dtype]:
     return Tensor[dtype](Shape)
 
-fn arange[dtype: DType = DType.float32](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
+
+fn arange[
+    dtype: DType = DType.float32
+](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
     var starting = start
     var stop = end
     if end == 0:
