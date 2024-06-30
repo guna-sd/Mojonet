@@ -1,3 +1,8 @@
+import math
+
+alias SELU_ALPHA = 1.6732632423543772848170429916717
+alias SELU_SCALE = 1.0507009873554804934193349852946
+
 @always_inline("nodebug")
 fn erfc[type: DType, nelts: Int](arg: SIMD[type, nelts]) -> SIMD[type, nelts]:
     return math.erfc(arg)
@@ -146,10 +151,8 @@ fn leaky_relu[
 
 @always_inline("nodebug")
 fn selu[type: DType, nelts: Int](value: SIMD[type, nelts]) -> SIMD[type, nelts]:
-    alias alpha = 1.6732632423543772848170429916717
-    alias scale = 1.0507009873554804934193349852946
     return max[type, nelts](
-        value, (scale * alpha * (math.exp[type, nelts](value) - 1))
+        value, (SELU_SCALE * SELU_ALPHA * (math.exp[type, nelts](value) - 1))
     )
 
 

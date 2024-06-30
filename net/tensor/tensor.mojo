@@ -1,3 +1,8 @@
+from net.utils.rand import rand_n
+from net.utils.mt19937 import mt19937Engine
+from memory import DTypePointer, memset, memset_zero, memcpy
+from .utils import list
+
 @value
 @register_passable("trivial")
 struct TensorType[T: DType]:
@@ -1180,14 +1185,23 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn rand(inout self):
-        rfill[type](self.tensor.data, self.num_elements())
-        # random.randn[type](self.data, self.shape.num_elements, 2, self.num_elements())
+        rand_n[type](self.tensor.data, self.num_elements())
+
+    @always_inline("nodebug")
+    fn rand(inout self, seed: Int):
+        rand_n[type](self.tensor.data, self.num_elements(), seed)
 
     @always_inline("nodebug")
     fn random(self) -> Self:
         var rand = self
         rand.rand()
         return rand^
+
+    @always_inline("nodebug")
+    fn random(self, seed: Int) -> Self:
+        var rand = self
+        rand.rand(seed)
+        return rand
 
     @always_inline("nodebug")
     fn fill(self: Self, value: Scalar[type]) -> Self:
@@ -1327,14 +1341,14 @@ struct Tensor[type: DType = DType.float32](
         return self.tensor.shape.numofelements()
 
     @always_inline("nodebug")
-    fn astype[des: DType](self: Self) -> Tensor[des]:
-        var casted = Tensor[des](self.tensor.shape)
-        alias nelts = simdwidthof[des]() * 2
+    fn astype[dest: DType](self: Self) -> Tensor[dest]:
+        var casted = Tensor[dest](self.tensor.shape)
+        alias nelts = simdwidthof[dest]() * 2
 
         @parameter
         fn cast_single_element[nelts: Int](index: Int):
             casted.tensor.store[nelts](
-                index, self.tensor.load[nelts](index).cast[des]()
+                index, self.tensor.load[nelts](index).cast[dest]()
             )
 
         vectorize[cast_single_element, nelts](
@@ -1344,7 +1358,7 @@ struct Tensor[type: DType = DType.float32](
             self.num_elements() - (self.num_elements() % nelts),
             self.num_elements(),
         ):
-            casted.store(index, self.load(index).cast[des]())
+            casted.store(index, self.load(index).cast[dest]())
         return casted^
 
     @always_inline("nodebug")

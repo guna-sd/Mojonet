@@ -1,3 +1,6 @@
+from utils import StaticTuple
+from os.path import exists
+
 alias SEEK_SET = 0
 alias SEEK_END = 2
 alias NBytes = DType.uint64.sizeof()

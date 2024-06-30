@@ -1,3 +1,7 @@
+from sys.intrinsics import PrefetchOptions
+alias PREFETCH_READ = PrefetchOptions().for_read().high_locality().to_data_cache()
+alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cache()
+
 @always_inline("nodebug")
 fn mm[
     T: DType
@@ -390,7 +394,8 @@ fn bmm[
             p,
         )
 
-    parallelize[MM](b, b)
+    for batch in range(b):
+        MM(batch)
 
 
 fn fusedbmm[
@@ -428,7 +433,8 @@ fn fusedbmm[
             p,
         )
 
-    parallelize[MM](b, b)
+    for batch in range(b):
+        MM(batch)
 
 
 fn fusedScalarbmm[
@@ -472,7 +478,8 @@ fn fusedScalarbmm[
             p,
         )
 
-    parallelize[MM](b, b)
+    for batch in range(b):
+        MM(batch)
 
 
 @always_inline("nodebug")

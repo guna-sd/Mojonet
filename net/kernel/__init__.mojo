@@ -1,9 +1,5 @@
 from .constant import *
 from .kernel import *
-from .linalg import *
+from .linalg import batch_matmul, bmm, matmul, fusedbmm
 from .kutils import *
 from .kmath import *
-from math.math import _call_libm
-from sys.intrinsics import PrefetchOptions
-alias PREFETCH_READ = PrefetchOptions().for_read().high_locality().to_data_cache()
-alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cache()

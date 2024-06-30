@@ -1,3 +1,5 @@
+from collections import InlinedFixedVector
+
 struct Serialize:
     alias MAGIC_NUMBER: UInt64 = 0xFFFFFFFFFFFFFFFF
     var storage: InlinedFixedVector[Bytes]
