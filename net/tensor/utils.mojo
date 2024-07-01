@@ -156,7 +156,13 @@ struct shape:
 
     @always_inline("nodebug")
     fn __str__(self : Self) -> String:
-        return str(self.shapes)
+        var buffer: String = "("
+        for i in range(len(self)):
+            buffer+=str(self[i])
+            if i != len(self) - 1:
+                buffer+=", "
+        buffer += ")"
+        return buffer
 
     @always_inline("nodebug")
     fn Strides(self : Self) -> List[Int]:
@@ -273,6 +279,25 @@ fn are_expandable(shape1: shape, shape2: shape) -> Bool:
         return False
     return True
 
+@always_inline("nodebug")
+fn is_compatible(A: List[Int], B: List[Int]) -> Bool:
+    for i in range(len(A)):
+        if A[i] != B[i]:
+            print(
+                "Incompatible Shapes: Tensors must have the same shape got [",
+                A[i],
+                "] and [",
+                B[i],
+                "] at [",
+                i,
+                "]",
+            )
+            return False
+    return True
+
+fn handle_issue(msg: String):
+    print("Issue: " + msg)
+    exit(1)
 
 @always_inline("nodebug")
 fn broadcast_shapes(shape1: shape, shape2: shape) -> shape:
@@ -282,8 +307,7 @@ fn broadcast_shapes(shape1: shape, shape2: shape) -> shape:
           var dim1 = shape1[shape1.__len__() - 1 - i] if i < shape1.__len__() else 1
           var dim2 = shape2[shape2.__len__() - 1 - i] if i < shape2.__len__() else 1
           if dim1 != dim2 and dim1 != 1 and dim2 != 1:
-              print("Shapes are not compatible for broadcasting:",str(shape1), " and ",str(shape2))
-              exit()
+            handle_issue("Shapes are not compatible for broadcasting:" + str(shape1) + " and " +str(shape2))
           result_shape.insert(0, max(dim1, dim2))
       return shape(result_shape)
 
@@ -472,56 +496,64 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
     var rank = shape.rank
 
     writer.write_str(TensorStart)
+    if shape.rank <= 1:
+        if shape.rank == 1:
+            writer.write_str(SquareBracketL)
+            complete[type](ptr, shape.num_elements, writer)
+            writer.write_str(SquareBracketR)
+        if shape.rank == 0:
+            writer.write_str(SquareBracketL+SquareBracketR)
 
-    var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
-    var row_elem_count = 1 if rank < 2 else shape.Shapes()[-2]
+    else:
+        var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
+        var row_elem_count = 1 if rank < 2 else shape.Shapes()[-2]
 
-    var matrix_elem_count = column_elem_count * row_elem_count
-    
-    for _ in range(2,rank):
-        writer.write_str(SquareBracketL)
+        var matrix_elem_count = column_elem_count * row_elem_count
+        
+        for _ in range(2,rank):
+            writer.write_str(SquareBracketL)
 
-    var num_matrices = 1
+        var num_matrices = 1
 
-    for i in range(max(rank -2, 0)):
-        num_matrices *= shape.Shapes()[i]
-    
-    var matrix_idx = 0
-    while matrix_idx < num_matrices:
-        if matrix_idx > 0:
-            writer.write_str(",\n\n\t")
-        writer.write_str(SquareBracketL)
+        for i in range(max(rank -2, 0)):
+            num_matrices *= shape.Shapes()[i]
+        
+        var matrix_idx = 0
+        while matrix_idx < num_matrices:
+            if matrix_idx > 0:
+                writer.write_str(",\n\n\t")
+            writer.write_str(SquareBracketL)
 
-        var row_idx = 0
-        while row_idx < row_elem_count:
-            if row_idx > 0 and row_elem_count > CompactMaxElemsToPrint:
-                writer.write_str("\n\t ")
+            var row_idx = 0
+            while row_idx < row_elem_count:
+                if row_idx > 0 and row_elem_count > CompactMaxElemsToPrint:
+                    writer.write_str("\n\t ")
 
-            if row_idx > 0 and row_elem_count <= CompactMaxElemsToPrint:
-                writer.write_str("\n\t ")
+                if row_idx > 0 and row_elem_count <= CompactMaxElemsToPrint:
+                    writer.write_str("\n\t ")
 
-            _serialize_elements[type](
-            ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
-            column_elem_count, writer)
-            row_idx += 1
+                _serialize_elements[type](
+                ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
+                column_elem_count, writer)
+                row_idx += 1
 
-            if row_idx != row_elem_count:
-                writer.write_str(", ")
+                if row_idx != row_elem_count:
+                    writer.write_str(", ")
 
-            if (row_elem_count >= CompactMaxElemsToPrint and row_idx == CompactElemPerSide):
-                writer.write_str("\n\t")
-                writer.write_str(Truncation)
-                row_idx = row_elem_count - CompactElemPerSide
-            
-        writer.write_str(SquareBracketR)
-        matrix_idx+=1
-        if (num_matrices >= CompactMaxElemsToPrint and matrix_idx == CompactElemPerSide):
-            writer.write_str("\n\n\t")
-            writer.write_str(" ...")
-            matrix_idx = num_matrices - CompactElemPerSide
+                if (row_elem_count >= CompactMaxElemsToPrint and row_idx == CompactElemPerSide):
+                    writer.write_str("\n\t")
+                    writer.write_str(Truncation)
+                    row_idx = row_elem_count - CompactElemPerSide
+                
+            writer.write_str(SquareBracketR)
+            matrix_idx+=1
+            if (num_matrices >= CompactMaxElemsToPrint and matrix_idx == CompactElemPerSide):
+                writer.write_str("\n\n\t")
+                writer.write_str(" ...")
+                matrix_idx = num_matrices - CompactElemPerSide
 
-    for _ in range(2,rank):
-        writer.write_str(SquareBracketR)
+        for _ in range(2,rank):
+            writer.write_str(SquareBracketR)
 
     if print_type:
         var buf = (",  dtype: " + type.__repr__())

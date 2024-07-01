@@ -497,11 +497,7 @@ fn matmul[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() > 2 and tensor2.rank() > 2:
-        print(
-            "matrix multiplication only works with 2d use batch_matmul for"
-            " tensor with rank > 2."
-        )
-        exit(1)
+        handle_issue("matrix multiplication only works with 2d use batch_matmul for tensor with rank > 2.")
 
     var result_shape = calculate_shapes(
         tensor1.tensor.shape, tensor2.tensor.shape
@@ -546,8 +542,7 @@ fn batch_matmul[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() <= 2 and tensor2.rank() <= 2:
-        print("Error: batch matrix multiplication requires a rank >= 3")
-        exit(1)
+        handle_issue("batch matrix multiplication requires a rank >= 3")
 
     var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
 
@@ -584,8 +579,7 @@ fn bmm[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() <= 2 and tensor2.rank() <= 2:
-        print("Error: batch matrix multiplication requires a rank >= 3")
-        exit(1)
+        handle_issue("batch matrix multiplication requires a rank >= 3")
 
     var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
 
@@ -623,8 +617,7 @@ fn fusedbmm[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() <= 2 and tensor2.rank() <= 2:
-        print("Error: batch matrix multiplication requires a rank >= 3")
-        exit(1)
+        handle_issue("batch matrix multiplication requires a rank >= 3")
 
     var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
 
@@ -667,8 +660,7 @@ fn fusedScalarbmm[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() <= 2 and tensor2.rank() <= 2:
-        print("Error: batch matrix multiplication requires a rank >= 3")
-        exit(1)
+        handle_issue("batch matrix multiplication requires a rank >= 3")
 
     var result_shape = calculate_shapes(tensor1.shapes(), tensor2.shapes())
 

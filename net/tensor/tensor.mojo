@@ -3,6 +3,7 @@ from net.utils.mt19937 import mt19937Engine
 from memory import DTypePointer, memset, memset_zero, memcpy
 from .utils import list
 
+
 @value
 @register_passable("trivial")
 struct TensorType[T: DType]:
@@ -183,6 +184,7 @@ struct Tensor[type: DType = DType.float32](
     """
 
     alias Type = TensorType[type]
+    alias Operation = Operation[type]
 
     var tensor: Self.Type
     """
@@ -333,6 +335,34 @@ struct Tensor[type: DType = DType.float32](
         """Iterate backwards over the tensor."""
         return _TensorIter[type, False](len(self), self)
 
+    fn __enter__(owned self) -> Self:
+        """The function to call when entering the context."""
+        return self^
+
+    fn __len__(self) -> Int:
+        return self.tensor.shape[0]
+
+    fn __repr__(self: Self) -> String:
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to[True, True](writer)
+        return output^
+
+    fn __str__(self: Self) -> String:
+        return String.format_sequence(self)
+
+    @always_inline("nodebug")
+    fn format_to(self, inout writer: Formatter):
+        TensorPrinter[type](self.tensor.data, self.shapes(), writer)
+
+    @always_inline("nodebug")
+    fn format_to[
+        print_type: Bool, print_shape: Bool
+    ](self, inout writer: Formatter):
+        TensorPrinter[type, print_type, print_shape](
+            self.tensor.data, self.shapes(), writer
+        )
+
     @always_inline("nodebug")
     fn load[nelts: Int = 1](self, index: Int) -> SIMD[type, nelts]:
         return self.tensor.load[nelts](index)
@@ -441,130 +471,211 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn __add__(self: Self, other: Self) -> Self:
-        var result = operate[type, SIMD.__add__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__add__](
+            self.tensor, other.tensor
+        )
         var requires_grad = self.requires_grad or other.requires_grad
 
         return Tensor(
-            result.tensor,
+            result,
             requires_grad=requires_grad,
         )
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__sub__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__sub__](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __mul__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__mul__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__mul__](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __truediv__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__truediv__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__truediv__](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __floordiv__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__floordiv__](self, other)
+        alias func: fn[Type: DType, nelts: Int] (
+            SIMD[Type, nelts], SIMD[Type, nelts]
+        ) -> SIMD[Type, nelts] = SIMD.__floordiv__
+        var result = Self.Operation.tensor_operation[func](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __mod__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__mod__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__mod__](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
-    fn __pow__(self: Self, exponent: Tensor[type]) -> Self:
+    fn __pow__(self: Self, exponent: Self) -> Self:
         """
         Exponentiation of each element in the tensor by the given exponent.
         """
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        if not is_compatible(
-            self.shapes().Shapes(), exponent.shapes().Shapes()
-        ):
-            print(Error("Tensors must be in same shape"))
-            exit(1)
-        alias nelts = simdwidthof[type]() * 2
-        var result = Tensor[type](self.shapes())
-        var num_elements = self.num_elements()
-
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            result.store(idx, pow(self.load(idx), self.load(idx)))
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        alias func: fn[Type: DType, nelts: Int] (
+            SIMD[Type, nelts], SIMD[Type, nelts]
+        ) -> SIMD[Type, nelts] = SIMD.__pow__
+        var result = Self.Operation.tensor_operation[func](
+            self.tensor, exponent.tensor
         )
+        var requires_grad = self.requires_grad or exponent.requires_grad
 
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            result.store(i, pow(self.load(i), exponent.load(i)))
-        return result
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __add__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__add__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__add__](
+            self.tensor, other
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __sub__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__sub__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__sub__](
+            self.tensor, other
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __mul__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__mul__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__mul__](
+            self.tensor, other
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __truediv__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__truediv__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__truediv__](
+            self.tensor, other
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __floordiv__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__floordiv__](self, other)
+        alias func: fn[Type: DType, nelts: Int] (
+            SIMD[Type, nelts], SIMD[Type, nelts]
+        ) -> SIMD[Type, nelts] = SIMD.__floordiv__
+        var result = Self.Operation.tensor_operation[func](self.tensor, other)
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __mod__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__mod__](self, other)
+        var result = Self.Operation.tensor_operation[SIMD.__mod__](
+            self.tensor, other
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __pow__(self: Self, exponent: Int) -> Self:
         """
         Exponentiation of each element in the tensor by the given exponent.
         """
-        constrained[type.is_numeric(), "the Tensor type must be numeric"]()
-        var result = self
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
+        alias func: fn[Type: DType, nelts: Int] (
+            SIMD[Type, nelts], Int
+        ) -> SIMD[Type, nelts] = SIMD.__pow__
+        var result = Self.Operation.tensor_operation[func](
+            self.tensor, exponent
+        )
+        var requires_grad = self.requires_grad or exponent
 
-        @parameter
-        fn power[nelts: Int](idx: Int):
-            result.store[nelts](idx, pow(result.load[nelts](idx), exponent))
-
-        vectorize[power, nelts](num_elements - (num_elements % nelts))
-        for index in range(
-            num_elements - (num_elements % nelts),
-            num_elements,
-        ):
-            result.store(index, pow(result.load(index), exponent))
-        return result
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn __iadd__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__add__](self, other)
+        self = self + other
 
     @always_inline("nodebug")
     fn __isub__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__sub__](self, other)
+        self = self - other
 
     @always_inline("nodebug")
     fn __imul__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__mul__](self, other)
+        self = self * other
 
     @always_inline("nodebug")
     fn __itruediv__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__truediv__](self, other)
+        self = self / other
 
     @always_inline("nodebug")
     fn __ifloordiv__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__floordiv__](self, other)
+        self = self // other
 
     @always_inline("nodebug")
     fn __imod__(inout self: Self, other: Self):
-        self = operate[type, SIMD.__mod__](self, other)
+        self = self % other
 
     @always_inline("nodebug")
     fn __ipow__(inout self: Self, exponent: Self):
@@ -576,27 +687,27 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn __iadd__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__add__](self, other)
+        self = self + other
 
     @always_inline("nodebug")
     fn __isub__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__sub__](self, other)
+        self = self - other
 
     @always_inline("nodebug")
     fn __imul__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__mul__](self, other)
+        self = self * other
 
     @always_inline("nodebug")
     fn __itruediv__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__truediv__](self, other)
+        self = self / other
 
     @always_inline("nodebug")
     fn __ifloordiv__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__floordiv__](self, other)
+        self = self // other
 
     @always_inline("nodebug")
     fn __imod__(inout self: Self, other: SIMD[type, 1]):
-        self = scalar_op[type, SIMD.__mod__](self, other)
+        self = self % other
 
     @always_inline("nodebug")
     fn __ipow__(inout self: Self, exponent: Int):
@@ -607,137 +718,111 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn __radd__(self: Self, other: Self) -> Self:
-        var result = operate[type, SIMD.__add__](self, other)
-        var requires_grad = self.requires_grad or other.requires_grad
+        return other + self
+
+    @always_inline("nodebug")
+    fn __rsub__(self: Self, other: Self) -> Self:
+        return other - self
+
+    @always_inline("nodebug")
+    fn __rmul__(self: Self, other: Self) -> Self:
+        return other * self
+
+    @always_inline("nodebug")
+    fn __rtruediv__(self: Self, other: Self) -> Self:
+        return other / self
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self: Self, other: Self) -> Self:
+        return other // self
+
+    @always_inline("nodebug")
+    fn __rmod__(self: Self, other: Self) -> Self:
+        return other % self
+
+    @always_inline("nodebug")
+    fn __radd__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self + other
+
+    @always_inline("nodebug")
+    fn __rsub__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self - other
+
+    @always_inline("nodebug")
+    fn __rmul__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self * other
+
+    @always_inline("nodebug")
+    fn __rtruediv__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self / other
+
+    @always_inline("nodebug")
+    fn __rfloordiv__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self // other
+
+    @always_inline("nodebug")
+    fn __rmod__(self: Self, other: SIMD[type, 1]) -> Self:
+        return self % other
+
+    @always_inline("nodebug")
+    fn __neg__(self: Self) -> Self:
+        return self * (Scalar[type](1)).__neg__()
+
+    @always_inline("nodebug")
+    fn __pos__(self: Self) -> Self:
+        return self * (Scalar[type](1)).__pos__()
+
+    @always_inline("nodebug")
+    fn __floor__(self: Self) -> Self:
+        alias func: fn[Type: DType, nelts: Int] (SIMD[Type, nelts]) -> SIMD[
+            Type, nelts
+        ] = SIMD.__floor__
+        var result = Self.Operation.tensor_operation[func](self.tensor)
+        var requires_grad = self.requires_grad
 
         return Tensor(
-            result.tensor,
+            result,
             requires_grad=requires_grad,
         )
 
     @always_inline("nodebug")
-    fn __rsub__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__sub__](self, other)
-
-    @always_inline("nodebug")
-    fn __rmul__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__mul__](self, other)
-
-    @always_inline("nodebug")
-    fn __rtruediv__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__truediv__](self, other)
-
-    @always_inline("nodebug")
-    fn __rfloordiv__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__floordiv__](self, other)
-
-    @always_inline("nodebug")
-    fn __rmod__(self: Self, other: Self) -> Self:
-        return operate[type, SIMD.__mod__](self, other)
-
-    @always_inline("nodebug")
-    fn __radd__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__add__](self, other)
-
-    @always_inline("nodebug")
-    fn __rsub__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__sub__](self, other)
-
-    @always_inline("nodebug")
-    fn __rmul__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__mul__](self, other)
-
-    @always_inline("nodebug")
-    fn __rtruediv__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__truediv__](self, other)
-
-    @always_inline("nodebug")
-    fn __rfloordiv__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__floordiv__](self, other)
-
-    @always_inline("nodebug")
-    fn __rmod__(self: Self, other: SIMD[type, 1]) -> Self:
-        return scalar_op[type, SIMD.__mod__](self, other)
-
-    @always_inline("nodebug")
-    fn __neg__(self: Self) -> Self:
-        return self * -1.0
-
-    @always_inline("nodebug")
-    fn __pos__(self: Self) -> Self:
-        return self
-
-    @always_inline("nodebug")
-    fn __floor__(self: Self) -> Self:
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
-
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            self.store[nelts](idx, SIMD.__floor__(self.load[nelts](idx)))
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
-        )
-
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            self.store(i, SIMD.__floor__(self.load(i)))
-        return self
-
-    @always_inline("nodebug")
     fn __ceil__(self: Self) -> Self:
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
+        alias func: fn[Type: DType, nelts: Int] (SIMD[Type, nelts]) -> SIMD[
+            Type, nelts
+        ] = SIMD.__ceil__
+        var result = Self.Operation.tensor_operation[func](self.tensor)
+        var requires_grad = self.requires_grad
 
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            self.store[nelts](idx, SIMD.__ceil__(self.load[nelts](idx)))
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
         )
-
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            self.store(i, SIMD.__ceil__(self.load(i)))
-        return self
 
     @always_inline("nodebug")
     fn __trunc__(self: Self) -> Self:
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
+        alias func: fn[Type: DType, nelts: Int] (SIMD[Type, nelts]) -> SIMD[
+            Type, nelts
+        ] = SIMD.__trunc__
+        var result = Self.Operation.tensor_operation[func](self.tensor)
+        var requires_grad = self.requires_grad
 
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            self.store[nelts](idx, SIMD.__trunc__(self.load[nelts](idx)))
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
         )
-
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            self.store(i, SIMD.__trunc__(self.load(i)))
-        return self
 
     @always_inline
     fn __abs__(self) -> Self:
-        var result = self
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
+        alias func: fn[Type: DType, nelts: Int] (SIMD[Type, nelts]) -> SIMD[
+            Type, nelts
+        ] = SIMD.__abs__
+        var result = Self.Operation.tensor_operation[func](self.tensor)
+        var requires_grad = self.requires_grad
 
-        @parameter
-        if type.is_unsigned() or type.is_bool():
-            return result
-
-        @parameter
-        fn absolute[nelts: Int](idx: Int):
-            result.store[nelts](idx, SIMD.__abs__(result.load[nelts](idx)))
-
-        vectorize[absolute, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
         )
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            result.store(i, abs(result.load(i)))
-        return result
 
     @always_inline
     fn __matmul__(self: Self, other: Self) -> Self:
@@ -747,38 +832,8 @@ struct Tensor[type: DType = DType.float32](
         """
         if self.rank() <= 2 and other.rank() <= 2:
             return matmul(self, other)
-        if self.rank() > 2 and other.rank() > 2:
-            return bmm[type](self, other)
         else:
             return bmm(self, other)
-
-    fn __enter__(owned self) -> Self:
-        """The function to call when entering the context."""
-        return self^
-
-    fn __len__(self) -> Int:
-        return self.tensor.shape[0]
-
-    fn __repr__(self: Self) -> String:
-        var output = String()
-        var writer = output._unsafe_to_formatter()
-        self.format_to[True, True](writer)
-        return output^
-
-    fn __str__(self: Self) -> String:
-        return String.format_sequence(self)
-
-    @always_inline("nodebug")
-    fn format_to(self, inout writer: Formatter):
-        TensorPrinter[type](self.tensor.data, self.shapes(), writer)
-
-    @always_inline("nodebug")
-    fn format_to[
-        print_type: Bool, print_shape: Bool
-    ](self, inout writer: Formatter):
-        TensorPrinter[type, print_type, print_shape](
-            self.tensor.data, self.shapes(), writer
-        )
 
     @always_inline("nodebug")
     fn apply[
@@ -803,20 +858,12 @@ struct Tensor[type: DType = DType.float32](
             print(x.apply[erf]())
         ```
         """
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
-
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            self.store[nelts](idx, func(self.load[nelts](idx)))
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        var result = Self.Operation.tensor_operation[func](self.tensor)
+        var requires_grad = self.requires_grad
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
         )
-
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            self.store(i, func(self.load(i)))
-        return self
 
     @always_inline("nodebug")
     fn apply[
@@ -854,28 +901,17 @@ struct Tensor[type: DType = DType.float32](
             print(x.apply[add](y))
         ```
         """
-        if self.tensor.shape != other.tensor.shape:
-            print("shapes mismatch should not be different shapes")
-            exit(1)
-        alias nelts = simdwidthof[type]() * 2
-        var num_elements = self.num_elements()
-
-        @parameter
-        fn operation[nelts: Int](idx: Int):
-            self.store[nelts](
-                idx, func(self.load[nelts](idx), other.load[nelts](idx))
-            )
-
-        vectorize[operation, nelts, unroll_factor=4](
-            num_elements - (num_elements % nelts)
+        var result = Self.Operation.tensor_operation[func](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad or other.requires_grad
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
         )
 
-        for i in range(num_elements - (num_elements % nelts), num_elements):
-            self.store(i, func(self.load(i), other.load(i)))
-        return self
-
     @always_inline("nodebug")
-    fn pow(inout self: Self, pow: Int):
+    fn pow(inout self: Self, pow: Self):
         self = self.__pow__(pow)
 
     @always_inline("nodebug")
@@ -923,29 +959,22 @@ struct Tensor[type: DType = DType.float32](
         return fusedbmm[type, fuse_operation](self, other)
 
     @always_inline("nodebug")
-    fn sum(self: Self) -> Scalar[type]:
+    fn sum(self: Self) -> Self:
         """
         Compute the sum of all elements in the tensor.
 
         Returns:
             The sum of all elements in the tensor as a scalar value.
         """
-        var result = Scalar[type]()
-        alias nelts = simdwidthof[type]() * 2
+        var result = Tensor[type](shape(1))
+        alias simd_width: Int = simdwidthof[type]()
 
         @parameter
-        fn _sum[nelts: Int](i: Int):
-            result += self.load[nelts](i).reduce_add()
+        fn vectorize_sum[simd_width: Int](idx: Int) -> None:
+            var simd_data = self.load[simd_width](idx)
+            result += simd_data.reduce_add()
 
-        vectorize[_sum, nelts](
-            self.num_elements() - (self.num_elements() % nelts)
-        )
-        for i in range(
-            self.num_elements() - (self.num_elements() % nelts),
-            self.num_elements(),
-        ):
-            result += self.load(i)
-
+        vectorize[vectorize_sum, simd_width](self.num_elements())
         return result
 
     @always_inline("nodebug")
@@ -957,13 +986,13 @@ struct Tensor[type: DType = DType.float32](
             The maximum value in the tensor as a scalar value.
         """
         var result = Scalar[type]()
-        alias nelts = simdwidthof[type]() * 2
+        alias nelts = simdwidthof[type]()
 
         @parameter
-        fn _max[nelts: Int](i: Int):
+        fn closure[nelts: Int](i: Int):
             result = max(result, self.load[nelts](i).reduce_max())
 
-        vectorize[_max, nelts](
+        vectorize[closure, nelts](
             self.num_elements() - (self.num_elements() % nelts)
         )
         for i in range(
@@ -986,10 +1015,10 @@ struct Tensor[type: DType = DType.float32](
         alias nelts = simdwidthof[type]() * 2
 
         @parameter
-        fn _min[nelts: Int](i: Int):
+        fn closure[nelts: Int](i: Int):
             result = min(result, self.load[nelts](i).reduce_min())
 
-        vectorize[_min, nelts](
+        vectorize[closure, nelts](
             self.num_elements() - (self.num_elements() % nelts)
         )
         for i in range(
@@ -1001,7 +1030,7 @@ struct Tensor[type: DType = DType.float32](
         return result
 
     @always_inline("nodebug")
-    fn mean(self: Self) -> Scalar[type]:
+    fn mean(self: Self) -> Self:
         """
         Compute the mean (average) value of the tensor.
 
@@ -1022,10 +1051,10 @@ struct Tensor[type: DType = DType.float32](
         alias nelts = simdwidthof[type]() * 2
 
         @parameter
-        fn _prod[nelts: Int](i: Int):
+        fn closure[nelts: Int](i: Int):
             result *= self.load[nelts](i).reduce_mul()
 
-        vectorize[_prod, nelts](
+        vectorize[closure, nelts](
             self.num_elements() - (self.num_elements() % nelts)
         )
         for i in range(
@@ -1037,53 +1066,14 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn relu(self: Self) -> Self:
-        """
-        Function `relu`: apply ReLU activation to given Tensor.
-        ReLU activation is defined as `max(0, x)` for each element x in the Tensor.
-
-        Returns:
-            Tensor: New Tensor with ReLU applied element-wise.
-        """
         return relu[type](self)
 
     @always_inline("nodebug")
     fn tanh(self: Self) -> Self:
-        """Function `tanh`: apply hyperbolic tangent activation to given Tensor.
-
-        Returns:
-            A new Tensor with the hyperbolic tangent of the input tensor elements applied.
-        """
         return tanh[type](self)
 
     @always_inline("nodebug")
-    fn gelu(self: Self) -> Self:
-        """
-        Function `gelu`: apply GELU activation to given Tensor.
-        GELU activation is defined as `x * Φ(x), where Φ(x)` is the CDF of the standard normal distribution.
-
-        Returns:
-            Tensor: New Tensor with GELU applied element-wise.
-        """
-        return gelu[type](self)
-
-    @always_inline("nodebug")
-    fn silu(self: Self) -> Self:
-        """
-        Function `silu`: apply SiLU (Swish) activation to given Tensor.
-        SiLU activation is defined as `x * sigmoid(x)` for each element x in the Tensor.
-
-        Returns:
-            Tensor: New Tensor with SiLU applied element-wise.
-        """
-        return silu[type](self)
-
-    @always_inline("nodebug")
     fn sigmoid(self: Self) -> Self:
-        """Function `sigmoid`: apply sigmoid activation to given Tensor.
-
-        Returns:
-            A new Tensor where each element is transformed by the sigmoid function.
-        """
         return sigmoid[type](self)
 
     @always_inline("nodebug")
@@ -1097,6 +1087,14 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn cos(self: Self) -> Self:
         return self.apply[cos]()
+
+    @always_inline("nodebug")
+    fn sinh(self: Self) -> Self:
+        return self.apply[sinh]()
+
+    @always_inline("nodebug")
+    fn cosh(self: Self) -> Self:
+        return self.apply[cosh]()
 
     @always_inline("nodebug")
     fn exp(self: Self) -> Self:
@@ -1119,20 +1117,100 @@ struct Tensor[type: DType = DType.float32](
         return self.apply[sin]()
 
     @always_inline("nodebug")
-    fn sinh(self: Self) -> Self:
-        return self.apply[sinh]()
-
-    @always_inline("nodebug")
     fn tan(self: Self) -> Self:
         return self.apply[math.tan]()
+
+    @always_inline("nodebug")
+    fn atan(self: Self) -> Self:
+        return self.apply[math.atan]()
+
+    @always_inline("nodebug")
+    fn atanh(self: Self) -> Self:
+        return self.apply[math.atanh]()
+
+    @always_inline("nodebug")
+    fn atan2(self: Self, other: Self) -> Self:
+        return self.apply[math.atan2](other)
+
+    @always_inline("nodebug")
+    fn hypot(self: Self, other: Self) -> Self:
+        return self.apply[math.hypot](other)
 
     @always_inline("nodebug")
     fn j0(self: Self) -> Self:
         return self.apply[j0]()
 
     @always_inline("nodebug")
-    fn mish(self: Self) -> Self:
-        return self.apply[mish]()
+    fn j1(self: Self) -> Self:
+        return self.apply[math.j1]()
+
+    @always_inline("nodebug")
+    fn log1p(self: Self) -> Self:
+        return self.apply[math.log1p]()
+
+    @always_inline("nodebug")
+    fn log(self: Self) -> Self:
+        return self.apply[math.log]()
+
+    @always_inline("nodebug")
+    fn log10(self: Self) -> Self:
+        return self.apply[math.log10]()
+
+    @always_inline("nodebug")
+    fn log2(self: Self) -> Self:
+        return self.apply[math.log2]()
+
+    @always_inline("nodebug")
+    fn logb(self: Self) -> Self:
+        return self.apply[math.logb]()
+
+    @always_inline("nodebug")
+    fn lgamma(self: Self) -> Self:
+        return self.apply[math.lgamma]()
+
+    @always_inline("nodebug")
+    fn sclab(self: Self, other: Self) -> Self:
+        return self.apply[math.scalb](other)
+
+    @always_inline("nodebug")
+    fn gamma(self: Self) -> Self:
+        return self.apply[math.gamma]()
+
+    @always_inline("nodebug")
+    fn y0(self: Self) -> Self:
+        return self.apply[math.y0]()
+
+    @always_inline("nodebug")
+    fn y1(self: Self) -> Self:
+        return self.apply[math.y1]()
+
+    @always_inline("nodebug")
+    fn ulp(self: Self) -> Self:
+        return self.apply[math.ulp]()
+
+    @always_inline("nodebug")
+    fn cbrt(self: Self) -> Self:
+        return self.apply[math.cbrt]()
+
+    @always_inline("nodebug")
+    fn rsqrt(self: Self) -> Self:
+        return self.apply[math.rsqrt]()
+
+    @always_inline("nodebug")
+    fn roundeven(self: Self) -> Self:
+        return self.apply[SIMD.roundeven]()
+    
+    @always_inline("nodebug")
+    fn nextafter(self: Self, other: Self) -> Self:
+        var result = Self.Operation.tensor_operation[math.nextafter](
+            self.tensor, other.tensor
+        )
+        var requires_grad = self.requires_grad
+
+        return Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn list(self) -> List[Scalar[type]]:
@@ -1140,36 +1218,6 @@ struct Tensor[type: DType = DType.float32](
         for i in range(self.num_elements()):
             result.append(self.load(i))
         return result^
-
-    @always_inline("nodebug")
-    fn arange(self, start: Int, end: Int = 0, step: Int = 1) -> Tensor[type]:
-        """
-        Returns a tensor with values from start to end with specified step size.
-
-        Args:
-            start: The start value of the sequence.
-            end: The end value of the sequence.
-            step: The step size between consecutive values. Default is 1.
-
-        Returns:
-            A tensor containing the values from start to end with the specified step size.
-        """
-        var result = Tensor[type](self.shapes())
-        var value = start
-
-        @parameter
-        fn arng[nelts: Int](i: Int):
-            result.store(i, value)
-            value += step
-
-        if end == 0:
-            vectorize[arng, 1](self.num_elements())
-        vectorize[arng, 1](end)
-        return result^
-
-    @always_inline("nodebug")
-    fn arange(inout self):
-        self = self.arange(0, self.num_elements())
 
     @always_inline("nodebug")
     fn zeros(inout self: Self):
@@ -1207,13 +1255,9 @@ struct Tensor[type: DType = DType.float32](
     fn fill(self: Self, value: Scalar[type]) -> Self:
         """Fill the tensor with a specified value."""
         var result = DTypePointer[type]().alloc(self.num_elements())
-
-        @parameter
-        fn _set(index: Int):
-            result.store(index, self.load(index).splat(value))
-
-        parallelize[_set](self.num_elements(), self.num_elements())
-        return Self(self.tensor.shape, result)
+        for i in range(0, self.num_elements()):
+            result[i] = result[i].splat(value)
+        return Tensor[type](TensorType[type](self.shapes(), result, self.device()), self.requires_grad)
 
     @always_inline("nodebug")
     fn ifill(inout self: Self, value: Scalar[type]):
@@ -1221,15 +1265,9 @@ struct Tensor[type: DType = DType.float32](
         self = self.fill(value)
 
     @always_inline("nodebug")
-    fn transposed(self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
+    fn transposed(inout self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
         if dim1 >= self.rank() or dim2 >= self.rank():
-            print(
-                Error(
-                    "dim1 and dim2 must be within the range of the tensor's"
-                    " rank"
-                )
-            )
-            exit(1)
+            handle_issue("dim1 and dim2 must be within the range of the tensor's rank")
 
         var tshape = self.shapes()
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
@@ -1246,31 +1284,38 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn transpose(inout self: Self, dim1: Int = -2, dim2: Int = 1):
         var ttensor = self.transposed(dim1, dim2)
-        self = Self(ttensor.shapes(), ttensor.tensor.data)
+        self = ttensor
 
     @always_inline("nodebug")
     fn reshape(self: Self, other: shape) -> Self:
         """Reshape the tensor to the new dimensions and returns the reshaped tensor.
         """
         if self.tensor.shape.num_elements != other.num_elements:
-            print("Error: Cannot reshape tensor.")
-            exit(1)
+            handle_issue("Cannot reshape tensor.")
 
         var data = Tensor[type](other)
 
         @parameter
-        fn _reshape[nelts: Int](idx: Int):
+        fn closure[nelts: Int](idx: Int):
             var old_indices = self.tensor.shape.indices(idx)
             var new_indices = other.indices(idx)
             data.store(new_indices, self.load(old_indices))
 
-        vectorize[_reshape, 1](self.num_elements())
+        vectorize[closure, 1](self.num_elements())
         return Self(other, data.tensor.data)
 
     fn broadcast_to(inout self: Self, other: shape):
-        var temp = Tensor[type](other)
-        temp.zeros()
-        self = Broadcast_op[type, SIMD.__add__](self, temp)
+        var Other = Tensor[type](other)
+        Other.zeros()
+        var result = Self.Operation.tensor_operation[SIMD.__add__](
+            self.tensor, Other.tensor
+        )
+        var requires_grad = self.requires_grad
+
+        self = Tensor(
+            result,
+            requires_grad=requires_grad,
+        )
 
     @always_inline("nodebug")
     fn reshape(self: Self, *new: Int) -> Self:
@@ -1333,7 +1378,7 @@ struct Tensor[type: DType = DType.float32](
 
     # TODO: Add support for GPU
     @always_inline("nodebug")
-    fn device(self: Self) -> String:
+    fn device(self: Self) -> StringLiteral:
         return self.tensor.device
 
     @always_inline("nodebug")
@@ -1488,19 +1533,21 @@ fn empty[dtype: DType = DType.float32](Shape: List[Int]) -> Tensor[dtype]:
     return Tensor[dtype](Shape)
 
 
-fn arange[
-    dtype: DType = DType.float32
-](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
-    var starting = start
-    var stop = end
-    if end == 0:
-        stop = start
-        starting = 0
+@always_inline("nodebug")
+fn arange[dtype: DType](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
+    """
+    Returns a tensor with values from start to end with specified step size.
 
-    var num_elements = int((abs(stop - starting)) / step)
-    var result = Tensor[dtype](num_elements)
-    var current = starting
-    for i in range(num_elements):
-        result[i] = current
-        current += step
-    return result^
+    Args:
+        start: The start value of the sequence.
+        end: The end value of the sequence.
+        step: The step size between consecutive values. Default is 1.
+
+    Returns:
+        A tensor containing the values from start to end with the specified step size.
+    """
+    var num: Int = int((end - start) / step)
+    var result: Tensor[dtype] = Tensor[dtype](shape(num))
+    for idx in range(num):
+        result[idx] = start + step * idx
+    return result

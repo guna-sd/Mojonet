@@ -1,6 +1,6 @@
 @value
 @register_passable("trivial")
-struct Vector[T: AnyTrivialRegType, Vector_size: Int]:
+struct Vector[T: AnyTrivialRegType]:
     """
     A dynamic array-like container for storing elements of type T with an initial capacity defined by Vector_size.
     """
@@ -13,8 +13,8 @@ struct Vector[T: AnyTrivialRegType, Vector_size: Int]:
     """`Capacity:`The current allocated capacity of the vector."""
 
     fn __init__(inout self):
-        self.Storage = UnsafePointer[T]().alloc(Vector_size)
-        self.Capacity = Vector_size
+        self.Storage = UnsafePointer[T]()
+        self.Capacity = 0
         self.Size = 0
 
     fn __init__(inout self, data: UnsafePointer[T], total_capacity: Int):
@@ -36,12 +36,12 @@ struct Vector[T: AnyTrivialRegType, Vector_size: Int]:
 
     fn __iter__(
         self: Reference[Self, _, _],
-    ) -> _VectortIter[T, Vector_size, self.is_mutable, self.lifetime]:
+    ) -> _VectortIter[T, self.is_mutable, self.lifetime]:
         return _VectortIter(0, self, True)
 
     fn __reversed__(
         self: Reference[Self, _, _]
-    ) -> _VectortIter[T, Vector_size, self.is_mutable, self.lifetime]:
+    ) -> _VectortIter[T, self.is_mutable, self.lifetime]:
         return _VectortIter(len(self[]), self, False)
 
     fn size(self) -> Int:
@@ -124,14 +124,13 @@ struct Vector[T: AnyTrivialRegType, Vector_size: Int]:
 @value
 struct _VectortIter[
     T: AnyTrivialRegType,
-    Size: Int,
     mutable: Bool,
     lifetime: AnyLifetime[mutable].type,
 ]:
     """An iterator for the Vector struct."""
 
     var index: Int
-    var src: Reference[Vector[T, Size], mutable, lifetime]
+    var src: Reference[Vector[T], mutable, lifetime]
     var forward: Bool
 
     fn __next__(inout self) -> Reference[T, mutable, lifetime]:

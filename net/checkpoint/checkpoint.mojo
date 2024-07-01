@@ -93,8 +93,7 @@ struct Serialize:
             var magic_buffer = file.readbytes(NBytes)
             var magic_number = frombytes[DType.uint64](magic_buffer)
             if magic_number != Self.MAGIC_NUMBER:
-                print("Invalid magic number")
-                exit(1)
+                handle_issue("Invalid magic number")
 
             var shapes = List[Int](capacity=26)
             while True:
