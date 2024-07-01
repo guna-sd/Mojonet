@@ -1,4 +1,5 @@
-from net.tensor.utils import shape, handle_issue
+from net.tensor.utils import shape
+from net.utils import handle_issue
 
 
 @always_inline("nodebug")

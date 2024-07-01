@@ -1,7 +1,7 @@
 from collections import InlinedFixedVector
 from net.checkpoint.fileutils import Bytes, fopen, tobytes, frombytes, NBytes
 from net.tensor import Tensor, shape
-from net.tensor.utils import handle_issue
+from net.utils import handle_issue
 
 struct Serialize:
     alias MAGIC_NUMBER: UInt64 = 0xFFFFFFFFFFFFFFFF

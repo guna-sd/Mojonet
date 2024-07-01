@@ -1,5 +1,5 @@
 from net.tensor import Tensor
-from net.tensor.utils import handle_issue
+from net.utils import handle_issue
 from algorithm import vectorize, parallelize
 from net.kernel import calculate_shapes
 from sys.intrinsics import PrefetchOptions

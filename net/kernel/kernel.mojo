@@ -1,4 +1,5 @@
-from net.tensor.utils import get_broadcast_index, broadcast_shapes, is_compatible, handle_issue
+from net.tensor.utils import get_broadcast_index, broadcast_shapes, is_compatible
+from net.utils import handle_issue
 from net.tensor import TensorType
 from algorithm import vectorize
 
