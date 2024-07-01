@@ -1,7 +1,7 @@
 from net.utils.rand import rand_n
 from net.utils.mt19937 import mt19937Engine
 from memory import DTypePointer, memset, memset_zero, memcpy
-from .utils import list
+from net.tensor.utils import list
 
 
 @value

@@ -1,5 +1,6 @@
 from utils import StaticTuple
 from os.path import exists
+from sys import exit
 
 alias SEEK_SET = 0
 alias SEEK_END = 2
@@ -268,11 +269,12 @@ struct Bytes(Sized, Stringable, Representable):
             result += str(self[i])
             if i != self.__len__() - 1:
                 result += ", "
-        return (result + "]")
+        return result + "]"
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
         var result: String = ""
+
         @parameter
         for i in range(NBytes):
             result += chr(int(self[i]))

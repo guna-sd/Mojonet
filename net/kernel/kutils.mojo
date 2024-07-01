@@ -1,3 +1,6 @@
+from net.tensor.utils import shape, handle_issue
+
+
 @always_inline("nodebug")
 fn check_shape(a: shape, b: shape) -> Bool:
     """
@@ -41,8 +44,7 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         The resulting shape of the matrix multiplication operation.
     """
     if not check_shape(shape1, shape2):
-        print("Error: Tensors cannot be multiplied due to incompatible shapes.")
-        exit(1)
+        handle_issue("Tensors cannot be multiplied due to incompatible shapes.")
 
     var batch_dims = List[Int]()
     var max_batch_rank = max(shape1.rank - 2, shape2.rank - 2)
@@ -50,15 +52,14 @@ fn calculate_shapes(shape1: shape, shape2: shape) -> shape:
         var dim1 = shape1[i] if i < shape1.rank - 2 else 1
         var dim2 = shape2[i] if i < shape2.rank - 2 else 1
         if dim1 != dim2 and dim1 != 1 and dim2 != 1:
-            print(
-                "Error: Incompatible dimensions at index",
-                i,
-                ":",
-                dim1,
-                "vs",
-                dim2,
+            handle_issue(
+                "Incompatible dimensions at index"
+                + str(i)
+                + ":"
+                + str(dim1)
+                + "vs"
+                + str(dim2)
             )
-            exit(1)
 
         batch_dims.append(max(dim1, dim2))
 

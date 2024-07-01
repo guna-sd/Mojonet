@@ -1,5 +1,6 @@
 from net.tensor.utils import get_broadcast_index, broadcast_shapes, is_compatible, handle_issue
 from net.tensor import TensorType
+from algorithm import vectorize
 
 struct Operation[dtype: DType]:
     alias nelts = simdwidthof[dtype]()

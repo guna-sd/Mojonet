@@ -1,4 +1,7 @@
 from collections import InlinedFixedVector
+from net.checkpoint.fileutils import Bytes, fopen, tobytes, frombytes, NBytes
+from net.tensor import Tensor, shape
+from net.tensor.utils import handle_issue
 
 struct Serialize:
     alias MAGIC_NUMBER: UInt64 = 0xFFFFFFFFFFFFFFFF
@@ -16,14 +19,14 @@ struct Serialize:
     fn __init__[type: DType](inout self, tensor: Tensor[type]):
         self.shapes = tensor.shapes().Shapes()
         self.storage = InlinedFixedVector[Bytes](
-            capacity=(tensor.num_elements() + self.shapes.__len__() + 2)
+            capacity=(tensor.num_elements() + len(self.shapes) + 2)
         )
         self.fromtensor(tensor)
 
     fn fromtensor[type: DType](inout self, tensor: Tensor[type]):
         var shapes = tensor.shapes().Shapes()
         var storage = InlinedFixedVector[Bytes](
-            capacity=(tensor.num_elements() + shapes.__len__() + 2)
+            capacity=(tensor.num_elements() + len(shapes) + 2)
         )
         var magic_bytes = tobytes[DType.uint64](Self.MAGIC_NUMBER)
         storage[0] = magic_bytes
@@ -59,8 +62,7 @@ struct Serialize:
             var magic_buffer = file.readbytes(NBytes)
             var magic_number = frombytes[DType.uint64](magic_buffer)
             if magic_number != Self.MAGIC_NUMBER:
-                print("Invalid magic number")
-                exit(1)
+                handle_issue("Invalid magic number")
 
             var shapes = List[Int](capacity=26)
             while True:

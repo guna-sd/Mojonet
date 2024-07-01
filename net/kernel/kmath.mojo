@@ -1,3 +1,5 @@
+from net.tensor import Tensor
+from net.kernel import Constants,Operation
 from math import (
     erfc,
     erf,

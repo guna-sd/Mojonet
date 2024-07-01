@@ -2,6 +2,7 @@ from builtin.io import _snprintf_scalar
 from builtin.string import _calc_format_buffer_size
 from utils import StaticIntTuple
 from utils._format import Formatter
+from net.utils import handle_issue
 
 alias TensorStart = "Tensor("
 alias TensorEnd = ")"
@@ -294,10 +295,6 @@ fn is_compatible(A: List[Int], B: List[Int]) -> Bool:
             )
             return False
     return True
-
-fn handle_issue(msg: String):
-    print("Issue: " + msg)
-    exit(1)
 
 @always_inline("nodebug")
 fn broadcast_shapes(shape1: shape, shape2: shape) -> shape:

@@ -73,7 +73,7 @@ struct GeLU[type: DType]:
         return GradOutput * (
             Scalar[type](0.5) * (Scalar[type](1) + erf_comp)
             + x
-            * (pi * Scalar[type](0.5))
+            * (Constants.pi * Scalar[type](0.5))
             * exp_comp
             / (sqrt2 * sqrt2 * sqrt2 * sqrt2)
         )
