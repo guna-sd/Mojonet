@@ -1,0 +1,6 @@
+trait dataset(CollectionElement, Stringable, Representable, Boolable, KeyElement, Defaultable, Formattable):
+    fn load(self, path: String) -> String:
+        ...
+    
+    fn download(self, url: String) ->String:
+        ...
