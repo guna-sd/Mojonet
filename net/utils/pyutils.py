@@ -2,10 +2,20 @@ import os
 import requests
 from tqdm import tqdm
 
-def datasets_downloader(url, download_folder='mojonet/datasets', chunk_size=8192 * 4):
+def datasets_downloader(url, download_folder='', chunk_size=8192 * 4):
+    """
+    Downloads a dataset from a given URL to a specified folder.
 
+    Args:
+        url (str): The URL from which to download the dataset.
+        download_folder (str, optional): The folder where the dataset will be saved. Defaults to 'mojonet/datasets'.
+        chunk_size (int, optional): The size of each chunk to download. Defaults to 8192 * 4.
+
+    Returns:
+        str: The path to the downloaded dataset file.
+    """
     filename = url.split('/')[-1]
-    folder = os.path.join(os.path.expanduser('~/.local/share'), download_folder)
+    folder = os.path.join(os.path.expanduser('~/.local/share/mojonet/datasets'), download_folder)
     file_path = os.path.join(folder, filename)
     os.makedirs(folder, exist_ok=True)
 
@@ -30,10 +40,20 @@ def datasets_downloader(url, download_folder='mojonet/datasets', chunk_size=8192
     return file_path
 
 
-def models_downloader(url, download_folder='mojonet/models', chunk_size=8192 * 4):
+def models_downloader(url, download_folder='', chunk_size=8192 * 4):
+    """
+    Downloads a model from a given URL to a specified folder.
 
+    Args:
+        url (str): The URL from which to download the model.
+        download_folder (str, optional): The folder where the model will be saved. Defaults to 'mojonet/models'.
+        chunk_size (int, optional): The size of each chunk to download. Defaults to 8192 * 4.
+
+    Returns:
+        str: The path to the downloaded model file.
+    """
     filename = url.split('/')[-1]
-    folder = os.path.join(os.path.expanduser('~/.local/share'), download_folder)
+    folder = os.path.join(os.path.expanduser('~/.local/share/mojonet/models'), download_folder)
     file_path = os.path.join(folder, filename)
     os.makedirs(folder, exist_ok=True)
 
