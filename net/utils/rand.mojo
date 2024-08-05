@@ -7,6 +7,7 @@
 
 import time
 
+
 struct randn:
     var _seed: Int
 
@@ -81,19 +82,31 @@ struct randn:
 
     @always_inline("nodebug")
     fn randf16(inout self) -> Float16:
-        return Float16((self.randint16()).cast[DType.float16]() / Float16.MAX_FINITE)
+        return Float16(
+            (self.randint16()).cast[DType.float16]() / Float16.MAX_FINITE
+        )
 
     @always_inline("nodebug")
     fn randf32(inout self) -> Float32:
-        return Float32((self.randint32()).cast[DType.float32]() / Float32.MAX_FINITE * 1e29)
+        return Float32(
+            (self.randint32()).cast[DType.float32]() / Float32.MAX_FINITE * 1e29
+        )
 
     @always_inline("nodebug")
     fn randf64(inout self) -> Float64:
-        return Float64((self.randint64()).cast[DType.float64]() / Float64.MAX_FINITE * 1e289)
+        return Float64(
+            (self.randint64()).cast[DType.float64]()
+            / Float64.MAX_FINITE
+            * 1e289
+        )
 
     @always_inline("nodebug")
     fn randbf16(inout self) -> BFloat16:
-        return BFloat16((self.randint64()).cast[DType.bfloat16]() / BFloat16.MAX_FINITE * 1e19)
+        return BFloat16(
+            (self.randint64()).cast[DType.bfloat16]()
+            / BFloat16.MAX_FINITE
+            * 1e19
+        )
 
 
 @always_inline("nodebug")

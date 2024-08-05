@@ -1,5 +1,5 @@
 from net.tensor import Tensor
-from net.kernel import Constants,Operation
+from net.kernel import Constants, Operation
 from math import (
     erfc,
     erf,
@@ -324,6 +324,7 @@ fn leaky_relu[
     """
     return max[type, simd_width](arg, (arg * alpha))
 
+
 @always_inline("nodebug")
 fn selu[
     type: DType, simd_width: Int
@@ -344,6 +345,7 @@ fn selu[
     return max[type, simd_width](
         arg, (SELU_SCALE * SELU_ALPHA * (exp[type, simd_width](arg) - 1))
     )
+
 
 @always_inline("nodebug")
 fn elu[type: DType](Input: Tensor[type], alpha: Scalar[type]) -> Tensor[type]:

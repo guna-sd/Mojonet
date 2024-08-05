@@ -2,8 +2,10 @@ from net.tensor import Tensor
 from net.utils import handle_issue
 from algorithm import vectorize, parallelize
 from sys.intrinsics import PrefetchOptions
+
 alias PREFETCH_READ = PrefetchOptions().for_read().high_locality().to_data_cache()
 alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cache()
+
 
 @always_inline("nodebug")
 fn mm[
@@ -500,7 +502,10 @@ fn matmul[
         A new tensor resulting from the batch matrix multiplication of the two input tensors.
     """
     if tensor1.rank() > 2 and tensor2.rank() > 2:
-        handle_issue("matrix multiplication only works with 2d use batch_matmul for tensor with rank > 2.")
+        handle_issue(
+            "matrix multiplication only works with 2d use batch_matmul for"
+            " tensor with rank > 2."
+        )
 
     var result_shape = calculate_shapes(
         tensor1.tensor.shape, tensor2.tensor.shape

@@ -2,9 +2,11 @@ import net
 from collections.dict import Dict
 from gpu.host import Device
 
-trait Modules:
 
-    fn forward[dtype : DType](inout self, x : net.Tensor[dtype]) -> net.Tensor[dtype]:
+trait Modules:
+    fn forward[
+        dtype: DType
+    ](inout self, x: net.Tensor[dtype]) -> net.Tensor[dtype]:
         """
         Forward Layer.
         """
@@ -27,7 +29,7 @@ trait Modules:
     fn train(inout self):
         """
         Sets the model in training mode.
-        This method should set internal flags or states 
+        This method should set internal flags or states
         to indicate the model is in training mode.
         """
         ...
@@ -35,7 +37,7 @@ trait Modules:
     fn eval(inout self):
         """
         Sets the model in evaluation mode.
-        This method should set internal flags or states 
+        This method should set internal flags or states
         to indicate the model is in evaluation mode.
         """
         ...
@@ -52,15 +54,17 @@ trait Modules:
         """
         ...
 
-    fn state_dict[dtype : DType](inout self) -> Dict[String, net.Tensor[dtype]]:
+    fn state_dict[dtype: DType](inout self) -> Dict[String, net.Tensor[dtype]]:
         """
         Returns a dictionary containing a whole state of the module.
         """
         ...
 
-    fn load_state_dict[dtype : DType](inout self, state_dict: Dict[String, net.Tensor[dtype]]):
+    fn load_state_dict[
+        dtype: DType
+    ](inout self, state_dict: Dict[String, net.Tensor[dtype]]):
         """
-        Copies parameters and buffers from state_dict into this module 
+        Copies parameters and buffers from state_dict into this module
         and its descendants.
         """
         ...
@@ -88,7 +92,7 @@ trait Modules:
         Returns a string representation of the module.
         """
         ...
-        
+
     fn save(inout self, filepath: String):
         """
         Saves the module's state to a file.
@@ -101,15 +105,16 @@ trait Modules:
         """
         ...
 
-@value
-struct ModuleType[type : DType]:
-    var name: String
-    var function : Function
-    
 
 @value
-struct Module[type : DType](CollectionElement):
-    var modules : Dict[String, ModuleType[type]]
-    var params : Dict[String, Parameter[type]]
-    var grads : Dict[String, Tensor[type]]
-    var training : Bool
+struct ModuleType[type: DType]:
+    var name: String
+    var function: Function
+
+
+@value
+struct Module[type: DType](CollectionElement):
+    var modules: Dict[String, ModuleType[type]]
+    var params: Dict[String, Parameter[type]]
+    var grads: Dict[String, Tensor[type]]
+    var training: Bool

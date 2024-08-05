@@ -10,6 +10,7 @@ alias LMASK: UInt32 = 0x7FFFFFFF
 # The `mt19937Engine` struct provides an implementation of the Mersenne Twister MT19937 pseudo-random number generator in MojoNet,
 # Based on 32-bit variant implemented in Pytorch.
 
+
 @value
 @register_passable("trivial")
 struct mt19937:
