@@ -7,6 +7,9 @@
 
 Mojonet is a ML/DL framework written in Mojo🔥.
 
+### Latest Nightly
+Use at your own risk and be patient!
+
 #### TODO
 
 -   [x] Tensors and Tensor Operations.
