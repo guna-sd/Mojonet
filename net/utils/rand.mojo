@@ -110,130 +110,130 @@ struct randn:
 
 
 @always_inline("nodebug")
-fn rand_n[type: DType](ptr: DTypePointer[type], count: Int):
+fn rand_n[type: DType](ptr: UnsafePointer[Scalar[type]], count: Int):
     var rand = randn()
 
     @parameter
-    if type.is_int8():
+    if type is DType.int8:
         for i in range(count):
             ptr[i] = rand.randint8().cast[type]()
 
     @parameter
-    if type.is_uint8():
+    if type is DType.uint8:
         for i in range(count):
             ptr[i] = rand.randuint8().cast[type]()
 
     @parameter
-    if type.is_int16():
+    if type is DType.int16:
         for i in range(count):
             ptr[i] = rand.randint16().cast[type]()
 
     @parameter
-    if type.is_uint16():
+    if type is DType.uint16:
         for i in range(count):
             ptr[i] = rand.randuint16().cast[type]()
 
     @parameter
-    if type.is_int32():
+    if type is DType.int32:
         for i in range(count):
             ptr[i] = rand.randint32().cast[type]()
 
     @parameter
-    if type.is_uint32():
+    if type is DType.uint32:
         for i in range(count):
             ptr[i] = rand.randuint32().cast[type]()
 
     @parameter
-    if type.is_int64():
+    if type is DType.int64:
         for i in range(count):
             ptr[i] = rand.randint64().cast[type]()
 
     @parameter
-    if type.is_uint64():
+    if type is DType.uint64:
         for i in range(count):
             ptr[i] = rand.randuint64().cast[type]()
 
     @parameter
-    if type.is_float16():
+    if type is DType.float16:
         for i in range(count):
             ptr[i] = rand.randf16().cast[type]()
 
     @parameter
-    if type.is_bfloat16():
+    if type is DType.bfloat16:
         for i in range(count):
             ptr[i] = rand.randbf16().cast[type]()
 
     @parameter
-    if type.is_float32():
+    if type is DType.float32:
         for i in range(count):
             ptr[i] = rand.randf32().cast[type]()
 
     @parameter
-    if type.is_float64():
+    if type is DType.float64:
         for i in range(count):
             ptr[i] = rand.randf64().cast[type]()
 
 
 @always_inline("nodebug")
-fn rand_n[type: DType](ptr: DTypePointer[type], count: Int, seed: Int):
+fn rand_n[type: DType](ptr: UnsafePointer[Scalar[type]], count: Int, seed: Int):
     var rand = randn(seed)
 
     @parameter
-    if type.is_int8():
+    if type is DType.int8:
         for i in range(count):
             ptr[i] = rand.randint8().cast[type]()
 
     @parameter
-    if type.is_uint8():
+    if type is DType.uint8:
         for i in range(count):
             ptr[i] = rand.randuint8().cast[type]()
 
     @parameter
-    if type.is_int16():
+    if type is DType.int16:
         for i in range(count):
             ptr[i] = rand.randint16().cast[type]()
 
     @parameter
-    if type.is_uint16():
+    if type is DType.uint16:
         for i in range(count):
             ptr[i] = rand.randuint16().cast[type]()
 
     @parameter
-    if type.is_int32():
+    if type is DType.int32:
         for i in range(count):
             ptr[i] = rand.randint32().cast[type]()
 
     @parameter
-    if type.is_uint32():
+    if type is DType.uint32:
         for i in range(count):
             ptr[i] = rand.randuint32().cast[type]()
 
     @parameter
-    if type.is_int64():
+    if type is DType.int64:
         for i in range(count):
             ptr[i] = rand.randint64().cast[type]()
 
     @parameter
-    if type.is_uint64():
+    if type is DType.uint64:
         for i in range(count):
             ptr[i] = rand.randuint64().cast[type]()
 
     @parameter
-    if type.is_float16():
+    if type is DType.float16:
         for i in range(count):
             ptr[i] = rand.randf16().cast[type]()
 
     @parameter
-    if type.is_bfloat16():
+    if type is DType.bfloat16:
         for i in range(count):
             ptr[i] = rand.randbf16().cast[type]()
 
     @parameter
-    if type.is_float32():
+    if type is DType.float32:
         for i in range(count):
             ptr[i] = rand.randf32().cast[type]()
 
     @parameter
-    if type.is_float64():
+    if type is DType.float64:
         for i in range(count):
             ptr[i] = rand.randf64().cast[type]()

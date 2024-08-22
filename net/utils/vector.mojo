@@ -35,14 +35,14 @@ struct Vector[T: AnyTrivialRegType]:
             self.Storage[i] = elements[i]
 
     fn __iter__(
-        self: Reference[Self, _, _],
-    ) -> _VectortIter[T, self.is_mutable, self.lifetime]:
+        ref [_]self: Self,
+    ) -> _VectortIter[T, __lifetime_of(self)]:
         return _VectortIter(0, self, True)
 
     fn __reversed__(
-        self: Reference[Self, _, _]
-    ) -> _VectortIter[T, self.is_mutable, self.lifetime]:
-        return _VectortIter(len(self[]), self, False)
+        ref [_]self: Self,
+    ) -> _VectortIter[T, __lifetime_of(self)]:
+        return _VectortIter(len(self), self, False)
 
     fn size(self) -> Int:
         return int(self.Size)
@@ -53,7 +53,7 @@ struct Vector[T: AnyTrivialRegType]:
     fn clear(inout self):
         """Clears the elements in the list."""
         for i in range(self.Size):
-            destroy_pointee(self.Storage + i)
+            UnsafePointer.destroy_pointee(self.Storage + i)
         self.Size = 0
 
     fn set_size(inout self, n: UInt64):
@@ -106,13 +106,13 @@ struct Vector[T: AnyTrivialRegType]:
         return self.Storage[index]
 
     fn __getitem__(
-        self: Reference[Self, _, _], index: Int
-    ) -> Reference[T, self.is_mutable, self.lifetime]:
+        ref [_]self: Self, index: Int
+    ) -> ref [__lifetime_of(self)] T:
         debug_assert(
-            -int(self[].Size) <= index < int(self[].Size),
+            -int(self.Size) <= index < int(self.Size),
             "index must be within bounds",
         )
-        return (self[].Storage + index)[]
+        return (self.Storage + index)[]
 
     fn __setitem__(inout self, index: Int, owned value: T):
         self.Storage[index] = value
@@ -123,23 +123,26 @@ struct Vector[T: AnyTrivialRegType]:
 
 @value
 struct _VectortIter[
+    mutable: Bool, //,
     T: AnyTrivialRegType,
-    mutable: Bool,
     lifetime: AnyLifetime[mutable].type,
 ]:
     """An iterator for the Vector struct."""
+    alias type = Vector[T]
 
     var index: Int
-    var src: Reference[Vector[T], mutable, lifetime]
+    var src: Reference[Self.type, lifetime]
     var forward: Bool
 
-    fn __next__(inout self) -> Reference[T, mutable, lifetime]:
+    fn __next__(
+        inout self,
+    ) -> Reference[T, lifetime]:
         if self.forward:
             self.index += 1
-            return self.src[][self.index - 1]
+            return self.src[].__getitem__(self.index - 1)
         else:
             self.index -= 1
-            return self.src[][self.index]
+            return self.src[].__getitem__(self.index)
 
     fn __len__(self) -> Int:
         if self.forward:

@@ -1,6 +1,5 @@
-from utils import StaticTuple
 from os.path import exists
-from sys import exit
+from os.pathlike import PathLike
 
 alias SEEK_SET = 0
 alias SEEK_END = 2
@@ -10,8 +9,8 @@ alias NBytes = DType.uint64.sizeof()
 fn remove(path: String) -> Bool:
     if exists(path):
         if (
-            external_call["unlink", Int, DTypePointer[DType.uint8]](
-                path.unsafe_uint8_ptr()
+            external_call["unlink", Int, UnsafePointer[UInt8]](
+                path.unsafe_ptr()
             )
             == 0
         ):
@@ -37,8 +36,8 @@ fn mkdir(path: String) -> Bool:
     """
     if not exists(path):
         if (
-            external_call["mkdir", Int, DTypePointer[DType.uint8]](
-                path.unsafe_uint8_ptr()
+            external_call["mkdir", Int, UnsafePointer[UInt8]](
+                path.unsafe_ptr()
             )
             == 0
         ):
@@ -63,8 +62,8 @@ fn rmdir(path: String) -> Bool:
     """
     if exists(path):
         if (
-            external_call["rmdir", Int, DTypePointer[DType.uint8]](
-                path.unsafe_uint8_ptr()
+            external_call["rmdir", Int, UnsafePointer[UInt8]](
+                path.unsafe_ptr()
             )
             == 0
         ):
@@ -98,7 +97,7 @@ struct File:
             UnsafePointer[FILE],
             UnsafePointer[UInt8],
             UnsafePointer[UInt8],
-        ](path.unsafe_uint8_ptr(), mode.unsafe_uint8_ptr())
+        ](path.unsafe_ptr(), mode.unsafe_ptr())
 
     fn read(self, size: Int = -1) -> String:
         var ssize = size
@@ -161,7 +160,7 @@ struct File:
             Int32,
             Int32,
             UnsafePointer[FILE],
-        ](buffer.unsafe_uint8_ptr(), 1, len(buffer), self.fd)
+        ](buffer.unsafe_ptr(), 1, len(buffer), self.fd)
         if ret == -1:
             print("write failed")
 
@@ -191,9 +190,6 @@ struct File:
     fn __enter__(owned self) -> Self:
         """The function to call when entering the context."""
         return self^
-
-    fn __del__(owned self):
-        self.close()
 
 
 fn fopen(path: String, mode: String) -> File:

@@ -1,7 +1,3 @@
-from net.tensor.utils import shape
-from net.utils import handle_issue
-
-
 @always_inline("nodebug")
 fn check_shape(a: shape, b: shape) -> Bool:
     """

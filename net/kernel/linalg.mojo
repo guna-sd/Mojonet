@@ -1,7 +1,4 @@
-from net.tensor import Tensor
-from net.utils import handle_issue
-from algorithm import vectorize, parallelize
-from sys.intrinsics import PrefetchOptions
+from sys.intrinsics import PrefetchOptions, prefetch
 
 alias PREFETCH_READ = PrefetchOptions().for_read().high_locality().to_data_cache()
 alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cache()
@@ -11,9 +8,9 @@ alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cac
 fn mm[
     T: DType
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     m: Int,
     n: Int,
     p: Int,
@@ -38,13 +35,9 @@ fn mm[
 
             @parameter
             fn dot[nelts: Int](n_idx: Int):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
-                DTypePointer.prefetch[PREFETCH_READ](
-                    B + (k * p + n_idx + nelts)
-                )
-                DTypePointer.prefetch[PREFETCH_WRITE](
-                    C + (i * p + n_idx + nelts)
-                )
+                prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
+                prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
 
                 C.store[width=nelts](
                     i * p + n_idx,
@@ -59,10 +52,10 @@ fn mm[
         for j in range(p - (p % nelts), p):
             var acc_sum = Scalar[T](0)
             for k in range(n):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
-                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                prefetch[PREFETCH_READ](B + (k * p + j + 1))
                 acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
-            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
             C[i * p + j] = acc_sum
 
     parallelize[calc_row](m, m)
@@ -72,9 +65,9 @@ fn mm[
 fn fusedmm[
     T: DType, func: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[T, nelts]
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     m: Int,
     n: Int,
     p: Int,
@@ -99,13 +92,9 @@ fn fusedmm[
 
             @parameter
             fn dot[nelts: Int](n_idx: Int):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
-                DTypePointer.prefetch[PREFETCH_READ](
-                    B + (k * p + n_idx + nelts)
-                )
-                DTypePointer.prefetch[PREFETCH_WRITE](
-                    C + (i * p + n_idx + nelts)
-                )
+                prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
+                prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
                 C.store[width=nelts](
                     i * p + n_idx,
                     func[T, nelts](
@@ -121,10 +110,10 @@ fn fusedmm[
         for j in range(p - (p % nelts), p):
             var acc_sum = Scalar[T](0)
             for k in range(n):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
-                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                prefetch[PREFETCH_READ](B + (k * p + j + 1))
                 acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
-            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
             C[i * p + j] = func[T, 1](acc_sum)
 
     parallelize[calc_row](m, m)
@@ -137,9 +126,9 @@ fn fusedscalarmm[
         T, nelts
     ],
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     Scalar_value: Scalar[T],
     m: Int,
     n: Int,
@@ -166,13 +155,9 @@ fn fusedscalarmm[
 
             @parameter
             fn dot[nelts: Int](n_idx: Int):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + nelts))
-                DTypePointer.prefetch[PREFETCH_READ](
-                    B + (k * p + n_idx + nelts)
-                )
-                DTypePointer.prefetch[PREFETCH_WRITE](
-                    C + (i * p + n_idx + nelts)
-                )
+                prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
+                prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
                 C.store[width=nelts](
                     i * p + n_idx,
                     func(
@@ -189,10 +174,10 @@ fn fusedscalarmm[
         for j in range(p - (p % nelts), p):
             var acc_sum = Scalar[T](0)
             for k in range(n):
-                DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k + 1))
-                DTypePointer.prefetch[PREFETCH_READ](B + (k * p + j + 1))
+                prefetch[PREFETCH_READ](A + (i * n + k + 1))
+                prefetch[PREFETCH_READ](B + (k * p + j + 1))
                 acc_sum = A[i * n + k].fma(B[k * p + j], acc_sum)
-            DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
+            prefetch[PREFETCH_WRITE](C + (i * p + j + 1))
             C[i * p + j] = func(acc_sum, Scalar_value)
 
     parallelize[calc_row](m, m)
@@ -200,11 +185,11 @@ fn fusedscalarmm[
 
 @always_inline("nodebug")
 fn mm3d2d[
-    dtype: DType
+    T: DType
 ](
-    A: DTypePointer[dtype],
-    B: DTypePointer[dtype],
-    C: DTypePointer[dtype],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     M: Int,
     N: Int,
     K: Int,
@@ -223,17 +208,17 @@ fn mm3d2d[
         K: Size of the third dimension of tensor A and number of columns in matrix B.
         Q: Number of columns in matrix A.
     """
-    alias nelts = simdwidthof[dtype]() * 2
+    alias nelts = simdwidthof[T]() * 2
 
     @parameter
     fn _calc(b: Int):
         for t in range(N):
-            var out_bt: DTypePointer[dtype] = C + b * N * Q + t * Q
-            var inp_bt: DTypePointer[dtype] = A + b * N * K + t * K
+            var out_bt: UnsafePointer[Scalar[T]] = C + b * N * Q + t * Q
+            var inp_bt: UnsafePointer[Scalar[T]] = A + b * N * K + t * K
 
             for o in range(Q):
-                var val: SIMD[dtype, 1] = 0
-                var wrow: DTypePointer[dtype] = B + o * K
+                var val: SIMD[T, 1] = 0
+                var wrow: UnsafePointer[Scalar[T]] = B + o * K
 
                 @parameter
                 fn _op[width: Int](iv: Int):
@@ -253,9 +238,9 @@ fn mm3d2d[
 fn Compute_blocks[
     T: DType
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     i_outer: Int,
     i_limit: Int,
     j_outer: Int,
@@ -290,16 +275,12 @@ fn Compute_blocks[
             fn dot_product[nelts: Int](`_`: Int):
                 var acc_sum = SIMD[T, nelts](0)
                 for k in range(k_outer, k_limit):
-                    DTypePointer.prefetch[PREFETCH_READ](
-                        A + (i * n + k + nelts)
-                    )
-                    DTypePointer.prefetch[PREFETCH_READ](
-                        B + (k * p + j + nelts)
-                    )
+                    prefetch[PREFETCH_READ](A + (i * n + k + nelts))
+                    prefetch[PREFETCH_READ](B + (k * p + j + nelts))
                     acc_sum += A.load[width=nelts](i * n + k) * B.load[
                         width=nelts
                     ](k * p + j)
-                DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j + nelts))
+                prefetch[PREFETCH_WRITE](C + (i * p + j + nelts))
                 C.store[width=nelts](i * p + j, acc_sum)
 
             vectorize[dot_product, nelts, unroll_factor=4](
@@ -308,10 +289,10 @@ fn Compute_blocks[
 
         var acc_sum = Scalar[T](0)
         for k_idx in range(k_outer, k_limit):
-            DTypePointer.prefetch[PREFETCH_READ](A + (i * n + k_idx + 1))
-            DTypePointer.prefetch[PREFETCH_READ](B + (k_idx * p + j_outer + 1))
+            prefetch[PREFETCH_READ](A + (i * n + k_idx + 1))
+            prefetch[PREFETCH_READ](B + (k_idx * p + j_outer + 1))
             acc_sum += A[i * n + k_idx] * B[k_idx * p + j_outer]
-        DTypePointer.prefetch[PREFETCH_WRITE](C + (i * p + j_outer + 1))
+        prefetch[PREFETCH_WRITE](C + (i * p + j_outer + 1))
         C[i * p + j_outer] = acc_sum
 
 
@@ -321,9 +302,9 @@ fn Compute_blocks[
 fn tmm[
     T: DType
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    C: UnsafePointer[Scalar[T]],
     m: Int,
     n: Int,
     p: Int,
@@ -367,9 +348,9 @@ fn tmm[
 fn bmm[
     T: DType
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    inout C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    inout C: UnsafePointer[Scalar[T]],
     b: Int,
     m: Int,
     n: Int,
@@ -406,9 +387,9 @@ fn bmm[
 fn fusedbmm[
     T: DType, func: fn[T: DType, nelts: Int] (SIMD[T, nelts]) -> SIMD[T, nelts]
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    inout C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    inout C: UnsafePointer[Scalar[T]],
     b: Int,
     m: Int,
     n: Int,
@@ -448,9 +429,9 @@ fn fusedScalarbmm[
         T, nelts
     ],
 ](
-    A: DTypePointer[T],
-    B: DTypePointer[T],
-    inout C: DTypePointer[T],
+    A: UnsafePointer[Scalar[T]],
+    B: UnsafePointer[Scalar[T]],
+    inout C: UnsafePointer[Scalar[T]],
     Scalar_value: SIMD[T, 1],
     b: Int,
     m: Int,

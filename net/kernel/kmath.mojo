@@ -41,7 +41,7 @@ fn relu[
     Returns:
     The `relu` of the input.
     """
-    return max[type, simd_width](arg, 0)
+    return max(arg, 0)
 
 
 @always_inline("nodebug")
@@ -61,7 +61,7 @@ fn sigmoid[
     Returns:
     The `sigmoid` of the input.
     """
-    return 1.0 / (1.0 + exp[type, simd_width](-arg))
+    return 1.0 / (1.0 + exp(-arg))
 
 
 @always_inline("nodebug")
@@ -101,7 +101,7 @@ fn softplus[
     Returns:
     The `softplus` of the input.
     """
-    return log[type, simd_width](1.0 + exp[type, simd_width](arg))
+    return log(1.0 + exp(arg))
 
 
 @always_inline("nodebug")
@@ -161,9 +161,9 @@ fn hard_swish[
     Returns:
     The `hard_swish` of the input.
     """
-    var offset = 3.0
-    var scale = 1.0 / 6.0
-    return arg * ((arg + offset).clamp(0, offset)) * scale
+    var offset : Scalar[type] = 3.0
+    var scale : Scalar[type]  = 1.0 / 6.0
+    return (arg * ((arg + offset).clamp(0, offset)) * scale)
 
 
 @always_inline("nodebug")
@@ -183,7 +183,7 @@ fn tanh[
     Returns:
     The `tanh` of the input.
     """
-    return (2.0 / (1.0 + exp[type, simd_width]((-2.0 * arg)))) - 1.0
+    return (2.0 / (1.0 + exp((-2.0 * arg)))) - 1.0
 
 
 @always_inline("nodebug")
@@ -223,7 +223,7 @@ fn arctan[
     Returns:
     The `atanh` of the input.
     """
-    return atan[type, simd_width](arg)
+    return atan(arg)
 
 
 @always_inline("nodebug")
@@ -272,8 +272,8 @@ fn softmax[
     Returns:
     The `softmax` of the input.
     """
-    var max_val = max[type, simd_width](arg, 0)
-    var exp = exp[type, simd_width](arg - max_val)
+    var max_val = max(arg, 0)
+    var exp = exp(arg - max_val)
     return exp / exp.reduce_add()
 
 
@@ -297,8 +297,8 @@ fn elu[
     Returns:
     The `elu` of the input.
     """
-    return max[type, simd_width](
-        arg, (alpha * (exp[type, simd_width](arg) - 1))
+    return max(
+        arg, (alpha * (exp(arg) - 1))
     )
 
 
@@ -322,7 +322,7 @@ fn leaky_relu[
     Returns:
     The `leaky_relu` of the input.
     """
-    return max[type, simd_width](arg, (arg * alpha))
+    return max(arg, (arg * alpha))
 
 
 @always_inline("nodebug")
@@ -342,8 +342,8 @@ fn selu[
     Returns:
     The `selu` of the input.
     """
-    return max[type, simd_width](
-        arg, (SELU_SCALE * SELU_ALPHA * (exp[type, simd_width](arg) - 1))
+    return max(
+        arg, (SELU_SCALE * SELU_ALPHA * (exp(arg) - 1))
     )
 
 

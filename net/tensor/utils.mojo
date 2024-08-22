@@ -1,8 +1,5 @@
 from builtin.io import _snprintf_scalar
-from builtin.string import _calc_format_buffer_size
-from utils import StaticIntTuple
-from utils._format import Formatter
-from net.utils import handle_issue
+from collections.string import _calc_format_buffer_size
 
 alias TensorStart = "Tensor("
 alias TensorEnd = ")"
@@ -34,22 +31,6 @@ struct shape:
         self.rank = 0
 
     @always_inline("nodebug")
-    fn __init__[*element_types : Intable](inout self, owned *elements : *element_types):
-        if (len(elements) > self.maxrank):
-            print("WARNING: max rank exceeded")
-            print("number of elements must be equal or less then rank {26}")
-            exit(1)
-        self.shapes = StaticIntTuple[Self.maxrank]()
-
-        @parameter
-        for i in range(0, elements.__len__()):
-            self.shapes[i] = int(elements.__getitem__[i]())
-        
-        self.strides = calculate_strides(self.shapes)
-        self.num_elements = num_elements(list(self.shapes, len(elements)))
-        self.rank = len(elements)
-
-    @always_inline("nodebug")
     fn __init__(inout self, owned shapes : List[Int]):
         if (len(shapes) > self.maxrank):
             print("WARNING: max rank exceeded")
@@ -74,19 +55,19 @@ struct shape:
         self.strides = calculate_strides(self.shapes)
         self.num_elements = num_elements(list(self.shapes, len(shapes)))
         self.rank = len(shapes)
-    
+
     @always_inline("nodebug")
-    fn __init__(inout self, owned shapes : TensorSpec):
-        if (shapes.rank() > self.maxrank):
+    fn __init__(inout self, owned *shapes : Int):
+        if (len(shapes) > self.maxrank):
             print("WARNING: max rank exceeded")
             print("number of elements must be equal or less then rank {26}")
             exit(1)
         self.shapes = StaticIntTuple[self.maxrank]()
-        for i in range(shapes.rank()):
+        for i in range(len(shapes)):
             self.shapes[i] = shapes[i]
         self.strides = calculate_strides(self.shapes)
-        self.num_elements = shapes.num_elements()
-        self.rank = shapes.rank()
+        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.rank = len(shapes)
     
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -98,20 +79,7 @@ struct shape:
         return True
 
     @always_inline("nodebug")
-    fn __eq__(self : Self, other : TensorShape) -> Bool:
-      if self.rank != other.rank():
-        return False
-      for i in range(self.rank):
-        if self.shapes[i] != other[i]:
-          return False
-      return True
-
-    @always_inline("nodebug")
     fn __ne__(self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
-    @always_inline("nodebug")
-    fn __ne__(self : Self, other : TensorShape) -> Bool:
         return not self.__eq__(other)
 
     @always_inline("nodebug")
@@ -392,47 +360,47 @@ fn bytes[type : DType](num_elements : Int) -> Int:
 # ===-------------------------------------------------------------------------------=== #
 
 @always_inline("nodebug")
-fn complete[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter):
+fn complete[type : DType,](ptr: UnsafePointer[Scalar[type]], len: Int, inout writer : Formatter):
     """
     Concatenates the elements of a tensor into a string, separated by commas, rounded, and formatted based on the specified width."""
     if len == 0:
         return
     _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1]()))
     for i in range(1,len):
-        writer.write_str(", ")
+        writer.write_str[", "]()
         _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1](i)))
 
 
 @always_inline("nodebug")
-fn _serialize_elements[type : DType,](ptr: DTypePointer, len: Int, inout writer : Formatter):
+fn _serialize_elements[type : DType,](ptr: UnsafePointer[Scalar[type]], len: Int, inout writer : Formatter):
     """
     Serializes the elements of a tensor into a string representation, including square brackets.
     """
-    writer.write_str(SquareBracketL)
+    writer.write_str[SquareBracketL]()
     var maxelemstoprint: Int = CompactMaxElemsToPrint
-    if type.is_int32() or type.is_uint32():
+    if type is DType.int32 or type is DType.uint32:
         maxelemstoprint = 15
-    if type.is_int64() or type.is_uint64():
+    if type is DType.int64 or type is DType.uint64:
         maxelemstoprint = 9
 
     var maxelemsperside: Int = CompactElemPerSide
-    if type.is_int64() or type.is_uint64():
+    if type is DType.int64 or type is DType.uint64:
         maxelemsperside = 3
     if len == 0:
-        writer.write_str(SquareBracketR)
+        writer.write_str[SquareBracketR]()
         return
 
     if len < maxelemstoprint:
         complete[type](ptr, len, writer)
-        writer.write_str(SquareBracketR)
+        writer.write_str[SquareBracketR]()
         return
 
     complete[type](ptr, maxelemsperside, writer)
-    writer.write_str(", ")
-    writer.write_str(Truncation)
+    writer.write_str[", "]()
+    writer.write_str[Truncation]()
     complete[type](ptr + len - maxelemsperside, maxelemsperside, writer)
 
-    writer.write_str(SquareBracketR)
+    writer.write_str[SquareBracketR]()
     return
 
 
@@ -453,7 +421,7 @@ fn _format_scalar[
             size,
             value,
         )
-        var str_slice = StringSlice[False, __lifetime_of(buf)](
+        var str_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](
             unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
         )
         writer.write_str(str_slice)
@@ -462,9 +430,9 @@ fn _format_scalar[
         var pad = str(" ")
         var type_width = int(dtype.sizeof()/2) -1
 
-        if dtype.is_int64() or dtype.is_uint64():
+        if dtype is DType.int64 or dtype is DType.uint64:
             type_width = type_width -1
-        if not dtype.is_int64() or dtype.is_uint64():
+        if not dtype is DType.int64 or dtype is DType.uint64:
             type_width = int(type_width/2)
 
         var wrote = _snprintf_scalar[dtype, "%f"](
@@ -472,7 +440,7 @@ fn _format_scalar[
             size,
             value,
         )
-        var str_slice = StringSlice[False, __lifetime_of(buf)](
+        var str_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](
             unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
         )
         var str_len = len(str(str_slice))
@@ -480,8 +448,8 @@ fn _format_scalar[
         if str_len < max_width:
             var pad_len = (int(max_width) - str_len) - (type_width)
             pad = pad * int(pad_len)
-            var pad_slice = StringSlice[False, __lifetime_of(pad)](
-                unsafe_from_utf8_ptr=pad.unsafe_uint8_ptr(), len=pad_len
+            var pad_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(pad)](
+                unsafe_from_utf8_ptr=pad.unsafe_ptr(), len=pad_len
             )
             writer.write_str(pad_slice)
 
@@ -489,17 +457,17 @@ fn _format_scalar[
 
 
 @always_inline("nodebug")
-fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = False](ptr : DTypePointer[type], shape : shape, inout writer : Formatter):
+fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = False](ptr : UnsafePointer[Scalar[type]], shape : shape, inout writer : Formatter):
     var rank = shape.rank
 
-    writer.write_str(TensorStart)
+    writer.write_str[TensorStart]()
     if shape.rank <= 1:
         if shape.rank == 1:
-            writer.write_str(SquareBracketL)
+            writer.write_str[SquareBracketL]()
             complete[type](ptr, shape.num_elements, writer)
-            writer.write_str(SquareBracketR)
+            writer.write_str[SquareBracketR]()
         if shape.rank == 0:
-            writer.write_str(SquareBracketL+SquareBracketR)
+            writer.write_str[SquareBracketL+SquareBracketR]()
 
     else:
         var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
@@ -508,7 +476,7 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
         var matrix_elem_count = column_elem_count * row_elem_count
         
         for _ in range(2,rank):
-            writer.write_str(SquareBracketL)
+            writer.write_str[SquareBracketL]()
 
         var num_matrices = 1
 
@@ -518,16 +486,16 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
         var matrix_idx = 0
         while matrix_idx < num_matrices:
             if matrix_idx > 0:
-                writer.write_str(",\n\n\t")
-            writer.write_str(SquareBracketL)
+                writer.write_str[",\n\n\t"]()
+            writer.write_str[SquareBracketL]()
 
             var row_idx = 0
             while row_idx < row_elem_count:
                 if row_idx > 0 and row_elem_count > CompactMaxElemsToPrint:
-                    writer.write_str("\n\t ")
+                    writer.write_str["\n\t "]()
 
                 if row_idx > 0 and row_elem_count <= CompactMaxElemsToPrint:
-                    writer.write_str("\n\t ")
+                    writer.write_str["\n\t "]()
 
                 _serialize_elements[type](
                 ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
@@ -535,34 +503,34 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
                 row_idx += 1
 
                 if row_idx != row_elem_count:
-                    writer.write_str(", ")
+                    writer.write_str[", "]()
 
                 if (row_elem_count >= CompactMaxElemsToPrint and row_idx == CompactElemPerSide):
-                    writer.write_str("\n\t")
-                    writer.write_str(Truncation)
+                    writer.write_str["\n\t"]()
+                    writer.write_str[Truncation]()
                     row_idx = row_elem_count - CompactElemPerSide
                 
-            writer.write_str(SquareBracketR)
+            writer.write_str[SquareBracketR]()
             matrix_idx+=1
             if (num_matrices >= CompactMaxElemsToPrint and matrix_idx == CompactElemPerSide):
-                writer.write_str("\n\n\t")
-                writer.write_str(" ...")
+                writer.write_str["\n\n\t"]()
+                writer.write_str[" ..."]()
                 matrix_idx = num_matrices - CompactElemPerSide
 
         for _ in range(2,rank):
-            writer.write_str(SquareBracketR)
+            writer.write_str[SquareBracketR]()
 
     if print_type:
         var buf = (",  dtype: " + type.__repr__())
-        var typeslice = StringSlice[False, __lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_uint8_ptr(), len=len(buf))
+        var typeslice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
         writer.write_str(typeslice)
 
     if print_shape:
         var buf = (",  shape: "+shape.__repr__())
-        var shapeslice = StringSlice[False, __lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_uint8_ptr(), len=len(buf))
+        var shapeslice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
         writer.write_str(shapeslice)
 
-    writer.write_str(TensorEnd)
+    writer.write_str[TensorEnd]()
     return
 
 

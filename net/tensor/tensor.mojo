@@ -1,15 +1,11 @@
-from net.utils.rand import rand_n
-from net.utils.mt19937 import mt19937Engine
-from memory import DTypePointer, memset, memset_zero, memcpy
 from net.tensor.utils import list
+from builtin._math import Ceilable, CeilDivable, Floorable, Truncable
 
 
-@value
-@register_passable("trivial")
 struct TensorType[T: DType]:
     """A Underlying Storage that represents the Tensor."""
 
-    var data: DTypePointer[T]
+    var data: UnsafePointer[Scalar[T]]
     """
     The data is a pointer to a block of memory that holds the elements of the tensor.
     """
@@ -23,26 +19,36 @@ struct TensorType[T: DType]:
     """
 
     fn __init__(inout self: Self):
-        self.data = stack_allocation[0, T]()
+        self.data = UnsafePointer[Scalar[T]]()
         self.shape = shape()
         self.device = "cpu"
 
     fn __init__(inout self: Self, shapes: shape, device: StringLiteral = "cpu"):
         self.shape = shapes
         self.device = device
-        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
+        self.data = UnsafePointer[Scalar[T]]().alloc(self.shape.numofelements())
         memset_zero(self.data, self.shape.numofelements())
 
     fn __init__(
         inout self: Self,
         shapes: shape,
-        data: DTypePointer[T],
+        data: UnsafePointer[Scalar[T]],
         device: StringLiteral = "cpu",
     ):
         self.shape = shapes
         self.device = device
-        self.data = DTypePointer[T]().alloc(self.shape.numofelements())
+        self.data = UnsafePointer[Scalar[T]]().alloc(self.shape.numofelements())
         memcpy(self.data, data, self.shape.numofelements())
+    
+    fn __copyinit__(inout self, other: TensorType[T]):
+        self.data = other.data
+        self.device = other.device
+        self.shape = other.shape
+
+    fn __moveinit__(inout self, owned other: TensorType[T]):
+        self.data = other.data
+        self.device = other.device
+        self.shape = other.shape
 
     @always_inline("nodebug")
     fn load[nelts: Int](self, owned index: Int) -> SIMD[T, nelts]:
@@ -147,7 +153,7 @@ struct _TensorIter[
 
     fn __next__(
         inout self,
-    ) -> Tensor[T]:
+    ) -> Scalar[T]:
         @parameter
         if forward:
             self.index += 1
@@ -164,7 +170,6 @@ struct _TensorIter[
             return self.index
 
 
-@value
 struct Tensor[type: DType = DType.float32](
     Absable,
     Ceilable,
@@ -221,7 +226,7 @@ struct Tensor[type: DType = DType.float32](
     fn __init__(
         inout self,
         *shapes: Int,
-        data: DTypePointer[type],
+        data: UnsafePointer[Scalar[type]],
         device: StringLiteral = "cpu",
         requires_grad: Bool = False,
     ):
@@ -235,7 +240,9 @@ struct Tensor[type: DType = DType.float32](
         device: StringLiteral = "cpu",
         requires_grad: Bool = False,
     ):
-        var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
+        var tensor_data = UnsafePointer[Scalar[type]]().alloc(
+            shapes.num_elements
+        )
         if shapes.numofelements() == data.__len__():
             for i in range(shapes.numofelements()):
                 tensor_data[i] = data[i]
@@ -250,7 +257,9 @@ struct Tensor[type: DType = DType.float32](
         device: StringLiteral = "cpu",
         requires_grad: Bool = False,
     ):
-        var tensor_data = DTypePointer[type]().alloc(shapes.num_elements)
+        var tensor_data = UnsafePointer[Scalar[type]]().alloc(
+            shapes.num_elements
+        )
         if shapes.numofelements() == data.__len__():
             for i in range(shapes.numofelements()):
                 tensor_data[i] = data[i]
@@ -266,7 +275,9 @@ struct Tensor[type: DType = DType.float32](
         requires_grad: Bool = False,
     ):
         var tensor_shape = shape(shapes)
-        var tensor_data = DTypePointer[type]().alloc(tensor_shape.num_elements)
+        var tensor_data = UnsafePointer[Scalar[type]]().alloc(
+            tensor_shape.num_elements
+        )
         if tensor_shape.numofelements() == data.__len__():
             for i in range(tensor_shape.numofelements()):
                 tensor_data[i] = data[i]
@@ -304,15 +315,6 @@ struct Tensor[type: DType = DType.float32](
         requires_grad: Bool = False,
     ):
         self.tensor = TensorType[type](shapes, device)
-        self.requires_grad = requires_grad
-
-    fn __init__(
-        inout self: Self,
-        data: MojoTensor[type],
-        device: StringLiteral = "cpu",
-        requires_grad: Bool = False,
-    ):
-        self.tensor = TensorType[type](shape(data._spec), data._ptr, device)
         self.requires_grad = requires_grad
 
     fn __copyinit__(inout self: Self, other: Self):
@@ -443,23 +445,7 @@ struct Tensor[type: DType = DType.float32](
         return True
 
     @always_inline("nodebug")
-    fn __eq__(self: Self, other: MojoTensor[type]) -> Bool:
-        if (
-            self.num_elements() != other.num_elements()
-            or self.tensor.shape != other.shape()
-        ):
-            return False
-        for i in range(self.num_elements()):
-            if self.load(i) != other.load(i):
-                return False
-        return True
-
-    @always_inline("nodebug")
     fn __ne__(self: Self, other: Self) -> Bool:
-        return not self.__eq__(other)
-
-    @always_inline("nodebug")
-    fn __ne__(self: Self, other: MojoTensor[type]) -> Bool:
         return not self.__eq__(other)
 
     @always_inline("nodebug")
@@ -972,7 +958,7 @@ struct Tensor[type: DType = DType.float32](
         @parameter
         fn vectorize_sum[simd_width: Int](idx: Int) -> None:
             var simd_data = self.load[simd_width](idx)
-            result += simd_data.reduce_add()
+            result = result + simd_data.reduce_add()
 
         vectorize[vectorize_sum, simd_width](self.num_elements())
         return result
@@ -1193,13 +1179,9 @@ struct Tensor[type: DType = DType.float32](
         return self.apply[math.cbrt]()
 
     @always_inline("nodebug")
-    fn rsqrt(self: Self) -> Self:
-        return self.apply[math.rsqrt]()
-
-    @always_inline("nodebug")
     fn roundeven(self: Self) -> Self:
         return self.apply[SIMD.roundeven]()
-    
+
     @always_inline("nodebug")
     fn nextafter(self: Self, other: Self) -> Self:
         var result = Self.Operation.tensor_operation[math.nextafter](
@@ -1229,7 +1211,7 @@ struct Tensor[type: DType = DType.float32](
 
     @always_inline("nodebug")
     fn ones(inout self: Self):
-        memset[type](self.tensor.data, 1, self.num_elements())
+        memset(self.tensor.data, 1, self.num_elements())
 
     @always_inline("nodebug")
     fn rand(inout self):
@@ -1254,10 +1236,13 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn fill(self: Self, value: Scalar[type]) -> Self:
         """Fill the tensor with a specified value."""
-        var result = DTypePointer[type]().alloc(self.num_elements())
+        var result = UnsafePointer[Scalar[type]]().alloc(self.num_elements())
         for i in range(0, self.num_elements()):
-            result[i] = result[i].splat(value)
-        return Tensor[type](TensorType[type](self.shapes(), result, self.device()), self.requires_grad)
+            result[i] = value
+        return Tensor[type](
+            TensorType[type](self.shapes(), result, self.device()),
+            self.requires_grad,
+        )
 
     @always_inline("nodebug")
     fn ifill(inout self: Self, value: Scalar[type]):
@@ -1267,7 +1252,9 @@ struct Tensor[type: DType = DType.float32](
     @always_inline("nodebug")
     fn transposed(inout self: Self, dim1: Int = -2, dim2: Int = 1) -> Self:
         if dim1 >= self.rank() or dim2 >= self.rank():
-            handle_issue("dim1 and dim2 must be within the range of the tensor's rank")
+            handle_issue(
+                "dim1 and dim2 must be within the range of the tensor's rank"
+            )
 
         var tshape = self.shapes()
         tshape[dim1], tshape[dim2] = tshape[dim2], tshape[dim1]
@@ -1355,17 +1342,6 @@ struct Tensor[type: DType = DType.float32](
         return self.tensor.shape
 
     @always_inline("nodebug")
-    fn data(self: Self) -> DTypePointer[type]:
-        return self.tensor.data
-
-    @always_inline("nodebug")
-    fn data(self, shapes: shape, offset: Int) -> DTypePointer[type]:
-        var num_elements = shapes.num_elements
-        var new_data = DTypePointer[type]().alloc(num_elements)
-        memcpy(new_data, self.tensor.data + (offset), num_elements)
-        return new_data
-
-    @always_inline("nodebug")
     fn unsafe_ptr(self) -> UnsafePointer[Scalar[type]]:
         var data = UnsafePointer[Scalar[type]]().alloc(self.num_elements())
         for i in range(self.num_elements()):
@@ -1439,17 +1415,6 @@ fn tensor[
     return tensor^
 
 
-fn tensor[
-    dtype: DType = DType.float32
-](*Shape: Int, rand: Bool = False) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if rand:
-        tensor.rand()
-        return tensor
-    tensor.zeros()
-    return tensor^
-
-
 fn ones[
     dtype: DType = DType.float32
 ](Shape: List[Int],) -> Tensor[dtype]:
@@ -1458,25 +1423,9 @@ fn ones[
     return tensor^
 
 
-fn ones[
-    dtype: DType = DType.float32
-](*Shape: Int,) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    fill[dtype](tensor, Scalar[dtype](1))
-    return tensor^
-
-
 fn zeros[
     dtype: DType = DType.float32
 ](Shape: List[Int],) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    fill[dtype](tensor, Scalar[dtype](0))
-    return tensor^
-
-
-fn zeros[
-    dtype: DType = DType.float32
-](*Shape: Int,) -> Tensor[dtype]:
     var tensor = Tensor[dtype](Shape)
     fill[dtype](tensor, Scalar[dtype](0))
     return tensor^
@@ -1487,14 +1436,6 @@ fn fill[
     dtype: DType = DType.float32
 ](inout x: Tensor[dtype], val: Scalar[dtype]):
     x.ifill(val)
-
-
-fn fill[
-    dtype: DType = DType.float32
-](*Shape: Int, val: Scalar[dtype]) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    fill[dtype](tensor, val)
-    return tensor^
 
 
 fn fill[
@@ -1515,26 +1456,14 @@ fn rand[
     return tensor^
 
 
-fn rand[
-    dtype: DType = DType.float32
-](*Shape: Int, seed: Optional[Int]) -> Tensor[dtype]:
-    var tensor = Tensor[dtype](Shape)
-    if seed:
-        tensor.rand()
-    tensor.rand()
-    return tensor^
-
-
-fn empty[dtype: DType = DType.float32](*Shape: Int) -> Tensor[dtype]:
-    return Tensor[dtype](Shape)
-
-
 fn empty[dtype: DType = DType.float32](Shape: List[Int]) -> Tensor[dtype]:
     return Tensor[dtype](Shape)
 
 
 @always_inline("nodebug")
-fn arange[dtype: DType](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
+fn arange[
+    dtype: DType
+](start: Int, end: Int = 0, step: Int = 1) -> Tensor[dtype]:
     """
     Returns a tensor with values from start to end with specified step size.
 

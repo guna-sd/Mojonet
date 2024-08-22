@@ -1,8 +1,3 @@
-from collections import InlinedFixedVector
-from net.tensor import Tensor, shape
-from net.utils import handle_issue
-
-
 struct Serialize:
     alias MAGIC_NUMBER: UInt64 = 0xFFFFFFFFFFFFFFFF
     var storage: InlinedFixedVector[Bytes]

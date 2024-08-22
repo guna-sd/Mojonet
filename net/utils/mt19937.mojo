@@ -1,4 +1,3 @@
-from utils import StaticTuple
 from time import now
 
 alias MERSENNE_STATE_N = 624
@@ -40,7 +39,7 @@ struct mt19937Engine:
     @always_inline("nodebug")
     fn __init__(inout self, seed: UInt64):
         var state = StaticTuple[UInt32, MERSENNE_STATE_N]()
-        state[0] = seed & 0xFFFFFFFF
+        state[0] = (seed & 0xFFFFFFFF).cast[DType.uint32]()
         for i in range(1, MERSENNE_STATE_N):
             state[i] = 1812433253 * (state[i - 1] ^ (state[i - 1] >> 30)) + i
         self.mt19937_data = mt19937(seed, 1, True, 0, state)
@@ -87,7 +86,7 @@ struct mt19937Engine:
         if (self.mt19937_data.left) == 0:
             self.nextstate()
         self.mt19937_data.left -= 1
-        var y = self.mt19937_data.state[self.mt19937_data.next]
+        var y = self.mt19937_data.state[int(self.mt19937_data.next)]
         self.mt19937_data.next += 1
         y ^= y >> 11
         y ^= (y << 7) & 0x9D2C5680
