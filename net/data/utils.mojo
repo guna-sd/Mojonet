@@ -1,5 +1,3 @@
-from net.utils.utilities import Status
-
 struct Batch[T: CollectionElement]:
     """
     The `Batch` struct represents a collection of data points in a dataset.

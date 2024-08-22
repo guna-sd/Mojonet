@@ -3,9 +3,6 @@ from net.tensor.utils import (
     broadcast_shapes,
     is_compatible,
 )
-from net.utils import handle_issue
-from net.tensor import TensorType
-from algorithm import vectorize
 
 
 struct Operation[dtype: DType]:
