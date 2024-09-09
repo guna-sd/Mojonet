@@ -1,0 +1,11 @@
+[project]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+description = "Add a short description here"
+name = "Mojonet"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+max = ">=24.6.0.dev2024090905,<25"
