@@ -367,7 +367,7 @@ fn complete[type : DType,](ptr: UnsafePointer[Scalar[type]], len: Int, inout wri
         return
     _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1]()))
     for i in range(1,len):
-        writer.write_str[", "]()
+        writer.write(", ")
         _format_scalar[type](writer, rebind[Scalar[type]](ptr.load[width=1](i)))
 
 
@@ -376,7 +376,7 @@ fn _serialize_elements[type : DType,](ptr: UnsafePointer[Scalar[type]], len: Int
     """
     Serializes the elements of a tensor into a string representation, including square brackets.
     """
-    writer.write_str[SquareBracketL]()
+    writer.write(SquareBracketL)
     var maxelemstoprint: Int = CompactMaxElemsToPrint
     if type is DType.int32 or type is DType.uint32:
         maxelemstoprint = 15
@@ -387,20 +387,20 @@ fn _serialize_elements[type : DType,](ptr: UnsafePointer[Scalar[type]], len: Int
     if type is DType.int64 or type is DType.uint64:
         maxelemsperside = 3
     if len == 0:
-        writer.write_str[SquareBracketR]()
+        writer.write(SquareBracketR)
         return
 
     if len < maxelemstoprint:
         complete[type](ptr, len, writer)
-        writer.write_str[SquareBracketR]()
+        writer.write(SquareBracketR)
         return
 
     complete[type](ptr, maxelemsperside, writer)
-    writer.write_str[", "]()
-    writer.write_str[Truncation]()
+    writer.write(", ")
+    writer.write(Truncation)
     complete[type](ptr + len - maxelemsperside, maxelemsperside, writer)
 
-    writer.write_str[SquareBracketR]()
+    writer.write(SquareBracketR)
     return
 
 
@@ -460,14 +460,14 @@ fn _format_scalar[
 fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = False](ptr : UnsafePointer[Scalar[type]], shape : shape, inout writer : Formatter):
     var rank = shape.rank
 
-    writer.write_str[TensorStart]()
+    writer.write(TensorStart)
     if shape.rank <= 1:
         if shape.rank == 1:
-            writer.write_str[SquareBracketL]()
+            writer.write(SquareBracketL)
             complete[type](ptr, shape.num_elements, writer)
-            writer.write_str[SquareBracketR]()
+            writer.write(SquareBracketR)
         if shape.rank == 0:
-            writer.write_str[SquareBracketL+SquareBracketR]()
+            writer.write(SquareBracketL+SquareBracketR)
 
     else:
         var column_elem_count  = 1 if rank < 1 else shape.Shapes()[-1]
@@ -476,7 +476,7 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
         var matrix_elem_count = column_elem_count * row_elem_count
         
         for _ in range(2,rank):
-            writer.write_str[SquareBracketL]()
+            writer.write(SquareBracketL)
 
         var num_matrices = 1
 
@@ -486,16 +486,16 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
         var matrix_idx = 0
         while matrix_idx < num_matrices:
             if matrix_idx > 0:
-                writer.write_str[",\n\n\t"]()
-            writer.write_str[SquareBracketL]()
+                writer.write(",\n\n\t")
+            writer.write(SquareBracketL)
 
             var row_idx = 0
             while row_idx < row_elem_count:
                 if row_idx > 0 and row_elem_count > CompactMaxElemsToPrint:
-                    writer.write_str["\n\t "]()
+                    writer.write("\n\t ")
 
                 if row_idx > 0 and row_elem_count <= CompactMaxElemsToPrint:
-                    writer.write_str["\n\t "]()
+                    writer.write("\n\t ")
 
                 _serialize_elements[type](
                 ptr + matrix_idx * matrix_elem_count + row_idx * column_elem_count,
@@ -503,22 +503,22 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
                 row_idx += 1
 
                 if row_idx != row_elem_count:
-                    writer.write_str[", "]()
+                    writer.write(", ")
 
                 if (row_elem_count >= CompactMaxElemsToPrint and row_idx == CompactElemPerSide):
-                    writer.write_str["\n\t"]()
-                    writer.write_str[Truncation]()
+                    writer.write("\n\t")
+                    writer.write(Truncation)
                     row_idx = row_elem_count - CompactElemPerSide
                 
-            writer.write_str[SquareBracketR]()
+            writer.write(SquareBracketR)
             matrix_idx+=1
             if (num_matrices >= CompactMaxElemsToPrint and matrix_idx == CompactElemPerSide):
-                writer.write_str["\n\n\t"]()
-                writer.write_str[" ..."]()
+                writer.write("\n\n\t")
+                writer.write(" ...")
                 matrix_idx = num_matrices - CompactElemPerSide
 
         for _ in range(2,rank):
-            writer.write_str[SquareBracketR]()
+            writer.write(SquareBracketR)
 
     if print_type:
         var buf = (",  dtype: " + type.__repr__())
@@ -530,7 +530,7 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
         var shapeslice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
         writer.write_str(shapeslice)
 
-    writer.write_str[TensorEnd]()
+    writer.write(TensorEnd)
     return
 
 
