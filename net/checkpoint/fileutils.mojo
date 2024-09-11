@@ -6,7 +6,7 @@ alias SEEK_END = 2
 alias NBytes = DType.uint64.sizeof()
 
 
-fn remove(path: String) -> Bool:
+fn remove(path: String)-> Bool:
     if exists(path):
         if (
             external_call["unlink", Int, UnsafePointer[UInt8]](
@@ -83,7 +83,7 @@ fn rmdir[pathlike: PathLike](path: pathlike):
     else:
         print(result)
 
-
+@register_passable("trivial")
 struct FILE:
     ...
 
@@ -92,12 +92,16 @@ struct File:
     var fd: UnsafePointer[FILE]
 
     fn __init__(inout self, path: String, mode: String):
-        self.fd = external_call[
+        var fd = external_call[
             "fopen",
             UnsafePointer[FILE],
             UnsafePointer[UInt8],
             UnsafePointer[UInt8],
         ](path.unsafe_ptr(), mode.unsafe_ptr())
+        
+        if fd == UnsafePointer[FILE]():
+            handle_issue("Error opening file")
+        self.fd = fd
 
     fn read(self, size: Int = -1) -> String:
         var ssize = size
@@ -113,7 +117,7 @@ struct File:
             UnsafePointer[FILE],
         ](buffer, 1, ssize, self.fd)
         if ret == -1:
-            print("read failed")
+            handle_issue("read failed")
         return String(buffer, ssize)
 
     fn readbytes(self, size: Int = -1) -> Bytes:
@@ -130,7 +134,7 @@ struct File:
             UnsafePointer[FILE],
         ](buffer, 1, ssize, self.fd)
         if ret == -1:
-            print("read failed")
+            handle_issue("read failed")
         return Bytes(buffer)
 
     fn size(self) -> Int:
@@ -138,17 +142,17 @@ struct File:
             "fseek", Int, UnsafePointer[FILE], Int, Int32
         ](self.fd, 0, SEEK_END)
         if result != 0:
-            print("Error seeking to end")
+            handle_issue("Error seeking to end")
             return -1
         var size = external_call["ftell", Int, UnsafePointer[FILE]](self.fd)
         if size == -1:
-            print("Error getting file size")
+            handle_issue("Error getting file size")
             return -1
         result = external_call["fseek", Int, UnsafePointer[FILE], Int, Int32](
             self.fd, 0, SEEK_SET
         )
         if result != 0:
-            print("Error resetting to start")
+            handle_issue("Error resetting to start")
             return -1
         return int(size + 1)
 
@@ -162,7 +166,7 @@ struct File:
             UnsafePointer[FILE],
         ](buffer.unsafe_ptr(), 1, len(buffer), self.fd)
         if ret == -1:
-            print("write failed")
+            handle_issue("write failed")
 
     fn writebytes(self, buffer: Bytes):
         var ret = external_call[
@@ -174,12 +178,12 @@ struct File:
             UnsafePointer[FILE],
         ](buffer.unsafe_ptr(), 1, len(buffer), self.fd)
         if ret == -1:
-            print("write failed")
+            handle_issue("write bytes failed")
 
     fn close(inout self):
         var ret = external_call["fclose", Int32, UnsafePointer[FILE]](self.fd)
         if ret == -1:
-            print("Failed to close")
+            handle_issue("Failed to close")
 
     fn __copyinit__(inout self, new: Self):
         self.fd = new.fd
