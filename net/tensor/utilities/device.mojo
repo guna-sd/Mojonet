@@ -1,4 +1,5 @@
 @value
+@register_passable("trivial")
 struct Device(Stringable, Formattable, Representable, KeyElement):
     alias CPU = Device(0)
     alias CUDA = Device(1)
@@ -19,6 +20,10 @@ struct Device(Stringable, Formattable, Representable, KeyElement):
     alias COMPILE_TIME_MAX_DEVICE_TYPES = 16
     var value: Int8
 
+    @always_inline
+    fn __init__(inout self):
+        self = Device.CPU
+        
     @no_inline
     fn __str__(self) -> String:
         """Gets the name of the Device.
@@ -38,13 +43,13 @@ struct Device(Stringable, Formattable, Representable, KeyElement):
         return "Device." + str(self)
 
     @always_inline("nodebug")
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Computes the hash value for the Device.
 
         Returns:
             An integer hash value based on the Device's value.
         """
-        return hash(UInt8(self.value))
+        return hash(UInt8(self.value.cast[DType.uint8]()))
 
     @no_inline
     fn format_to(self, inout writer: Formatter):

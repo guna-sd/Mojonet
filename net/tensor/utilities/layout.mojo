@@ -32,13 +32,13 @@ struct Layout(Stringable, Formattable, Representable, KeyElement):
         return "Layout." + str(self)
 
     @always_inline("nodebug")
-    fn __hash__(self) -> Int:
+    fn __hash__(self) -> UInt:
         """Computes the hash value for the Layout.
 
         Returns:
             An integer hash value based on the Layout's value.
         """
-        return hash(UInt8(self.value))
+        return hash(UInt8(self.value.cast[DType.uint8]()))
 
     @no_inline
     fn format_to(self, inout writer: Formatter):
