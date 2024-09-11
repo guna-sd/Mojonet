@@ -23,7 +23,7 @@ struct Device(Stringable, Formattable, Representable, KeyElement):
     @always_inline
     fn __init__(inout self):
         self = Device.CPU
-        
+
     @no_inline
     fn __str__(self) -> String:
         """Gets the name of the Device.
@@ -96,7 +96,7 @@ struct Device(Stringable, Formattable, Representable, KeyElement):
     @staticmethod
     fn _from_str(device_str: String) -> Device:
         """Construct a Device from a string.
-        
+
         Args:
             device_str: The name of the Device.
         """

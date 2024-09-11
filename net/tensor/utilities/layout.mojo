@@ -95,7 +95,6 @@ struct Layout(Stringable, Formattable, Representable, KeyElement):
         """
         return self == rhs
 
-
     @always_inline("nodebug")
     fn __isnot__(self, rhs: Layout) -> Bool:
         """Compares one Layout to another for inequality.

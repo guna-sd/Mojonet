@@ -1,106 +1,11 @@
-@register_passable("trivial")
-struct DataPtr:
-    """Represents a pointer with an associated device."""
-    
-    var ptr: UnsafePointer[UInt8]
-    var device: Device
-
-
-    @always_inline
-    fn __init__(inout self):
-        """Create a null pointer."""
-        self.ptr = UnsafePointer[UInt8]()
-        self.device = Device()
-
-    @always_inline
-    fn __init__(inout self, ptr: UnsafePointer[UInt8], device: Device = Device.CPU):
-        """Initializes a DataPtr with a data pointer and a device."""
-        self.ptr = ptr
-        self.device = device
-
-    @always_inline
-    fn __init__(inout self, *, other: Self):
-        """Copy the object.
-
-        Args:
-            other: The value to copy.
-        """
-        self.ptr = other.ptr
-        self.device = other.device
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        """Return true if the pointer is non-null.
-
-        Returns:
-            Whether the pointer is null.
-        """
-        return int(self.ptr) != 0
-
-    @no_inline
-    fn __str__(self) -> String:
-        """Gets a string representation of the pointer.
-
-        Returns:
-            The string representation of the pointer.
-        """
-        return hex(int(self.ptr))
-
-    @no_inline
-    fn format_to(self, inout writer: Formatter):
-        """
-        Formats this pointer address to the provided formatter.
-
-        Args:
-            writer: The formatter to write to.
-        """
-
-        writer.write(str(self))
-
-    fn free(owned self):
-        """Frees the associated memory and clears the data pointer."""
-        if self.ptr:
-            self.ptr.free()
-
-    fn unsafe_ptr(self) -> UnsafePointer[UInt8]:
-        """Returns the data pointer."""
-        return self.ptr
-
-    fn is_valid(self) -> Bool:
-        """Checks if the data pointer is valid (i.e., not null)."""
-        return self.ptr
-
-
-struct Allocator:
-    """Represents an allocator that allocates and frees memory."""
-    
-    @staticmethod
-    fn allocate(size: Int, device: Device = Device.CPU) -> DataPtr:
-        """Allocates memory of the given size for a specific device.
-
-        Args:
-            size: The size in bytes of the memory to allocate.
-            device: The device on which to allocate memory (defaults to CPU).
-
-        Returns:
-            A DataPtr that holds the allocated memory and device.
-        """
-        var ptr: UnsafePointer[UInt8] = UnsafePointer[UInt8].alloc(size)
-        return DataPtr(ptr, device)
-
-    @staticmethod
-    fn free(owned ptr: DataPtr):
-        """Frees the memory held by the given DataPtr.
-
-        Args:
-            ptr: The DataPtr whose memory is to be freed.
-        """
-        ptr.free()
+from memory.unsafe_pointer import alignof, _malloc, _free
 
 
 @value
 @register_passable("trivial")
-struct DataPointer(Boolable, CollectionElement, Intable, Stringable, EqualityComparable):
+struct DataPointer(
+    Boolable, CollectionElement, Intable, Stringable, EqualityComparable
+):
     alias _pointer_type = UnsafePointer[UInt8]
     var address: Self._pointer_type
     var device: Device
@@ -224,7 +129,9 @@ struct DataPointer(Boolable, CollectionElement, Intable, Stringable, EqualityCom
 
     @staticmethod
     @always_inline
-    fn alloc[type: DType, alignment: Int = alignof[type]()](count: Int, /, *,device: Device) -> Self:
+    fn alloc[
+        type: DType, alignment: Int = alignof[type]()
+    ](count: Int, /, *, device: Device) -> Self:
         """Heap-allocates a number of element of the specified type using
         the specified alignment.
 
@@ -239,9 +146,12 @@ struct DataPointer(Boolable, CollectionElement, Intable, Stringable, EqualityCom
         Returns:
             A new `DataPointer` object which has been allocated on the heap.
         """
-        return Self(_malloc[Scalar[type], alignment=alignment](
-            count * sizeof[type]()
-        ).bitcast[UInt8](), device)
+        return Self(
+            _malloc[Scalar[type], alignment=alignment](
+                count * sizeof[type]()
+            ).bitcast[UInt8](),
+            device,
+        )
 
     @always_inline
     fn free(self):
