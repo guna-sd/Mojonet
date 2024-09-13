@@ -9,3 +9,6 @@ version = "0.1.0"
 
 [dependencies]
 max = ">=24.6.0.dev2024090905,<25"
+python = "==3.12.5"
+tqdm = "==4.66.5"
+requests = "==2.32.3"
