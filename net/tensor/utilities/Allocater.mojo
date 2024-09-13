@@ -1,25 +1,64 @@
+from memory.unsafe_pointer import alignof, _free, is_power_of_two
+from memory.memory import memcpy, _malloc
+from gpu.host.memory import _malloc as gpu_malloc
+
+
 struct Allocator:
-    """Represents an allocator that allocates and frees memory."""
 
     @staticmethod
-    fn allocate(size: Int, device: Device = Device.CPU) -> DataPointer:
-        """Allocates memory of the given size for a specific device.
+    @always_inline
+    fn allocate[alignment: Int = alignof[UInt8]()](size: Int, device: Device) -> DataPointer:
+        """Allocates a block of memory with a specified size and alignment.
+
+        Parameters:
+            alignment: The alignment requirement of the memory block.
 
         Args:
-            size: The size in bytes of the memory to allocate.
-            device: The device on which to allocate memory (defaults to CPU).
+            size: The size of the memory block to allocate in bytes.
+            device: The device to which the memory block is to be allocated.
 
         Returns:
-            A DataPtr that holds the allocated memory and device.
+            A DataPointer pointing to the allocated memory.
         """
-        var ptr: UnsafePointer[UInt8] = UnsafePointer[UInt8].alloc(size)
+        constrained[
+            is_power_of_two(alignment), "alignment must be a power of 2."
+        ]()
+        var ptr : UnsafePointer[UInt8] = UnsafePointer[UInt8]()
+        if device.is_cpu():
+           ptr = _malloc[UInt8, alignment=alignment](size)
         return DataPointer(ptr, device)
 
     @staticmethod
-    fn free(owned ptr: DataPointer):
-        """Frees the memory held by the given DataPtr.
+    @always_inline
+    fn deallocate(data_pointer: DataPointer):
+        """Deallocates a block of memory.
 
         Args:
-            ptr: The DataPtr whose memory is to be freed.
+            data_pointer: The DataPointer pointing to the memory to deallocate.
         """
-        ptr.free()
+        if data_pointer.device.is_cpu():
+            _free(data_pointer.address)
+
+    @staticmethod
+    @always_inline
+    fn reallocate[alignment: Int = alignof[UInt8]()](data_pointer: DataPointer, new_size: Int, old_size: Int) -> DataPointer:
+        """Reallocates a block of memory to a new size with a specified alignment.
+
+        Parameters:
+            alignment: The alignment requirement of the memory block.
+
+        Args:
+            data_pointer: The DataPointer pointing to the memory to reallocate.
+            new_size: The new size of the memory block in bytes.
+            old_size: The size of the memory allocated previosly.
+
+        Returns:
+            A new DataPointer pointing to the reallocated memory.
+        """
+        constrained[
+            is_power_of_two(alignment), "alignment must be a power of 2."
+        ]()
+        var new_ptr = UnsafePointer[UInt8]()
+        new_ptr =  _malloc[UInt8, alignment=alignment](new_size)
+        memcpy(new_ptr, data_pointer.address, old_size)
+        return DataPointer(new_ptr, data_pointer.device)
