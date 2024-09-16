@@ -45,7 +45,7 @@ struct Serialize:
         for i in range(tensor.num_elements()):
             var value = frombytes[type](self.storage[i + 2 + len(shapes)])
             tensor.store(i, value)
-        return tensor
+        return tensor^
 
     fn write(self, path: String):
         with fopen(path, "wb") as file:
@@ -146,13 +146,13 @@ struct Serialize:
         for i in range(tensor.num_elements()):
             var value = frombytes[type](bytes.storage[i + 2 + len(shapes)])
             tensor.store(i, value)
-        return tensor
+        return tensor^
 
     fn list(self) -> List[Bytes]:
         var list_bytes = List[Bytes](capacity=self.storage.capacity)
         for i in range(self.storage.capacity):
             list_bytes[i] = self.storage[i]
-        return list_bytes
+        return list_bytes^
 
 
 # struct ckpt:

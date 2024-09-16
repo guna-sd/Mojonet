@@ -5,88 +5,9 @@ alias SEEK_SET = 0
 alias SEEK_END = 2
 alias NBytes = DType.uint64.sizeof()
 
-
-fn remove(path: String)-> Bool:
-    if exists(path):
-        if (
-            external_call["unlink", Int, UnsafePointer[UInt8]](
-                path.unsafe_ptr()
-            )
-            == 0
-        ):
-            return True
-        else:
-            return False
-    else:
-        print("Path does not exist")
-        return False
-
-
-fn remove[pathlike: PathLike](path: pathlike):
-    var result = remove(path.__fspath__())
-    if result:
-        return
-    else:
-        print(result)
-
-
-fn mkdir(path: String) -> Bool:
-    """
-    Create a directory at the given path.
-    """
-    if not exists(path):
-        if (
-            external_call["mkdir", Int, UnsafePointer[UInt8]](
-                path.unsafe_ptr()
-            )
-            == 0
-        ):
-            return True
-        return False
-    else:
-        print("Directory already exists")
-        return False
-
-
-fn mkdir[pathlike: PathLike](path: pathlike):
-    var result = mkdir(path.__fspath__())
-    if result:
-        return
-    else:
-        print(result)
-
-
-fn rmdir(path: String) -> Bool:
-    """
-    Remove a directory from the given path.
-    """
-    if exists(path):
-        if (
-            external_call["rmdir", Int, UnsafePointer[UInt8]](
-                path.unsafe_ptr()
-            )
-            == 0
-        ):
-            return True
-        else:
-            print("Directory is not empty")
-            return False
-    else:
-        print("Path does not exist")
-        return False
-
-
-fn rmdir[pathlike: PathLike](path: pathlike):
-    var result = rmdir(path.__fspath__())
-    if result:
-        return
-    else:
-        print(result)
-
 @register_passable("trivial")
 struct FILE:
     ...
-
 
 struct File:
     var fd: UnsafePointer[FILE]
@@ -199,9 +120,8 @@ struct File:
 fn fopen(path: String, mode: String) -> File:
     return File(path, mode)
 
-
 @register_passable("trivial")
-struct Bytes(Sized, Stringable, Representable):
+struct Bytes(Sized, Stringable, Representable, Formattable):
     var data: StaticTuple[UInt8, NBytes]
 
     @always_inline("nodebug")
@@ -273,12 +193,12 @@ struct Bytes(Sized, Stringable, Representable):
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
-        var result: String = ""
-
+        return String.format_sequence(self)
+    
+    fn format_to(self, inout writer: Formatter):
         @parameter
         for i in range(NBytes):
-            result += chr(int(self[i]))
-        return result
+            writer.write(chr(int(self[i])))
 
     @always_inline("nodebug")
     fn clear(inout self):
@@ -302,7 +222,7 @@ struct Bytes(Sized, Stringable, Representable):
         @parameter
         for i in range(NBytes):
             data[i] = self[i]
-        return data
+        return data^
 
     @always_inline("nodebug")
     fn reverse(self) -> Self:
