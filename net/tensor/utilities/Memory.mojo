@@ -1,4 +1,4 @@
-from memory.unsafe_pointer import is_power_of_two
+from memory.unsafe_pointer import is_power_of_two, _free
 
 
 @value
@@ -182,3 +182,40 @@ struct DataPointer(
             is_power_of_two(alignment), "alignment must be a power of 2."
         ]()
         return int(self) % alignment == 0
+
+    @always_inline("nodebug")
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = 1,
+    ](self) -> SIMD[type, width]:
+        return self.address.bitcast[type]().load[width=width, alignment=alignment]()
+
+    @always_inline("nodebug")
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = 1,
+    ](self, owned val: SIMD[type, width]):
+        self.address.bitcast[type]().store[width=width, alignment=alignment](val)
+
+    fn load[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = 1,
+    ](self: Self, offset: Int) -> SIMD[type, width]:
+        return (self + int(offset) * sizeof[type]()).load[type=type, width=width, alignment=alignment]()
+
+    fn store[
+        type: DType, //,
+        width: Int = 1,
+        *,
+        alignment: Int = 1,
+    ](self: Self, offset: Int, owned value: SIMD[type, width]):
+        (self + int(offset) * sizeof[type]()).store[type=type, width=width, alignment=alignment](value)   
+    
+    fn free(owned self):
+        _free(self.address)

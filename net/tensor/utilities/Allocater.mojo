@@ -7,7 +7,7 @@ struct Allocator:
 
     @staticmethod
     @always_inline
-    fn allocate[alignment: Int = alignof[UInt8]()](size: Int, device: Device) -> DataPointer:
+    fn allocate[alignment: Int = 1](size: Int, device: Device = Device.CPU) -> DataPointer:
         """Allocates a block of memory with a specified size and alignment.
 
         Parameters:
@@ -41,7 +41,7 @@ struct Allocator:
 
     @staticmethod
     @always_inline
-    fn reallocate[alignment: Int = alignof[UInt8]()](data_pointer: DataPointer, new_size: Int, old_size: Int) -> DataPointer:
+    fn reallocate[alignment: Int = 1](inout data_pointer: DataPointer, new_size: Int, old_size: Int):
         """Reallocates a block of memory to a new size with a specified alignment.
 
         Parameters:
@@ -51,9 +51,6 @@ struct Allocator:
             data_pointer: The DataPointer pointing to the memory to reallocate.
             new_size: The new size of the memory block in bytes.
             old_size: The size of the memory allocated previosly.
-
-        Returns:
-            A new DataPointer pointing to the reallocated memory.
         """
         constrained[
             is_power_of_two(alignment), "alignment must be a power of 2."
@@ -61,4 +58,4 @@ struct Allocator:
         var new_ptr = UnsafePointer[UInt8]()
         new_ptr =  _malloc[UInt8, alignment=alignment](new_size)
         memcpy(new_ptr, data_pointer.address, old_size)
-        return DataPointer(new_ptr, data_pointer.device)
+        data_pointer = DataPointer(new_ptr, data_pointer.device)
