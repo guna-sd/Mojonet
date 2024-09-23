@@ -1,5 +1,3 @@
-from time import now
-
 alias MERSENNE_STATE_N = 624
 alias MERSENNE_STATE_M = 397
 alias MATRIX_A: UInt32 = 0x9908B0DF

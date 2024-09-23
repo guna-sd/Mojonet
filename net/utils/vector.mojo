@@ -1,6 +1,6 @@
 @value
 @register_passable("trivial")
-struct Vector[T: AnyTrivialRegType]:
+struct Vector[T: AnyCollectionElement]:
     """
     A dynamic array-like container for storing elements of type T with an initial capacity defined by Vector_size.
     """
@@ -124,7 +124,7 @@ struct Vector[T: AnyTrivialRegType]:
 @value
 struct _VectortIter[
     mutable: Bool, //,
-    T: AnyTrivialRegType,
+    T: AnyCollectionElement,
     lifetime: AnyLifetime[mutable].type,
 ]:
     """An iterator for the Vector struct."""
@@ -149,3 +149,6 @@ struct _VectortIter[
             return len(self.src[]) - self.index
         else:
             return self.index
+
+trait AnyCollectionElement(AnyType, Copyable, Movable):
+    ...

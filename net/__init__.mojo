@@ -1,4 +1,6 @@
 from algorithm import vectorize, parallelize, elementwise
+from time.time import perf_counter_ns, perf_counter, now
+import math
 from collections import (
     List,
     Dict,
@@ -26,9 +28,13 @@ from sys import (
     sizeof,
     bitwidthof,
 )
-import math
-from utils import StaticTuple, StaticIntTuple, StringSlice
-from utils._format import Formatter
+from utils import (
+    StaticTuple,
+    StaticIntTuple,
+    StringSlice,
+    Formatter,
+    Formattable,
+)
 from .tensor import *
 from .nn import *
 from .autograd import *

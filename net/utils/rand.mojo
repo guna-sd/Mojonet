@@ -5,15 +5,12 @@
 # This struct is designed for simplicity and performance in scenarios where high statistical quality is
 # not critical. For production use or applications requiring higher randomness quality, consider using MersenneTwister.
 
-import time
-
-
 struct randn:
     var _seed: Int
 
     @always_inline("nodebug")
     fn __init__(inout self):
-        self._seed = time.now()
+        self._seed = now()
 
     @always_inline("nodebug")
     fn __init__(inout self, seed: Int):
@@ -21,7 +18,7 @@ struct randn:
 
     @always_inline("nodebug")
     fn seed(inout self):
-        self._seed = time.now()
+        self._seed = now()
 
     @always_inline("nodebug")
     fn seed(inout self, seed: Int):
