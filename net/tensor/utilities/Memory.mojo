@@ -1,4 +1,5 @@
 from memory.unsafe_pointer import is_power_of_two, _free
+from memory.memory import memcpy, _malloc
 
 
 @value
@@ -18,7 +19,7 @@ struct DataPointer(
         self.device = Device()
 
     @always_inline
-    fn __init__(inout self, other: Self._pointer_type, device: Device):
+    fn __init__(inout self, owned other: Self._pointer_type, owned device: Device):
         self.address = other
         self.device = device
 
@@ -207,7 +208,7 @@ struct DataPointer(
         *,
         alignment: Int = 1,
     ](self: Self, offset: Int) -> SIMD[type, width]:
-        return (self + int(offset) * sizeof[type]()).load[type=type, width=width, alignment=alignment]()
+        return (self + int(offset)).load[type=type, width=width, alignment=alignment]()
 
     fn store[
         type: DType, //,
@@ -215,7 +216,14 @@ struct DataPointer(
         *,
         alignment: Int = 1,
     ](self: Self, offset: Int, owned value: SIMD[type, width]):
-        (self + int(offset) * sizeof[type]()).store[type=type, width=width, alignment=alignment](value)   
-    
+        (self + int(offset)).store[type=type, width=width, alignment=alignment](value)   
+
+    @always_inline
+    fn alloc[alignment: Int = 1,](owned self, count: Int) -> Self:
+        var ptr : UnsafePointer[UInt8] = UnsafePointer[UInt8]()
+        if self.device.is_cpu():
+           ptr = ptr.alloc(count)
+        return DataPointer(ptr, self.device)
+
     fn free(owned self):
         _free(self.address)
