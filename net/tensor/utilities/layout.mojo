@@ -5,6 +5,7 @@ alias kMkldnn = Layout.Mkldnn
 
 
 @value
+@register_passable("trivial")
 struct Layout(Stringable, Formattable, Representable, KeyElement):
     alias Strided = Layout(0)
     alias Sparse = Layout(1)

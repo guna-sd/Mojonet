@@ -9,15 +9,17 @@ alias Truncation = " ...,"
 alias CompactMaxElemsToPrint = 19
 alias CompactElemPerSide = 4
 
-@register_passable("trivial")
-struct shape:
-    alias maxrank = 26
-    alias shape_type = StaticIntTuple[Self.maxrank]
-
-    var shapes : Self.shape_type
+@value
+struct shape(Movable, Representable, Formattable, Stringable, Sized):
+    alias maxrank: Int = 26
+    var shapes : List[Int]
     """`shapes:` shapes of ndimensional tensors."""
-    var strides : Self.shape_type
+    var strides : List[Int]
     """`strides:` strides between ndimensional tensors."""
+    var layout: Layout
+    """`layout:` layout of the tensor."""
+    var is_contiguous : Bool
+    """`is_contiguous:` This field indicates whether the tensor is contiguous or not."""
     var rank : Int
     """`rank:` The number of dimensions in the tensor, also known as its rank."""
     var num_elements : Int
@@ -25,9 +27,11 @@ struct shape:
 
     @always_inline("nodebug")
     fn __init__(inout self):
-        self.shapes = StaticIntTuple[self.maxrank]()
-        self.strides = calculate_strides(self.shapes)
-        self.num_elements = num_elements(list(self.shapes, 0))
+        self.shapes = List[Int]()
+        self.strides = List[Int]()
+        self.layout = Layout.Strided
+        self.is_contiguous = True
+        self.num_elements = 0
         self.rank = 0
 
     @always_inline("nodebug")
@@ -36,11 +40,11 @@ struct shape:
             print("WARNING: max rank exceeded")
             print("number of elements must be equal or less then rank {26}")
             exit(1)
-        self.shapes = StaticIntTuple[self.maxrank]()
-        for i in range(len(shapes)):
-            self.shapes[i] = shapes[i]
+        self.shapes = shapes
         self.strides = calculate_strides(self.shapes)
-        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.layout = Layout.Strided
+        self.is_contiguous = True
+        self.num_elements = num_elements(self.shapes)
         self.rank = len(shapes)
 
     @always_inline("nodebug")
@@ -49,11 +53,11 @@ struct shape:
             print("WARNING: max rank exceeded")
             print("number of elements must be equal or less then rank {26}")
             exit(1)
-        self.shapes = StaticIntTuple[self.maxrank]()
-        for i in range(len(shapes)):
-            self.shapes[i] = shapes[i]
+        self.shapes = list(shapes)
         self.strides = calculate_strides(self.shapes)
-        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.layout = Layout.Strided
+        self.is_contiguous = True
+        self.num_elements = num_elements(self.shapes)
         self.rank = len(shapes)
 
     @always_inline("nodebug")
@@ -62,11 +66,13 @@ struct shape:
             print("WARNING: max rank exceeded")
             print("number of elements must be equal or less then rank {26}")
             exit(1)
-        self.shapes = StaticIntTuple[self.maxrank]()
+        self.shapes = List[Int]()
         for i in range(len(shapes)):
             self.shapes[i] = shapes[i]
         self.strides = calculate_strides(self.shapes)
-        self.num_elements = num_elements(list(self.shapes, len(shapes)))
+        self.layout = Layout.Strided
+        self.is_contiguous = True
+        self.num_elements = num_elements(self.shapes)
         self.rank = len(shapes)
     
     @always_inline("nodebug")
@@ -125,13 +131,19 @@ struct shape:
 
     @always_inline("nodebug")
     fn __str__(self : Self) -> String:
-        var buffer: String = "("
+        var output = String()
+        var writer = output._unsafe_to_formatter()
+        self.format_to(writer)
+        return output^
+
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        writer.write("(")
         for i in range(len(self)):
-            buffer+=str(self[i])
+            writer.write(str(self[i]))
             if i != len(self) - 1:
-                buffer+=", "
-        buffer += ")"
-        return buffer
+                writer.write(", ")
+        writer.write(")")
 
     @always_inline("nodebug")
     fn Strides(self : Self) -> List[Int]:
@@ -155,29 +167,10 @@ struct shape:
     @always_inline("nodebug")
     fn numofelements(self : Self) -> Int:
         return self.num_elements
-    
-    @always_inline("nodebug")
-    fn reduce(self) -> Int:
-        var ret : Int = 1
-        for i in (self.Shapes()):
-            ret *= i[]
-        return ret
-
-    @always_inline("nodebug")
-    fn offset(self : Self, *indices : Int) -> Int:
-      """Calculates the flat index for a variadic list of multi-dimensional indices."""
-        if indices.__len__() > self.__len__():
-          print("Number of indices must not exceed tensor dimension")
-          exit(1)
-        var offset = 0
-        var strides = self.strides
-        for i in range(indices.__len__()):
-          offset += indices[i] * strides[i]
-        return offset
 
     @always_inline("nodebug")
     fn offset(self : Self, indices : List[Int]) -> Int:
-      """Calculates the flat index for a variadic list of multi-dimensional indices."""
+      """Calculates the flat index for a list of multi-dimensional indices."""
         if indices.__len__() > self.__len__():
           print("Number of indices must not exceed tensor dimension")
           exit(1)
@@ -191,27 +184,47 @@ struct shape:
     fn indices(self : Self, idx : Int) -> List[Int]:
         """Converts a linear index into its corresponding multi-dimensional indices based on the shape."""
         return calculate_indices(self.shapes, idx)
+    
+    fn flatten(self) -> shape:
+        var new = shape(List[Int](self.num_elements), List[Int](1), self.layout, self.is_contiguous, 1, self.num_elements)
+        return new
+    
+    fn reshape(self: Self, new_shapes: List[Int]) -> shape:
+        var new_shape = shape(new_shapes)
+        if new_shape.num_elements != self.num_elements:
+            handle_issue("shapes should be the same size")
+        return new_shape
+    
+    fn transpose(self) -> shape:
+        if self.rank <= 1:
+            return self
+        var transposed_shapes = List[Int]()
+        for i in range(self.rank):
+            transposed_shapes[i] = self.shapes[self.rank - i - 1]
+        var transposed_strides = List[Int]()
+        var new_stride = 1
+        for i in range(self.rank - 1, -1, -1):
+            transposed_strides[i] = new_stride
+            new_stride *= self.shapes[i]
+        var new_is_contiguous = self.is_contiguous and (self.rank == 2) and (self.shapes[0] == self.num_elements)
 
+        return shape(
+            transposed_shapes, 
+            transposed_strides,
+            self.layout, 
+            new_is_contiguous, 
+            self.rank, 
+            self.num_elements
+            )
 
 @always_inline("nodebug")
-fn calculate_strides[size : Int](shapes : StaticIntTuple[size]) -> StaticIntTuple[size]:
+fn calculate_strides(shapes : List[Int]) -> List[Int]:
     var stride = 1
-    var strides = StaticIntTuple[size]()
+    var strides = List[Int]()
     for i in range(shapes.__len__() - 1, -1, -1):
         strides[i] = stride
         stride *= shapes[i]
     return strides
-
-
-@always_inline("nodebug")
-fn calculate_indices[size: Int](shape: StaticIntTuple[size], index: Int) -> List[Int]:
-    var idx = index
-    var indices = List[Int](capacity=size)
-    @parameter
-    for i in reversed(range(0,size)):
-        indices[i] = idx % shape[i]
-        idx //= shape[i]
-    return indices^
 
 
 @always_inline("nodebug")
@@ -337,17 +350,17 @@ fn list(shapes : VariadicList[Int])-> List[Int]:
     return list^
 
 @always_inline("nodebug")
-fn list[size : Int](shapes : StaticIntTuple[size], capacity : Int)-> List[Int]:
+fn list[size : Int](shapes : IndexList[size], capacity : Int)-> List[Int]:
     var list = List[Int](capacity=capacity)
     for i in range(capacity):
         list.append(shapes[i])
     return list^
 
 @always_inline("nodebug")
-fn list(*shapes : Int)-> List[Int]:
-    var list = List[Int](capacity=shapes.__len__())
+fn list[T: CollectionElement](*shapes : T)-> List[T]:
+    var list = List[T](capacity=shapes.__len__())
     for i in shapes:
-        list.append(i)
+        list.append(i[])
     return list^
 
 @always_inline("nodebug")
@@ -421,7 +434,7 @@ fn _format_scalar[
             size,
             value,
         )
-        var str_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](
+        var str_slice = StringSlice[lifetime=__lifetime_of(buf)](
             unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
         )
         writer.write_str(str_slice)
@@ -440,7 +453,7 @@ fn _format_scalar[
             size,
             value,
         )
-        var str_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](
+        var str_slice = StringSlice[lifetime=__lifetime_of(buf)](
             unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=wrote
         )
         var str_len = len(str(str_slice))
@@ -448,7 +461,7 @@ fn _format_scalar[
         if str_len < max_width:
             var pad_len = (int(max_width) - str_len) - (type_width)
             pad = pad * int(pad_len)
-            var pad_slice = StringSlice[is_mutable=False, lifetime=__lifetime_of(pad)](
+            var pad_slice = StringSlice[lifetime=__lifetime_of(pad)](
                 unsafe_from_utf8_ptr=pad.unsafe_ptr(), len=pad_len
             )
             writer.write_str(pad_slice)
@@ -457,7 +470,7 @@ fn _format_scalar[
 
 
 @always_inline("nodebug")
-fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = False](ptr : UnsafePointer[Scalar[type]], shape : shape, inout writer : Formatter):
+fn TensorPrinter[type : DType, // , print_type : Bool = False, print_shape : Bool = False](ptr : UnsafePointer[Scalar[type]], shape : shape, inout writer : Formatter):
     var rank = shape.rank
 
     writer.write(TensorStart)
@@ -522,12 +535,12 @@ fn TensorPrinter[type : DType, print_type : Bool = False, print_shape : Bool = F
 
     if print_type:
         var buf = (",  dtype: " + type.__repr__())
-        var typeslice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
+        var typeslice = StringSlice[lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
         writer.write_str(typeslice)
 
     if print_shape:
         var buf = (",  shape: "+shape.__repr__())
-        var shapeslice = StringSlice[is_mutable=False, lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
+        var shapeslice = StringSlice[lifetime=__lifetime_of(buf)](unsafe_from_utf8_ptr=buf.unsafe_ptr(), len=len(buf))
         writer.write_str(shapeslice)
 
     writer.write(TensorEnd)
@@ -540,33 +553,51 @@ struct __PrinterOptions:
     var threshold : FloatLiteral
     var edgeitems : Int
     var linewidth : Int
-    var sci_mode: Optional[Bool]
-    
-    fn __init__(inout self):
+    var max_width : Int
+    var sci_mode: Bool
+
+    fn __init__(inout self, sci_mode: Bool):
         self.precision = 4
         self.threshold = 1000
         self.edgeitems = 3
         self.linewidth = 80
-        self.sci_mode = None
+        self.max_width = 1
+        self.sci_mode = sci_mode
 
-alias PRINT_OPTS = __PrinterOptions()
 
 #TODO: still under construction...
-struct TensorFormatter:
-    var floating_dtype : Bool
-    var int_mode : Bool
-    var sci_mode : Bool
-    var max_width : Int
+@value
+struct TensorFormatter[Type: DType]:
+    var Format: __PrinterOptions
+    var tensor: Pointer[type=Tensor[Type], lifetime=ImmutableAnyLifetime]
 
-    fn __init__[T : DType](inout self, tensor : Tensor[T], sci_mode : Bool = False):
-        self.floating_dtype = tensor.type.is_floating_point()
-        self.int_mode = tensor.type.is_integral()
-        self.sci_mode = sci_mode
-        self.max_width = 1
-        
-        var tensor_view = tensor.list()
 
-        if not self.floating_dtype:
-            for value in tensor_view:
-                var value_str = str(value[])
-                self.max_width = max(self.max_width, len(value_str))
+    fn __init__(inout self, tensor : Pointer[Tensor[Type], ImmutableAnyLifetime], sci_mode : Bool = False):
+        self.Format = __PrinterOptions(sci_mode)
+        self.tensor = tensor
+    
+    @no_inline
+    fn format_to(self, inout writer: Formatter):
+        writer.write(TensorStart)
+        if self.tensor[].shape[].rank <=1:
+            if self.tensor[].shape[].rank == 1:
+                writer.write(SquareBracketL)
+                complete(self.tensor[].data.raw_ptr[], self.tensor[].shape[].num_elements, writer)
+                writer.write(SquareBracketR)
+            if self.tensor[].shape[].rank == 0:
+                writer.write(SquareBracketL+SquareBracketR)
+
+    fn __format_scalar(self, inout writer: Formatter):
+        ...
+
+    fn __format_int(self, inout writer: Formatter):
+        ...
+    
+    fn __format_float(self, inout writer: Formatter):
+        ...
+    
+    fn __format_double(self, inout writer: Formatter):
+        ...
+    
+    fn __format_1d(self, inout writer: Formatter):
+        ...

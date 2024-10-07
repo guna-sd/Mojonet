@@ -1,5 +1,7 @@
 from .device import Device
-from .Memory import DataPointer
+from .mem import DataPointer
 from .layout import Layout
-from .storageImpl import StorageImpl
-from .Allocater import Allocator
+from .storage import StorageImpl
+from .allocater import Allocator
+from memory.memory import triple_is_nvidia_cuda, alignof
+from .memutils import __sizeof, __alignment

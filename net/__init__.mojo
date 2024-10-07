@@ -30,7 +30,7 @@ from sys import (
 )
 from utils import (
     StaticTuple,
-    StaticIntTuple,
+    IndexList,
     StringSlice,
     Formatter,
     Formattable,

@@ -1,27 +1,33 @@
-from memory.unsafe_pointer import is_power_of_two, _free
-from memory.memory import memcpy, _malloc
-
-
 @value
 @register_passable("trivial")
-struct DataPointer(
-    Boolable, CollectionElement, Intable, Stringable, EqualityComparable
-):
-    alias _pointer_type = UnsafePointer[UInt8]
-    var address: Self._pointer_type
-    """The pointed-to address."""
-    var device: Device
-    """The device associated with."""
+struct DataPointer:
+    alias __ptr_type = UnsafePointer[UInt8]
+    alias Null = Self.__ptr_type()
+    var ptr: Self.__ptr_type
+    var dtype: DType
 
-    @always_inline
     fn __init__(inout self):
-        self.address = UnsafePointer[UInt8]()
-        self.device = Device()
+        self.dtype = DType.invalid
+        self.ptr = Self.Null
+    
+    fn __init__(inout self, dtype: DType):
+        self.dtype = dtype
+        self.ptr = Self.Null
+    
+    fn __init__(inout self, owned ptr: Self.__ptr_type, owned dtype: DType):
+        self.ptr = ptr
+        self.dtype = dtype
 
     @always_inline
-    fn __init__(inout self, owned other: Self._pointer_type, owned device: Device):
-        self.address = other
-        self.device = device
+    fn alloc(inout self, count: Int):
+        var sizeof_t : Int = __sizeof(self.dtype)
+        if sizeof_t == -1 or sizeof_t == 0:
+            handle_issue("DType invalid could not allocate memory")
+        if self.dtype == DType.uint8:
+            self.ptr = self.ptr.alloc(count)
+            return
+        self.ptr = self.ptr.alloc(sizeof_t * count)
+        return
 
     @no_inline
     fn __str__(self) -> String:
@@ -31,7 +37,7 @@ struct DataPointer(
             A String containing the hexadecimal representation of the memory location
             destination of this pointer.
         """
-        return str(self.address)
+        return str(self.ptr)
 
     @no_inline
     fn format_to(self, inout writer: Formatter):
@@ -51,7 +57,7 @@ struct DataPointer(
         Returns:
             Returns False if the DataPointer is *null* and True otherwise.
         """
-        return bool(self.address)
+        return bool(self.ptr)
 
     @always_inline
     fn __int__(self) -> Int:
@@ -60,7 +66,7 @@ struct DataPointer(
         Returns:
           The address of the pointer as an Int.
         """
-        return int(self.address)
+        return int(self.ptr)
 
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
@@ -72,7 +78,7 @@ struct DataPointer(
         Returns:
             True if the two pointers are equal and False otherwise.
         """
-        return self.address == rhs.address
+        return self.ptr == rhs.ptr
 
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
@@ -84,7 +90,7 @@ struct DataPointer(
         Returns:
             True if the two pointers are not equal and False otherwise.
         """
-        return self.address != rhs.address
+        return self.ptr != rhs.ptr
 
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
@@ -96,7 +102,7 @@ struct DataPointer(
         Returns:
             True if this pointer represents a lower address and False otherwise.
         """
-        return self.address < rhs.address
+        return self.ptr < rhs.ptr
 
     @always_inline("nodebug")
     fn offset[T: IntLike](self, idx: T) -> Self:
@@ -111,7 +117,7 @@ struct DataPointer(
         Returns:
             The new constructed DataPointer.
         """
-        return Self(self.address.offset(idx), self.device)
+        return Self(self.ptr.offset(idx), self.dtype)
 
     @always_inline("nodebug")
     fn __add__[T: IntLike](self, rhs: T) -> Self:
@@ -167,63 +173,12 @@ struct DataPointer(
         """
         self = self - rhs
 
+    fn __getitem__[
+        Type: CollectionElement,
+    ](self, offset: Int) -> Type:
+        return (self.ptr.bitcast[Type]() + offset)[]
 
-    @always_inline
-    fn is_aligned[alignment: Int](self) -> Bool:
-        """Checks if the pointer is aligned.
-
-        Parameters:
-            alignment: The minimal desired alignment.
-
-        Returns:
-            `True` if the pointer is at least `alignment`-aligned or `False`
-            otherwise.
-        """
-        constrained[
-            is_power_of_two(alignment), "alignment must be a power of 2."
-        ]()
-        return int(self) % alignment == 0
-
-    @always_inline("nodebug")
-    fn load[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = 1,
-    ](self) -> SIMD[type, width]:
-        return self.address.bitcast[type]().load[width=width, alignment=alignment]()
-
-    @always_inline("nodebug")
-    fn store[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = 1,
-    ](self, owned val: SIMD[type, width]):
-        self.address.bitcast[type]().store[width=width, alignment=alignment](val)
-
-    fn load[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = 1,
-    ](self: Self, offset: Int) -> SIMD[type, width]:
-        return (self + int(offset)).load[type=type, width=width, alignment=alignment]()
-
-    fn store[
-        type: DType, //,
-        width: Int = 1,
-        *,
-        alignment: Int = 1,
-    ](self: Self, offset: Int, owned value: SIMD[type, width]):
-        (self + int(offset)).store[type=type, width=width, alignment=alignment](value)   
-
-    @always_inline
-    fn alloc[alignment: Int = 1,](owned self, count: Int) -> Self:
-        var ptr : UnsafePointer[UInt8] = UnsafePointer[UInt8]()
-        if self.device.is_cpu():
-           ptr = ptr.alloc(count)
-        return DataPointer(ptr, self.device)
-
-    fn free(owned self):
-        _free(self.address)
+    fn __setitem__[
+        Type: CollectionElement
+    ](self, offset: Int, owned value: Type):
+        (self.ptr.bitcast[Type]() + offset).init_pointee_move(value)

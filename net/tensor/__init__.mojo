@@ -1,3 +1,3 @@
-from .utils import shape, TensorPrinter
-from .tensor import Tensor, TensorType, tensor
+from .utils import shape, TensorPrinter, list
+from ._tensor import Tensor #TensorType, tensor
 from .utilities import *
