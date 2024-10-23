@@ -1,4 +1,5 @@
 [project]
+authors = ["guna-sd <sdgunaseker@gmail.com>"]
 channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
 description = "Add a short description here"
 name = "Mojonet"
