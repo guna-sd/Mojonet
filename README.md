@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/net.png" alt="mojonet">
+  <img src="assets/mojonet.png" alt="mojonet">
 </div>
 
 > [!WARNING]
