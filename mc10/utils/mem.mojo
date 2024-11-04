@@ -1,3 +1,5 @@
+from mc10.core.Device import Device
+
 @value
 @register_passable("trivial")
 struct DataPointer(
@@ -5,7 +7,7 @@ struct DataPointer(
     CollectionElement,
     CollectionElementNew,
     Stringable,
-    Formattable,
+    Writable,
     Intable,
     Comparable,
 ):
@@ -55,7 +57,7 @@ struct DataPointer(
 
     @always_inline
     fn alloc(inout self, size: Int):
-        self.ptr = __malloc[NoneType](size)
+        self.ptr = rebind[UnsafePointer[NoneType]](__malloc[NoneType](size))
 
     # ===-------------------------------------------------------------------===#
     # Operator dunders
@@ -148,7 +150,7 @@ struct DataPointer(
         """
         self = self - rhs
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __eq__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are equal.
@@ -161,7 +163,7 @@ struct DataPointer(
         """
         return self.ptr == rhs.ptr
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ne__(self, rhs: Self) -> Bool:
         """Returns True if the two pointers are not equal.
@@ -174,7 +176,7 @@ struct DataPointer(
         """
         return self.ptr != rhs.ptr
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __lt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower address than rhs.
@@ -187,7 +189,7 @@ struct DataPointer(
         """
         return self.ptr < rhs.ptr
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __le__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a lower than or equal
@@ -201,7 +203,7 @@ struct DataPointer(
         """
         return int(self) <= int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __gt__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher address than rhs.
@@ -214,7 +216,7 @@ struct DataPointer(
         """
         return int(self) > int(rhs)
 
-    @__unsafe_disable_nested_lifetime_exclusivity
+    @__unsafe_disable_nested_origin_exclusivity
     @always_inline("nodebug")
     fn __ge__(self, rhs: Self) -> Bool:
         """Returns True if this pointer represents a higher than or equal
@@ -270,7 +272,7 @@ struct DataPointer(
         return str(self.ptr)
 
     @no_inline
-    fn format_to(self, inout writer: Formatter):
+    fn write_to[W: Writer](self, inout writer: W):
         """
         Formats this pointer address to the provided formatter.
 
@@ -290,7 +292,7 @@ struct DataPointer(
     
     @always_inline("nodebug")
     fn __set[Type: DType](inout self, owned value: Scalar[Type]):
-        self.ptr.bitcast[Type]().init_pointee_move(value)
+        self.ptr.bitcast[__type_of(value)]().init_pointee_move(value)
 
     @always_inline("nodebug")    
     fn __get[Type: DType](self) -> Scalar[Type]:
