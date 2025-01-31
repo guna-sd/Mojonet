@@ -1,4 +1,5 @@
 from mc10.core.Device import Device
+from memory import UnsafePointer
 
 @value
 @register_passable("trivial")
@@ -35,19 +36,19 @@ struct DataPointer(
     # Life cycle methods
     # ===-------------------------------------------------------------------===#
 
-    fn __init__(inout self):
+    fn __init__(out self):
         self.device = Device.CPU
         self.ptr = Self.Null
     
-    fn __init__(inout self, device: Device = Device.CPU):
+    fn __init__(out self, device: Device = Device.CPU):
         self.device = device
         self.ptr = Self.Null
     
-    fn __init__(inout self, owned ptr: Self.__ptr_type, owned device: Device):
+    fn __init__(out self, owned ptr: Self.__ptr_type, owned device: Device):
         self.ptr = ptr
         self.device = device
 
-    fn __init__(inout self: DataPointer, /, *, other: DataPointer) -> None:
+    fn __init__(out self: DataPointer, *, other: DataPointer):
         self.ptr = other.ptr
         self.device = other.device
 
@@ -56,7 +57,7 @@ struct DataPointer(
     # ===-------------------------------------------------------------------===#
 
     @always_inline
-    fn alloc(inout self, size: Int):
+    fn alloc(mut self, size: Int):
         self.ptr = rebind[UnsafePointer[NoneType]](__malloc[NoneType](size))
 
     # ===-------------------------------------------------------------------===#
@@ -70,7 +71,7 @@ struct DataPointer(
         Returns:
             A reference to the value.
         """
-        return self.ptr.bitcast[T]()[]
+        return self.ptr.bitcast[Scalar[T]]()[]
 
     @always_inline
     fn __getitem__[T : DType](ref[_]self, offset: Int) -> ref[self] Scalar[T]:
@@ -79,7 +80,7 @@ struct DataPointer(
         Returns:
             A reference to the value.
         """
-        return self.ptr.bitcast[T]()[offset]
+        return self.ptr.bitcast[Scalar[T]]()[offset]
 
     @always_inline("nodebug")
     fn offset[T: IntLike](self, idx: T) -> DataPointer:
@@ -296,13 +297,13 @@ struct DataPointer(
 
     @always_inline("nodebug")    
     fn __get[Type: DType](self) -> Scalar[Type]:
-        return self.ptr.bitcast[Type]()[]
+        return self.ptr.bitcast[Scalar[Type]]()[]
 
     @always_inline("nodebug")
     fn __set[Type: DType](inout self, offset: Int, owned value: Scalar[Type]):
-        (self.ptr.bitcast[Type]() + offset).destroy_pointee()
-        (self.ptr.bitcast[Type]() + offset).init_pointee_move(value)
+        (self.ptr.bitcast[Scalar[Type]]() + offset).destroy_pointee()
+        (self.ptr.bitcast[Scalar[Type]]() + offset).init_pointee_move(value)
 
     @always_inline("nodebug")    
     fn __get[Type: DType](self, offset: Int) -> Scalar[Type]:
-        return (self.ptr.bitcast[Type]() + offset)[]
+        return (self.ptr.bitcast[Scalar[Type]]() + offset)[]
