@@ -21,7 +21,7 @@ struct Device(Stringable, Writable, Representable, KeyElement):
     var value: Int8
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self = Device.CPU
 
     @no_inline

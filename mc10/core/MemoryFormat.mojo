@@ -9,7 +9,7 @@ struct MemoryFormat:
     var value: Int8
 
     @always_inline
-    fn __init__(inout self):
+    fn __init__(out self):
         self = MemoryFormat.Contiguous
     
     @no_inline
@@ -97,3 +97,8 @@ struct MemoryFormat:
     @always_inline("nodebug")
     fn is_numopts(self) -> Bool:
         return self == Self.NumOptions
+
+    @always_inline("nodebug")
+    @staticmethod
+    fn is_valid(value: Int8) -> Bool:
+        return value >= 0 and value < 4
