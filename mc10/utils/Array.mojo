@@ -43,7 +43,7 @@ fn _set_array_elem_copy[
     capacity: Int,
 ](
     index: Int,
-    owned element: type,
+    element: type,
     ref array: __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`],
 ):
     ptr = __mlir_op.`pop.array.gep`(
@@ -59,8 +59,7 @@ fn _create_array[
     array = Array[type, capacity]()
     array.size = len(storage)
 
-    @parameter
-    for idx in range(capacity):
+    for idx in range(len(storage)):
         _set_array_elem_move[type, capacity](idx, storage[idx], array.storage)
 
     __mlir_op.`lit.ownership.mark_destroyed`(__get_mvalue_as_litref(storage))
@@ -122,6 +121,8 @@ struct Array[Type: CollectionElement, capacity: Int]:
         )
         self = _create_array[Type, capacity](storage^)
 
+    @always_inline
+    @implicit
     fn __init__(out self, list: List[Type, _]):
         debug_assert(
             capacity == list.capacity,
@@ -199,6 +200,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
 
     fn list(read self) -> List[Self.Type, True]:
         var list = List[Self.Type, True](capacity=capacity)
+        list.size = self.size
 
         @parameter
         for i in range(capacity):
