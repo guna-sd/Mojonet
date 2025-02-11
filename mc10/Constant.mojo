@@ -92,17 +92,14 @@ struct Constant:
 
     @always_inline("nodebug")
     fn __str__(self) -> String:
-        string = String()
+        return String.write(self)
+
+    @always_inline("nodebug")
+    fn __repr__(self) -> String:
+        return String("constant(", self, ")")
+    
+    fn write_to[W: Writer](self, mut string: W):
         if self.__is_float__():
             string.write(self.__float__())
         else:
             string.write(self.__int__())
-        return string
-
-    @always_inline("nodebug")
-    fn __repr__(self) -> String:
-        string = String()
-        string.write("constant(")
-        string.write(self.__str__())
-        string.write(")")
-        return string
