@@ -24,14 +24,14 @@ struct MemoryFormat:
 
     @always_inline("nodebug")
     fn __repr__(self) -> String:
-        return "MemoryFormat." + str(self)
+        return "MemoryFormat." + String(self)
 
     @always_inline("nodebug")
     fn __hash__(self) -> UInt:
         return hash(UInt8(self.value.cast[DType.uint8]()))
     
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         if self == MemoryFormat.Contiguous:
             return writer.write("contiguous")
         if self == MemoryFormat.Preserve:

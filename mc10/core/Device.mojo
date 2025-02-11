@@ -40,7 +40,7 @@ struct Device(Stringable, Writable, Representable, KeyElement):
         Returns:
             The representation of the device.
         """
-        return "Device." + str(self)
+        return "Device." + String(self)
 
     @always_inline("nodebug")
     fn __hash__(self) -> UInt:
@@ -52,7 +52,7 @@ struct Device(Stringable, Writable, Representable, KeyElement):
         return hash(UInt8(self.value.cast[DType.uint8]()))
 
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         """
         Formats this device to the provided formatter.
 
