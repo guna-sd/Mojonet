@@ -1,6 +1,81 @@
 from mc10.__mlir import _toi64, MlirType
 from os import abort
+from mc10.utils.debuggable import asserts
 from math import Ceilable, CeilDivable, Floorable, Truncable
+
+
+@always_inline
+fn indexable[
+    Type: Sized, //, name: StringLiteral
+](idx: index, container: Type) -> index:
+    """
+    Ensures `idx` is within bounds and returns the indexed value.
+
+    Args:
+        idx : The index to access.
+        container : A sized container (array, list, etc.).
+
+    Returns:
+        Indexable in the container.
+    """
+
+    asserts(len(container) >= 0, "Container must have a valid size!")
+
+    asserts(
+        len(container) > 0,
+        "Attempting to index into an empty ",
+        name,
+        " container with 0 elements!",
+    )
+    if idx < 0:
+        abort(String("Index must be non-negative! Got idx: ") + idx.__str__())
+
+    if idx >= len(container):
+        abort(
+            String("Index out of bounds! Provided idx: ")
+            + idx.__str__()
+            + String(" is larger than container length: ")
+            + len(container).__str__()
+        )
+
+    return idx
+
+
+@always_inline
+fn indexable[
+    Type: Sized, //, name: StringLiteral
+](idx: Int, container: Type) -> Int:
+    """
+    Ensures `idx` is within bounds and returns the indexed value.
+
+    Args:
+        idx : The index to access.
+        container : A sized container (array, list, etc.).
+
+    Returns:
+        Indexable in the container.
+    """
+
+    asserts(len(container) >= 0, "Container must have a valid size!")
+
+    asserts(
+        len(container) > 0,
+        "Attempting to index into an empty ",
+        name,
+        " container with 0 elements!",
+    )
+    if idx < 0:
+        abort(String("Index must be non-negative! Got idx: ") + idx.__str__())
+
+    if idx >= len(container):
+        abort(
+            String("Index out of bounds! Provided idx: ")
+            + idx.__str__()
+            + String(" is larger than container length: ")
+            + len(container).__str__()
+        )
+
+    return idx
 
 
 @value
@@ -59,30 +134,30 @@ struct index(
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: Int64):
-        self.value = value.__mlir_index__()
+        self.value = value.__index__()
 
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: Int32):
-        self = value.__mlir_index__()
+        self = value.__index__()
 
     @always_inline("nodebug")
     @implicit
     fn __init__[T: DType](out self, value: Scalar[T]):
-        self = value.__mlir_index__()
+        self = value.__index__()
 
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: Int):
-        self = value.__mlir_index__()
+        self = value.__index__()
 
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: UInt):
-        self = value.__mlir_index__()
+        self = value.__index__()
 
     @always_inline("nodebug")
-    fn __mlir_index__(self) -> __mlir_type.index:
+    fn __index__(self) -> Self.Type:
         return self.value
 
     @always_inline("nodebug")
@@ -301,7 +376,7 @@ struct index(
 
     @always_inline("nodebug")
     fn __int__(self) -> Int:
-        return Int(self.__mlir_index__())
+        return Int(self.value)
 
     @always_inline("nodebug")
     fn __abs__(self) -> Self:

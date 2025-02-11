@@ -1,23 +1,7 @@
-from collections._index_normalization import normalize_index
 from memory import UnsafePointer, bitcast
-from mc10.__mlir import (
-    _mlirtype_is_eq,
-    _type_is_eq,
-    is_trivial,
-    implements,
-    int,
-    long,
-    float,
-    double,
-)
-from utils import StaticTuple
-from os import abort
-
-alias ByteArray = Array[Byte, *_]
-alias IntArray = Array[int, *_]
-alias LongArray = Array[long, *_]
-alias FloatArray = Array[float, *_]
-alias DoubleArray = Array[double, *_]
+from mc10.__mlir import _type_is_eq
+from mc10.utils.index import indexable
+from mc10.utils.debuggable import asserts
 
 
 @always_inline
@@ -67,6 +51,29 @@ fn _create_array[
     return array
 
 
+@always_inline
+fn _create_array[
+    type: AnyTrivialRegType, size: Int
+](storage: VariadicList[type]) -> __mlir_type[
+    `!pop.array<`, size.value, `, `, type, `>`
+]:
+    if len(storage) == 1:
+        return __mlir_op.`pop.array.repeat`[
+            _type = __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+        ](storage[0])
+
+    asserts(size == len(storage), "mismatch in the number of elements")
+
+    var array: __mlir_type[`!pop.array<`, size.value, `, `, type, `>`]
+    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(array))
+
+    @parameter
+    for idx in range(size):
+        _set_array_elem_copy[type, size](idx, storage[idx], array)
+
+    return array
+
+
 fn _init_array_default[
     capacity: Int, type: CollectionElement
 ](default: type) -> __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`]:
@@ -84,7 +91,6 @@ fn _array_construction_checks[size: Int]():
 
 
 @value
-@register_passable("trivial")
 struct Array[Type: CollectionElement, capacity: Int]:
     alias __array_type = __mlir_type[
         `!pop.array<`, Self.capacity.value, `, `, Self.Type, `>`
@@ -115,7 +121,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
 
     @always_inline
     fn __init__(out self, owned storage: VariadicListMem[Self.Type, _]):
-        debug_assert(
+        asserts(
             len(storage) <= capacity,
             "number of elements in storage is too large",
         )
@@ -124,7 +130,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
     @always_inline
     @implicit
     fn __init__(out self, list: List[Type, _]):
-        debug_assert(
+        asserts(
             capacity == list.capacity,
             "mismatch in the number of elements in the list",
         )
@@ -176,16 +182,9 @@ struct Array[Type: CollectionElement, capacity: Int]:
 
     @always_inline
     fn unsafe_get(ref self, index: Int) -> ref [self.storage] Self.Type:
-        debug_assert(
-            -self.size <= index < self.size,
-            " Array.unsafe_get() index out of bounds: ",
-            index,
-            " should be less than: ",
-            capacity,
-        )
         var ptr = __mlir_op.`pop.array.gep`(
             UnsafePointer.address_of(self.storage).address,
-            index.value,
+            indexable["Array"](index, self).value,
         )
         return UnsafePointer(ptr)[]
 
@@ -206,34 +205,6 @@ struct Array[Type: CollectionElement, capacity: Int]:
         for i in range(capacity):
             list[i] = self[i]
         return list^
-
-    fn toString[
-        T: RepresentableCollectionElement
-    ](read self: Array[T, *_]) -> String:
-        var string = String()
-        string.write("[")
-
-        for i in range(capacity):
-            if i >= self.size:
-                string.write("null")
-            else:
-                string.write(repr(self[i]))
-            if i < capacity - 1:
-                string.write(", ")
-        string.write("]")
-        return string
-
-    @no_inline
-    fn __str__[
-        T: RepresentableCollectionElement, //
-    ](self: Array[T, *_]) -> String:
-        return self.toString()
-
-    @no_inline
-    fn __repr__[
-        T: RepresentableCollectionElement, //
-    ](self: Array[T, *_]) -> String:
-        return self.__str__()
 
 
 struct Arrays:
@@ -259,3 +230,20 @@ struct Arrays:
             if i[] < min:
                 min = i[]
         return min
+
+    @staticmethod
+    fn toString[
+        T: WritableCollectionElement
+    ](read self: Array[T, *_]) -> String:
+        var string = String()
+        string.write("[")
+
+        for i in range(self.capacity):
+            if i >= self.size:
+                string.write("null")
+            else:
+                string.write(self[i])
+            if i < self.capacity - 1:
+                string.write(", ")
+        string.write("]")
+        return string

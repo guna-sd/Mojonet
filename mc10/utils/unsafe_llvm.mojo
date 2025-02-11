@@ -179,11 +179,11 @@ struct LLvmPointer[
 
     @no_inline
     fn __str__(self) -> String:
-        return hex(self.__int__().__int__())
+        return String.write(self)
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(str(self))
+        writer.write(hex(self.__int__().__int__()))
 
     @always_inline
     fn offset(self, idx: int) -> Self:

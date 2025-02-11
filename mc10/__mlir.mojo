@@ -9,10 +9,20 @@ from _mlir._c.BuiltinTypes import (
 )
 
 
+fn newRuntime() -> UnsafePointer[NoneType]:
+    return external_call[
+        "KGEN_CompilerRT_AsyncRT_CreateRuntime", UnsafePointer[NoneType]
+    ](0)
+
+
 fn getRuntime() -> UnsafePointer[NoneType]:
     return external_call[
         "KGEN_CompilerRT_AsyncRT_GetCurrentRuntime", UnsafePointer[NoneType]
     ]()
+
+
+fn delRuntime(ptr: UnsafePointer[NoneType]):
+    external_call["KGEN_CompilerRT_AsyncRT_DestroyRuntime", NoneType](ptr)
 
 
 fn newMlirContext() -> MlirContext:
@@ -59,6 +69,10 @@ fn _tosi8(val: Int8) -> __mlir_type.si8:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.si8](val.value)
 
 
+fn _tosi16(val: Int16) -> __mlir_type.si16:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.si16](val.value)
+
+
 fn _tosi32(val: Int32) -> __mlir_type.si32:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.si32](val.value)
 
@@ -69,6 +83,10 @@ fn _tosi64(val: Int64) -> __mlir_type.si64:
 
 fn _toi8(val: Int8) -> __mlir_type.i8:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i8](val.value)
+
+
+fn _toi16(val: Int16) -> __mlir_type.i16:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i16](val.value)
 
 
 fn _toi32(val: Int32) -> __mlir_type.i32:
@@ -83,12 +101,32 @@ fn _toui8(val: UInt8) -> __mlir_type.ui8:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui8](val.value)
 
 
+fn _toui16(val: UInt16) -> __mlir_type.ui16:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui16](val.value)
+
+
 fn _toui32(val: UInt32) -> __mlir_type.ui32:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui32](val.value)
 
 
 fn _toui64(val: UInt64) -> __mlir_type.ui64:
     return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.ui64](val.value)
+
+
+fn _tof16(val: Float16) -> __mlir_type.f16:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.f16](val.value)
+
+
+fn _tof32(val: Float32) -> __mlir_type.f32:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.f32](val.value)
+
+
+fn _tof64(val: Float64) -> __mlir_type.f64:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.f64](val.value)
+
+
+fn _tobf16(val: BFloat16) -> __mlir_type.bf16:
+    return __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.bf16](val.value)
 
 
 fn _fromi8(val: __mlir_type.i8) -> Int8:
@@ -128,26 +166,32 @@ fn _fromui64(val: __mlir_type.ui64) -> UInt64:
 
 
 fn vector1d(val: Int32) -> __mlir_type.`vector<1xi32>`:
-    var vec :  __mlir_type.`vector<1xi32>`
+    var vec: __mlir_type.`vector<1xi32>`
     __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(vec))
-    return __mlir_op.`llvm.insertelement`[_type = __type_of(vec)](vec, _toi32(val), _toi32(0))
+    return __mlir_op.`llvm.insertelement`[_type = __type_of(vec)](
+        vec, _toi32(val), _toi32(0)
+    )
 
 
-trait MlirType:
+trait MlirType(CollectionElement):
     alias Type: AnyTrivialRegType
 
+
+@register_passable("trivial")
 struct i8(MlirType):
     alias Type = __mlir_type.i8
-    
+
+
+@register_passable("trivial")
 struct i16(MlirType):
     alias Type = __mlir_type.i16
 
+
+@register_passable("trivial")
 struct i32(MlirType):
     alias Type = __mlir_type.i32
 
+
+@register_passable("trivial")
 struct i64(MlirType):
     alias Type = __mlir_type.i64
-
-
-struct memref[Type: MlirType = i32]:
-    var mem : __mlir_type[`memref<*x`, i32.Type, `>`]
