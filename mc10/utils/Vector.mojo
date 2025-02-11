@@ -1,6 +1,6 @@
 from _mlir.builtin_types import DialectType, FunctionType, MLIR_func, Context, Type
-from _mlir.builtin_attributes import Attribute, BoolAttr, TypeAttr, StringAttr, DialectAttribute, BuiltinAttributes, StringRef, BuiltinTypes
-from _mlir.diagnostics import _to_string, DiagnosticSeverity, MlirLogicalResult
+from _mlir.builtin_attributes import Attribute, BoolAttr, TypeAttr, StringAttr, DialectAttribute, BuiltinAttributes, BuiltinTypes
+from _mlir.diagnostics import DiagnosticSeverity, MlirLogicalResult
 from _mlir.ir import NamedAttribute, _WriteState, Dialect, DialectHandle, DialectRegistry, Location, Operation, _OpBuilderList, IR, Region, Value, Block, Module
 from _mlir.rewrite import Rewriter
 from sys.ffi import _Global, _mlirtype_is_eq
@@ -74,10 +74,10 @@ struct DataTypes(AnyType):
 
     @no_inline
     fn __repr__(self) -> String:
-        return "MLIRType." + str(self)
+        return "MLIRType." + String(self)
     
     @no_inline
-    fn write_to[W: Writer](self, inout writer: W):
+    fn write_to[W: Writer](self, mut writer: W):
         if _mlirtype_is_eq[__type_of(self.value), __type_of(Self.i8.value)]():
             writer.write("i8")
         elif _mlirtype_is_eq[__type_of(self.value), __type_of(Self.i16.value)]():

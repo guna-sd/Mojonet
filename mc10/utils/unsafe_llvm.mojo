@@ -4,8 +4,6 @@ from sys.info import is_gpu, alignof
 from memory import UnsafePointer
 from mc10.utils.Int import int
 
-alias _must_be_mut_err = "Pointer must be mutable for this operation"
-
 
 @value
 @register_passable("trivial")
