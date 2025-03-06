@@ -1,5 +1,5 @@
-from mc10.__mlir import _toi64, MlirType
-from os import abort
+from mc10.__mlir import _toi32, MlirType
+from mc10.utils.debuggable import abort
 from math import Ceilable, CeilDivable, Floorable, Truncable
 
 
@@ -21,13 +21,14 @@ struct int(
 ):
     alias MAX = Self(Scalar[DType.int32].MAX)
     alias MIN = Self(Scalar[DType.int32].MIN)
-    alias Type = __mlir_type.i64
+    alias Type = __mlir_type.i32
+    alias elem_type = DType.int32
 
     var value: Self.Type
 
     @always_inline("nodebug")
     fn __init__(out self):
-        self.value = __mlir_attr.`0:i64`
+        self.value = __mlir_attr.`0:i32`
 
     @always_inline("nodebug")
     fn __init__(out self: Self, *, other: Self):
@@ -35,13 +36,13 @@ struct int(
 
     @always_inline("nodebug")
     @implicit
-    fn __init__(out self, value: __mlir_type.i64):
+    fn __init__(out self, value: __mlir_type.i32):
         self.value = value
 
     @always_inline("nodebug")
     @implicit
     fn __init__(out self, value: __mlir_type.index):
-        self.value = __mlir_op.`index.casts`[_type = __mlir_type.i64](value)
+        self.value = __mlir_op.`index.casts`[_type = __mlir_type.i32](value)
 
     @always_inline("nodebug")
     @implicit
@@ -50,18 +51,13 @@ struct int(
 
     @always_inline("nodebug")
     @implicit
-    fn __init__(out self, value: __mlir_type.`!pop.scalar<i64>`):
-        self = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i64](value)
-
-    @always_inline("nodebug")
-    @implicit
-    fn __init__(out self, value: __mlir_type.`!pop.scalar<si64>`):
-        self = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i64](value)
-
-    @always_inline("nodebug")
-    @implicit
     fn __init__(out self, value: __mlir_type.`!pop.scalar<i32>`):
-        self = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i64](value)
+        self = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i32](value)
+
+    @always_inline("nodebug")
+    @implicit
+    fn __init__(out self, value: __mlir_type.`!pop.scalar<si32>`):
+        self = __mlir_op.`pop.cast_to_builtin`[_type = __mlir_type.i32](value)
 
     @always_inline("nodebug")
     @implicit
@@ -70,18 +66,8 @@ struct int(
 
     @always_inline("nodebug")
     @implicit
-    fn __init__(out self, value: Int64):
-        self.value = _toi64(value)
-
-    @always_inline("nodebug")
-    @implicit
     fn __init__(out self, value: Int32):
-        self = value.cast[DType.int64]()
-
-    @always_inline("nodebug")
-    @implicit
-    fn __init__[T: DType](out self, value: Scalar[T]):
-        self = Self(value.cast[DType.int32]())
+        self.value = _toi32(value)
 
     @always_inline("nodebug")
     @implicit
@@ -147,25 +133,25 @@ struct int(
         # return __mlir_op.`index.add`(
         #     self.__mlir_index__(), rhs.__mlir_index__()
         # )
-        return __mlir_op.`llvm.add`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.add`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
     @always_inline("nodebug")
     fn __sub__(self, rhs: Self) -> Self:
-        return __mlir_op.`llvm.sub`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.sub`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
     @always_inline("nodebug")
     fn __mul__(self, rhs: Self) -> Self:
-        return __mlir_op.`llvm.mul`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.mul`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
     @always_inline("nodebug")
     fn __truediv__(self, rhs: Self) -> Self:
-        return __mlir_op.`llvm.sdiv`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.sdiv`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
@@ -177,7 +163,7 @@ struct int(
 
     @always_inline("nodebug")
     fn __mod__(self, rhs: Self) -> Self:
-        return __mlir_op.`llvm.srem`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.srem`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
@@ -204,7 +190,7 @@ struct int(
         """Return `self << rhs`."""
         if rhs < 0:
             abort("Shift cannot be negative.")
-        return __mlir_op.`llvm.shl`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.shl`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 
@@ -213,7 +199,7 @@ struct int(
         """Return `self >> rhs`."""
         if rhs < 0:
             abort("Shift cannot be negative.")
-        return __mlir_op.`llvm.shr`[_type = __mlir_type.i64](
+        return __mlir_op.`llvm.shr`[_type = __mlir_type.i32](
             self.value, rhs.value
         )
 

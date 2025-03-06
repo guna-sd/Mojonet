@@ -1,17 +1,21 @@
 from sys.ffi import external_call, _mlirtype_is_eq
-from mc10.__mlir import _toi32, _toi8, vector1d, MlirType, i8
+from mc10.__mlir import _toi32, _toi8, vector1d, MlirType, i8, i32, i64
 from sys.info import is_gpu, alignof
 from memory import UnsafePointer
 from mc10.utils.Int import int
+from mc10.utils.debuggable import asserts
+
+from memory.pointer import _GPUAddressSpace
 
 
 @value
 @register_passable("trivial")
 struct LLvmPointer[
+    address_space: AddressSpace = AddressSpace(1),
     mut: Bool = True,
     origin: Origin[mut] = Origin[mut].cast_from[MutableAnyOrigin].result,
 ]:
-    alias __ptr_type = __mlir_type.`!llvm.ptr`
+    alias __ptr_type = __mlir_type.`!llvm.ptr<0>`
 
     # ===-------------------------------------------------------------------===#
     # Fields
@@ -50,6 +54,62 @@ struct LLvmPointer[
         self.address = address
         self.dtype = DType.int8
 
+    @doc_private
+    @always_inline
+    @implicit
+    fn __init__(out self, address: __mlir_type.`!llvm.ptr<1>`):
+        """Create a pointer with address.
+
+        Args:
+            address: The MLIR value of the pointer to construct with.
+        """
+        self.address = __mlir_op.`builtin.unrealized_conversion_cast`[
+            _type = Self.__ptr_type
+        ](address)
+        self.dtype = DType.int8
+
+    @doc_private
+    @always_inline
+    @implicit
+    fn __init__(out self, address: __mlir_type.`!llvm.ptr<3>`):
+        """Create a pointer with address.
+
+        Args:
+            address: The MLIR value of the pointer to construct with.
+        """
+        self.address = __mlir_op.`builtin.unrealized_conversion_cast`[
+            _type = Self.__ptr_type
+        ](address)
+        self.dtype = DType.int8
+
+    @doc_private
+    @always_inline
+    @implicit
+    fn __init__(out self, address: __mlir_type.`!llvm.ptr<4>`):
+        """Create a pointer with address.
+
+        Args:
+            address: The MLIR value of the pointer to construct with.
+        """
+        self.address = __mlir_op.`builtin.unrealized_conversion_cast`[
+            _type = Self.__ptr_type
+        ](address)
+        self.dtype = DType.int8
+
+    @doc_private
+    @always_inline
+    @implicit
+    fn __init__(out self, address: __mlir_type.`!llvm.ptr<5>`):
+        """Create a pointer with address.
+
+        Args:
+            address: The MLIR value of the pointer to construct with.
+        """
+        self.address = __mlir_op.`builtin.unrealized_conversion_cast`[
+            _type = Self.__ptr_type
+        ](address)
+        self.dtype = DType.int8
+
     @always_inline
     fn copy(self) -> Self:
         """Copy an existing pointer.
@@ -71,8 +131,8 @@ struct LLvmPointer[
         """
         var __size = _toi32(Int32(size))
         alias __alignment = _toi8(Int8(alignment))
-        var ptr: Self.__ptr_type = __mlir_op.`llvm.alloca`[
-            _type = Self.__ptr_type,
+        var ptr = __mlir_op.`llvm.alloca`[
+            _type = __mlir_type.`!llvm.ptr<1>`,
             _alignment=__alignment,
             elem_type = __mlir_attr[type.Type],
         ](__size)
@@ -173,7 +233,7 @@ struct LLvmPointer[
 
     @always_inline
     fn __int__(self) -> int:
-        return __mlir_op.`llvm.ptrtoint`[_type = __mlir_type.i64](self.address)
+        return __mlir_op.`llvm.ptrtoint`[_type = __mlir_type.i32](self.address)
 
     @no_inline
     fn __str__(self) -> String:
@@ -198,6 +258,6 @@ struct LLvmPointer[
     # ===-------------------------------------------------------------------===#
 
     # not working trying to figure out how to!!
-    # @staticmethod
-    # fn castAddressspace[dest_addr: int](self) -> Self:
-    #     return __mlir_op.`llvm.addrspacecast`[_type = __mlir_type.`!llvm.ptr<1>`](self.address)
+    @staticmethod
+    fn castAddressspace[dest_addr: int](self) -> Self:
+        return __mlir_op.`llvm.addrspacecast`[_type = __mlir_type.`!llvm.ptr<1>`](self.address)

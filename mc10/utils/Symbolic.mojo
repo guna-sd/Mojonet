@@ -1,50 +1,73 @@
 from memory import ArcPointer
-from utils import Variant
 from mc10.__mlir import long, double, bool
 from collections import Optional
+from os import Atomic
 
 
 @value
+@register_passable("trivial")
 struct SymNodeImpl:
-    var value: Variant[long, double, bool]
+    alias __mlir_type = __mlir_type[
+        `!kgen.variant<`,
+        long,
+        `,`,
+        double,
+        `,`,
+        bool,
+        `>`,
+    ]
+    var value: Self.__mlir_type
 
     fn __init__(out self):
-        self.value = Variant[long, double, bool](None)
+        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
     fn __init__(out self, owned value: long):
-        self.value = value
+        self.value = __mlir_op.`kgen.variant.create`[
+            _type = Self.__mlir_type, index = Int(0).value
+        ](value)
 
     fn __init__(out self, owned value: double):
-        self.value = value
+        self.value = __mlir_op.`kgen.variant.create`[
+            _type = Self.__mlir_type, index = Int(1).value
+        ](value)
 
     fn __init__(out self, owned value: bool):
-        self.value = value
+        self.value = __mlir_op.`kgen.variant.create`[
+            _type = Self.__mlir_type, index = Int(2).value
+        ](value)
 
-    fn is_int(read self) -> bool:
-        return self.value.isa[long]()
+    fn is_int(read self) -> Bool:
+        return __mlir_op.`kgen.variant.is`[index = Int(0).value](self.value)
 
-    fn is_float(read self) -> bool:
-        return self.value.isa[double]()
+    fn is_float(read self) -> Bool:
+        return __mlir_op.`kgen.variant.is`[index = Int(1).value](self.value)
 
-    fn is_bool(read self) -> bool:
-        return self.value.isa[bool]()
-
-    fn get_bool(read self) -> Optional[bool]:
-        if self.is_bool():
-            return self.value.unsafe_get[bool]()
-        return None
+    fn is_bool(read self) -> Bool:
+        return __mlir_op.`kgen.variant.is`[index = Int(2).value](self.value)
 
     fn get_int(read self) -> Optional[long]:
         if self.is_int():
-            return self.value.unsafe_get[long]()
+            return __mlir_op.`kgen.variant.get`[index = Int(0).value](
+                self.value
+            )
         return None
 
     fn get_float(read self) -> Optional[double]:
         if self.is_float():
-            return self.value.unsafe_get[double]()
+            return __mlir_op.`kgen.variant.get`[index = Int(1).value](
+                self.value
+            )
+        return None
+
+    fn get_bool(read self) -> Optional[bool]:
+        if self.is_bool():
+            return __mlir_op.`kgen.variant.get`[index = Int(2).value](
+                self.value
+            )
         return None
 
 
+@value
 struct SymNode:
     var impl: ArcPointer[SymNodeImpl]
 

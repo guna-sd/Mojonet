@@ -165,33 +165,42 @@ fn _fromui64(val: __mlir_type.ui64) -> UInt64:
     return __mlir_op.`index.casts`[_type = __mlir_type.index](val)
 
 
-fn vector1d(val: Int32) -> __mlir_type.`vector<1xi32>`:
-    var vec: __mlir_type.`vector<1xi32>`
-    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(vec))
-    return __mlir_op.`llvm.insertelement`[_type = __type_of(vec)](
-        vec, _toi32(val), _toi32(0)
+fn vector1d(val: Int32, out vector: __mlir_type.`vector<1xi32>`):
+    __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(vector))
+    return __mlir_op.`llvm.insertelement`[_type = __type_of(vector)](
+        vector, _toi32(val), _toi32(0)
     )
 
 
 trait MlirType(CollectionElement):
     alias Type: AnyTrivialRegType
+    alias elem_type: DType
 
 
 @register_passable("trivial")
 struct i8(MlirType):
     alias Type = __mlir_type.i8
+    alias elem_type = DType.int8
 
 
 @register_passable("trivial")
 struct i16(MlirType):
     alias Type = __mlir_type.i16
+    alias elem_type = DType.int16
 
 
 @register_passable("trivial")
 struct i32(MlirType):
     alias Type = __mlir_type.i32
+    alias elem_type = DType.int32
 
 
 @register_passable("trivial")
 struct i64(MlirType):
     alias Type = __mlir_type.i64
+    alias elem_type = DType.int64
+
+
+alias value = __mlir_type[
+    `!pop.union<`, __mlir_type.i64, `,`, __mlir_type.f64, `>`
+]

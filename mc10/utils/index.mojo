@@ -1,6 +1,5 @@
 from mc10.__mlir import _toi64, MlirType
-from os import abort
-from mc10.utils.debuggable import asserts
+from mc10.utils.debuggable import asserts, abort
 from math import Ceilable, CeilDivable, Floorable, Truncable
 
 
@@ -95,6 +94,7 @@ struct index(
     Truncable,
 ):
     alias Type = __mlir_type.index
+    alias elem_type = DType.index
 
     var value: Self.Type
 

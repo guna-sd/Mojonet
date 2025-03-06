@@ -87,6 +87,14 @@ fn __assert(messages: VariadicPack[_, Writable, *_], loc: _SourceLocation):
     if defined_mode != "warn":
         abort()
 
+@no_inline
+fn __abort(messages: VariadicPack[_, Writable, *_]):
+    var stdout = FileDescriptor(1)
+    var buffer = _WriteBufferStack[4096](stdout)
+    write_args(buffer, messages, end="\n")
+    buffer.flush()
+    abort()
+
 
 @always_inline
 fn asserts[*Ts: Writable, cond: Bool](*messages: *Ts):
@@ -104,6 +112,9 @@ fn asserts[*Ts: Writable](cond: Bool, *messages: *Ts):
     var loc: _SourceLocation = __call_location()
     __assert(messages, loc)
 
+@always_inline
+fn abort[*Ts: Writable](*messages: *Ts):
+    __abort(messages)
 
 # TODO: still under construction...
 fn capture_backtrace():

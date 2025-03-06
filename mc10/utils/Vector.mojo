@@ -9,6 +9,7 @@ alias a = BuiltinTypes.mlirContextCreate()
 alias f162 = (BuiltinTypes.mlirF16TypeGet(a))
 alias asa = Type(f162)
 
+
 struct DataType:
     alias typecontext = BuiltinTypes.mlirContextCreate()
     alias i8 = Self(BuiltinTypes.mlirIntegerTypeGet(Self.typecontext, 8))
