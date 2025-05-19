@@ -1,15 +1,16 @@
 [project]
 authors = ["guna-sd <sdgunaseker@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
-description = "Add a short description here"
+channels = ["conda-forge", "https://conda.modular.com/max-nightly", "https://repo.prefix.dev/modular-community"]
+description = "A deep learning framework in mojo🔥"
 name = "Mojonet"
-platforms = ["linux-64"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
 version = "0.1.0"
 
 [tasks]
 
 [dependencies]
-max = ">=24.6.0.dev2024090905,<25"
-python = "==3.12.5"
-tqdm = "==4.66.5"
-requests = "==2.32.3"
+lit = ">=20.1.5,<21"
+max = ">=25.4.0.dev2025051718,<26"
+python = ">=3.13.3,<3.14"
+tqdm = ">=4.67.1,<5"
+requests = ">=2.32.3,<3"

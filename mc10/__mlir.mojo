@@ -1,5 +1,5 @@
 from sys.intrinsics import _mlirtype_is_eq, _type_is_eq
-from sys.ffi import _get_global_or_null, external_call
+from sys.ffi import external_call
 from os import abort
 from memory import UnsafePointer
 from _mlir._c.BuiltinTypes import (
@@ -7,22 +7,6 @@ from _mlir._c.BuiltinTypes import (
     mlirContextCreate,
     mlirContextDestroy,
 )
-
-
-fn newRuntime() -> UnsafePointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_AsyncRT_CreateRuntime", UnsafePointer[NoneType]
-    ](0)
-
-
-fn getRuntime() -> UnsafePointer[NoneType]:
-    return external_call[
-        "KGEN_CompilerRT_AsyncRT_GetCurrentRuntime", UnsafePointer[NoneType]
-    ]()
-
-
-fn delRuntime(ptr: UnsafePointer[NoneType]):
-    external_call["KGEN_CompilerRT_AsyncRT_DestroyRuntime", NoneType](ptr)
 
 
 fn newMlirContext() -> MlirContext:
@@ -40,8 +24,7 @@ alias size_t = UInt64
 alias float = Float32
 alias double = Float64
 alias bool = Scalar[DType.bool]
-alias _AnyTypeMetaType = __mlir_type[`!lit.anytrait<`, AnyType, `>`]
-
+alias AnyTrait = __type_of(AnyType)
 
 struct AnyStruct[T: AnyType]:
     @implicit
@@ -49,11 +32,11 @@ struct AnyStruct[T: AnyType]:
         ...
 
 
-fn implements[T2: _AnyTypeMetaType, T: T2]() -> Bool:
+fn implements[T2: AnyTrait, T: T2]() -> Bool:
     return True
 
 
-fn implements[T2: _AnyTypeMetaType, T: AnyStruct]() -> Bool:
+fn implements[T2: AnyTrait, T: AnyStruct]() -> Bool:
     return False
 
 
@@ -172,7 +155,7 @@ fn vector1d(val: Int32, out vector: __mlir_type.`vector<1xi32>`):
     )
 
 
-trait MlirType(CollectionElement):
+trait MlirType(Copyable & Movable):
     alias Type: AnyTrivialRegType
     alias elem_type: DType
 
@@ -199,8 +182,3 @@ struct i32(MlirType):
 struct i64(MlirType):
     alias Type = __mlir_type.i64
     alias elem_type = DType.int64
-
-
-alias value = __mlir_type[
-    `!pop.union<`, __mlir_type.i64, `,`, __mlir_type.f64, `>`
-]

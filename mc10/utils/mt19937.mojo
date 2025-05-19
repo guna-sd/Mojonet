@@ -1,3 +1,6 @@
+from mc10.types.DTypeArray import DTypeArray
+from mc10.utils.time import now
+
 alias MERSENNE_STATE_N = 624
 alias MERSENNE_STATE_M = 397
 alias MATRIX_A: UInt32 = 0x9908B0DF
@@ -15,28 +18,29 @@ struct mt19937:
     var left: Int
     var seeded: Bool
     var next: UInt32
-    var state: StaticTuple[UInt32, MERSENNE_STATE_N]
+    var state: DTypeArray[DType.uint32, MERSENNE_STATE_N]
 
 
+@value
 @register_passable("trivial")
 struct mt19937Engine:
     var mt19937_data: mt19937
 
     @always_inline("nodebug")
-    fn __init__(inout self):
-        self.__init__(UInt64(now()))
+    fn __init__(out self):
+        return self.__init__(UInt64(now()))
 
     @always_inline("nodebug")
-    fn seed(inout self, seed: UInt64):
-        self.__init__(seed)
+    fn seed(mut self, seed: UInt64):
+        self = self.__init__(seed)
 
     @always_inline("nodebug")
-    fn __init__(inout self, data: mt19937):
+    fn __init__(out self, data: mt19937):
         self.mt19937_data = data
 
     @always_inline("nodebug")
-    fn __init__(inout self, seed: UInt64):
-        var state = StaticTuple[UInt32, MERSENNE_STATE_N]()
+    fn __init__(out self, seed: UInt64):
+        var state = DTypeArray[DType.uint32, MERSENNE_STATE_N]()
         state[0] = (seed & 0xFFFFFFFF).cast[DType.uint32]()
         for i in range(1, MERSENNE_STATE_N):
             state[i] = 1812433253 * (state[i - 1] ^ (state[i - 1] >> 30)) + i
@@ -60,7 +64,7 @@ struct mt19937Engine:
             return Self.mixbits(u, v) >> 1
 
     @always_inline("nodebug")
-    fn nextstate(inout self):
+    fn nextstate(mut self):
         var state = self.mt19937_data.state
         self.mt19937_data.left = MERSENNE_STATE_N
         self.mt19937_data.next = 0
@@ -80,11 +84,11 @@ struct mt19937Engine:
         self.mt19937_data.state = state
 
     @always_inline("nodebug")
-    fn __call__(inout self) -> UInt32:
+    fn __call__(mut self) -> UInt32:
         if (self.mt19937_data.left) == 0:
             self.nextstate()
         self.mt19937_data.left -= 1
-        var y = self.mt19937_data.state[int(self.mt19937_data.next)]
+        var y = self.mt19937_data.state[Int(self.mt19937_data.next)]
         self.mt19937_data.next += 1
         y ^= y >> 11
         y ^= (y << 7) & 0x9D2C5680
@@ -101,3 +105,16 @@ struct mt19937Engine:
         ):
             return True
         return False
+
+    @always_inline("nodebug")
+    fn discard(mut self, count: Int):
+        for _ in range(0, count):
+            _ = self.__call__()
+
+    @always_inline("nodebug")
+    fn save(self) -> mt19937:
+        return self.mt19937_data
+
+    @always_inline("nodebug")
+    fn load(mut self, owned state: mt19937):
+        self.mt19937_data = state

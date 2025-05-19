@@ -1,4 +1,8 @@
 from sys.intrinsics import PrefetchOptions, prefetch
+from sys.info import simdwidthof
+from memory.unsafe_pointer import UnsafePointer
+from algorithm import vectorize, parallelize
+
 
 alias PREFETCH_READ = PrefetchOptions().for_read().high_locality().to_data_cache()
 alias PREFETCH_WRITE = PrefetchOptions().for_write().high_locality().to_data_cache()
@@ -39,7 +43,7 @@ fn mm[
                 prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
                 prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
 
-                C.store[width=nelts](
+                C.store(
                     i * p + n_idx,
                     A.load[width=nelts](i * n + k).fma(
                         B.load[width=nelts](k * p + n_idx),
@@ -95,7 +99,7 @@ fn fusedmm[
                 prefetch[PREFETCH_READ](A + (i * n + k + nelts))
                 prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
                 prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
-                C.store[width=nelts](
+                C.store(
                     i * p + n_idx,
                     func[T, nelts](
                         A.load[width=nelts](i * n + k).fma(
@@ -158,7 +162,7 @@ fn fusedscalarmm[
                 prefetch[PREFETCH_READ](A + (i * n + k + nelts))
                 prefetch[PREFETCH_READ](B + (k * p + n_idx + nelts))
                 prefetch[PREFETCH_WRITE](C + (i * p + n_idx + nelts))
-                C.store[width=nelts](
+                C.store(
                     i * p + n_idx,
                     func(
                         A.load[width=nelts](i * n + k).fma(
@@ -281,7 +285,7 @@ fn Compute_blocks[
                         width=nelts
                     ](k * p + j)
                 prefetch[PREFETCH_WRITE](C + (i * p + j + nelts))
-                C.store[width=nelts](i * p + j, acc_sum)
+                C.store(i * p + j, acc_sum)
 
             vectorize[dot_product, nelts, unroll_factor=4](
                 size=k_limit - k_outer
@@ -350,7 +354,7 @@ fn bmm[
 ](
     A: UnsafePointer[Scalar[T]],
     B: UnsafePointer[Scalar[T]],
-    inout C: UnsafePointer[Scalar[T]],
+    mut C: UnsafePointer[Scalar[T]],
     b: Int,
     m: Int,
     n: Int,
@@ -389,7 +393,7 @@ fn fusedbmm[
 ](
     A: UnsafePointer[Scalar[T]],
     B: UnsafePointer[Scalar[T]],
-    inout C: UnsafePointer[Scalar[T]],
+    mut C: UnsafePointer[Scalar[T]],
     b: Int,
     m: Int,
     n: Int,
@@ -431,7 +435,7 @@ fn fusedScalarbmm[
 ](
     A: UnsafePointer[Scalar[T]],
     B: UnsafePointer[Scalar[T]],
-    inout C: UnsafePointer[Scalar[T]],
+    mut C: UnsafePointer[Scalar[T]],
     Scalar_value: SIMD[T, 1],
     b: Int,
     m: Int,

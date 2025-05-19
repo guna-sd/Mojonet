@@ -1,0 +1,1 @@
+from .mc10.ptr import test_ptr

@@ -5,7 +5,8 @@ from builtin.simd import Floorable, CeilDivable, Ceilable
 
 trait TensorLike(
     Boolable,
-    CollectionElement,
+    Copyable,
+    Movable,
     CeilDivable,
     Ceilable,
     Comparable,
@@ -19,6 +20,7 @@ trait TensorLike(
     Representable,
     Roundable,
     Sized,
+    Serializable,
 ):
     alias Type: DType
 
@@ -30,10 +32,6 @@ trait TensorLike(
         """Returns the total number of elements in the tensor."""
         ...
 
-    fn tofile(self, path: Path):
-        """Writes the tensor's contents to a file at the specified path."""
-        ...
-
     fn flatten(self) -> Self:
         """Returns a 1-dimensional version of the tensor."""
         ...
@@ -42,16 +40,27 @@ trait TensorLike(
         """Returns the data type of the tensor elements."""
         ...
 
+    fn shape(self) -> VariadicList[Int]:
+        """Returns the shape of the tensor."""
+        ...
+
+    fn reshape(self, shape: VariadicList[Int]) -> Self:
+        """Returns a new tensor with the specified shape."""
+        ...
+
+    fn transpose(self) -> Self:
+        """Returns a new tensor that is the transpose of the original tensor."""
+        ...
+
 
 trait Symbolic(
     Absable,
     Boolable,
     CeilDivable,
     Ceilable,
-    CollectionElement,
-    Comparable,
-    ComparableCollectionElement,
-    EqualityComparableCollectionElement,
+    Copyable,
+    Movable,
+    Comparable,    
     Floorable,
     Hashable,
     ImplicitlyBoolable,
@@ -71,6 +80,9 @@ trait Symbolic(
     fn is_float(self) -> Bool:
         ...
 
+    fn is_symbol(self) -> Bool:
+        ...
+
 
 trait Serializable:
     fn save(self, path: Path):
@@ -82,3 +94,9 @@ trait Serializable:
         """Loads the object from the specified path."""
         ...
 
+
+trait Iterable(
+    AnyType,
+    Sized,
+):
+    ...

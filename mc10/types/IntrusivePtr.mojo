@@ -147,7 +147,8 @@ struct IntrusivePointer[T: RefCounted]:
             existing: The existing `IntrusivePointer` to copy.
         """
         self._inner = existing._inner
-        self[].add_ref()
+        if not self.is_null():
+            self[].add_ref()
 
     @no_inline
     fn __del__(owned self):
@@ -156,10 +157,7 @@ struct IntrusivePointer[T: RefCounted]:
         This method is called when the `IntrusivePointer` is destroyed. It decrements the reference count for the
         managed object. If the reference count reaches zero, the object is destroyed, and the memory is freed.
         """
-        if self._inner:
-            if self[].drop_ref():
-                self._inner.destroy_pointee()
-                self._inner.free()
+        self.reset()
 
     fn __getitem__(ref self) -> ref [self] T:
         """Get a mutable reference to the managed object.
@@ -207,9 +205,21 @@ struct IntrusivePointer[T: RefCounted]:
             `True` if both pointers point to different objects, `False` otherwise.
         """
         return self._inner != rhs._inner
-    
+
     fn __str__(self) -> String:
         return String.write(self)
-    
+
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(self._inner)
+
+    fn is_null(self) -> Bool:
+        """Check if this is a null pointer."""
+        return self._inner == UnsafePointer[T]()
+
+    fn reset(mut self):
+        """Reset this pointer to null."""
+        if not self.is_null():
+            if self[].drop_ref():
+                self._inner.destroy_pointee()
+                self._inner.free()
+            self._inner = UnsafePointer[T]()

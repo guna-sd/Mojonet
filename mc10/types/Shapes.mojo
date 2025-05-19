@@ -1,15 +1,11 @@
 from collections import OptionalReg
-from memory import UnsafePointer
 from mc10.utils.index import index, indexable
 from mc10.utils.debuggable import abort, asserts
-from mc10.__mlir import _mlirtype_is_eq
-
-from utils import StaticTuple
 
 
-@value
+@fieldwise_init
 @register_passable("trivial")
-struct dim:
+struct dim(Intable, ImplicitlyIntable, Writable):
     """
     A tensor dimension that may be static (known at compile time) or dynamic (unknown).
 
@@ -17,7 +13,7 @@ struct dim:
     Otherwise it is dynamic.
     """
 
-    alias dynamic = index(-1)
+    alias dynamic = index(-111)
     var static: OptionalReg[index]
 
     fn __init__(out self):
@@ -26,14 +22,10 @@ struct dim:
     @implicit
     fn __init__(out self, value: Int):
         self.static = index(value)
-        if value == -1:
-            self.static = None
 
     @implicit
     fn __init__(out self, value: index):
         self.static = value
-        if value == -1:
-            self.static = None
 
     @always_inline("nodebug")
     fn is_dynamic(self) -> Bool:
@@ -42,7 +34,7 @@ struct dim:
         Returns:
             Bool: True if the dim is dynamic, False otherwise.
         """
-        return not Bool(self.static)
+        return self.static is None
 
     @always_inline("nodebug")
     fn as_index(self) -> index:
@@ -137,7 +129,7 @@ struct dim:
         Returns:
             Bool: The boolean representation of the dim.
         """
-        return Bool(self.static)
+        return self.is_dynamic()
 
     @always_inline("nodebug")
     fn __as_bool__(self) -> Bool:
@@ -474,9 +466,8 @@ struct dim:
             writer.write(self.static.value())
 
 
-@value
 @register_passable("trivial")
-struct shape:
+struct shape(Sized, Writable):
     """
     Represents a tensor shape as a collection of dimensions.
     """
@@ -486,40 +477,73 @@ struct shape:
     fn __init__(out self):
         self.dims = VariadicList[dim]()
 
+    fn __init__(out self, dims: (dim,)):
+        self.dims = VariadicList[dim](dims[0])
+
+    fn __init__(
+        out self,
+        dims: (
+            dim,
+            dim,
+        ),
+    ):
+        self.dims = VariadicList[dim](dims[0], dims[1])
+
+    fn __init__(
+        out self,
+        dims: (
+            dim,
+            dim,
+            dim,
+        ),
+    ):
+        self.dims = VariadicList[dim](dims[0], dims[1], dims[2])
+
+    fn __init__(
+        out self,
+        dims: (
+            dim,
+            dim,
+            dim,
+            dim,
+        ),
+    ):
+        self.dims = VariadicList[dim](dims[0], dims[1], dims[2], dims[3])
+
+    fn __init__(
+        out self,
+        dims: (
+            dim,
+            dim,
+            dim,
+            dim,
+            dim,
+        ),
+    ):
+        self.dims = VariadicList[dim](
+            dims[0], dims[1], dims[2], dims[3], dims[4]
+        )
+
+    fn __init__(
+        out self,
+        dims: (
+            dim,
+            dim,
+            dim,
+            dim,
+            dim,
+            dim,
+        ),
+    ):
+        self.dims = VariadicList[dim](
+            dims[0], dims[1], dims[2], dims[3], dims[4], dims[5]
+        )
+
     fn __init__(out self, *dims: dim):
         self.dims = dims
 
     fn __init__(out self, dims: VariadicList[dim]):
         self.dims = dims
-
-    fn __init__[
-        size: Int,
-        /,
-    ](out self, dims: StaticTuple[dim, size]):
-        self = Self.unknown[size]()
-
-        @parameter
-        for i in range(size):
-            self[i] = dims[i]
-
-    # TODO: either this is not the right way to do this or something is wrong with the implementation
-    # fn __init__[*Ts: CollectionElement](out self, dims: Tuple[*Ts]):
-    #     asserts(
-    #         _mlirtype_is_eq[
-    #             VariadicList(Ts)._mlir_type,
-    #             __mlir_type[`!kgen.variadic<`, dim, `>`],
-    #         ](),
-    #         "tuple does not contain dim",
-    #     )
-
-    #     alias size = VariadicList(dims.element_types).__len__()
-
-    #     self = Self.unknown[size]()
-
-    #     @parameter
-    #     for i in range(size):
-    #         print(rebind[dim](dims[i]))
-    #         self[i] = rebind[dim](dims[i])
 
     fn __len__(self) -> Int:
         return len(self.dims)
@@ -527,16 +551,6 @@ struct shape:
     @always_inline("nodebug")
     fn __getitem__(self, index: index) -> dim:
         return self.dims[indexable["shape"](index.__int__(), self)]
-
-    @always_inline("nodebug")
-    fn __setitem__(mut self, index: index, dimension: dim):
-        tmp = UnsafePointer.address_of(self.dims).bitcast[List[dim]]()[]
-        tmp[indexable["shape"](index, self)] = dimension
-
-    @always_inline("nodebug")
-    fn __setitem__(self, index: index, dimension: Int):
-        tmp = UnsafePointer.address_of(self.dims).bitcast[List[dim]]()[]
-        tmp[indexable["shape"](index, self)] = dim(dimension)
 
     @always_inline("nodebug")
     fn __eq__(self, other: Self) -> Bool:
@@ -617,13 +631,6 @@ struct shape:
         for i in range(len(self)):
             nelms *= self[i]
         return nelms
-
-    @always_inline("nodebug")
-    fn reshape(self: Self, *shapes: dim) -> shape:
-        var new = shape(shapes)
-        if new.num_elements() != self.num_elements():
-            abort("shapes should be the same size")
-        return new
 
     @always_inline("nodebug")
     fn list(self) -> List[dim]:

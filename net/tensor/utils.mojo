@@ -1,4 +1,3 @@
-from builtin.io import _snprintf_scalar
 from collections.string import _calc_format_buffer_size
 
 alias TensorStart = "Tensor("

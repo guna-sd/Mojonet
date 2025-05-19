@@ -6,7 +6,7 @@ from mc10.utils.debuggable import asserts
 
 @always_inline
 fn _set_array_elem_move[
-    type: CollectionElement,
+    type: Copyable & Movable,
     capacity: Int,
 ](
     index: Int,
@@ -14,7 +14,7 @@ fn _set_array_elem_move[
     ref array: __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`],
 ):
     ptr = __mlir_op.`pop.array.gep`(
-        UnsafePointer.address_of(array).address, index.value
+        UnsafePointer(to=array).address, index.value
     )
     UnsafePointer(ptr).init_pointee_move(element)
 
@@ -23,7 +23,7 @@ fn _set_array_elem_move[
 
 @always_inline
 fn _set_array_elem_copy[
-    type: CollectionElement,
+    type: Copyable & Movable,
     capacity: Int,
 ](
     index: Int,
@@ -31,14 +31,14 @@ fn _set_array_elem_copy[
     ref array: __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`],
 ):
     ptr = __mlir_op.`pop.array.gep`(
-        UnsafePointer.address_of(array).address, index.value
+        UnsafePointer(to=array).address, index.value
     )
     UnsafePointer(ptr).init_pointee_copy(element)
 
 
 @always_inline
 fn _create_array[
-    type: CollectionElement, capacity: Int
+    type: Copyable & Movable, capacity: Int
 ](owned storage: VariadicListMem[type]) -> Array[type, capacity]:
     array = Array[type, capacity]()
     array.size = len(storage)
@@ -75,7 +75,7 @@ fn _create_array[
 
 
 fn _init_array_default[
-    capacity: Int, type: CollectionElement
+    capacity: Int, type: Copyable & Movable
 ](default: type) -> __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`]:
     var array: __mlir_type[`!pop.array<`, capacity.value, `, `, type, `>`]
     __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(array))
@@ -90,8 +90,9 @@ fn _array_construction_checks[size: Int]():
     constrained[size > 0, "number of elements in `Array` must be > 0"]()
 
 
-@value
-struct Array[Type: CollectionElement, capacity: Int]:
+@fieldwise_init
+@register_passable("trivial")
+struct Array[Type: Copyable & Movable, capacity: Int](Sized):
     alias __array_type = __mlir_type[
         `!pop.array<`, Self.capacity.value, `, `, Self.Type, `>`
     ]
@@ -172,7 +173,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
         return len(self) > 0
 
     fn __contains__[
-        T: EqualityComparableCollectionElement, //
+        T: Copyable & Movable & EqualityComparable, //
     ](self: Array[T, *_], value: T) -> Bool:
         @parameter
         for i in range(capacity):
@@ -183,7 +184,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
     @always_inline
     fn unsafe_get(ref self, index: Int) -> ref [self.storage] Self.Type:
         var ptr = __mlir_op.`pop.array.gep`(
-            UnsafePointer.address_of(self.storage).address,
+            UnsafePointer(to=self.storage).address,
             indexable["Array"](index, self).value,
         )
         return UnsafePointer(ptr)[]
@@ -195,7 +196,7 @@ struct Array[Type: CollectionElement, capacity: Int]:
         Returns:
             An `UnsafePointer` to the underlying array.
         """
-        return UnsafePointer.address_of(self.storage).bitcast[Self.Type]()
+        return UnsafePointer(to=self.storage).bitcast[Self.Type]()
 
     fn list(read self) -> List[Self.Type, True]:
         var list = List[Self.Type, True](capacity=capacity)
@@ -216,11 +217,13 @@ struct Arrays:
             ](),
             "Type must be a UInt8 to write a string from array",
         ]()
+
+        ## TODO: This is still a workaround for the fact that we don't have a proper way to convert an array to a string
         var p = array.list()
         var ptr = p.steal_data()
-        var str = String(
-            ptr=rebind[UnsafePointer[UInt8]](ptr), length=array.capacity
-        )
+        var str = String()
+        str._len_or_data = array.capacity
+        str._ptr_or_data = ptr.bitcast[Byte]()
         return str^
 
     @staticmethod
@@ -233,7 +236,7 @@ struct Arrays:
 
     @staticmethod
     fn toString[
-        T: WritableCollectionElement
+        T: Writable & Copyable & Movable
     ](read self: Array[T, *_]) -> String:
         var string = String()
         string.write("[")

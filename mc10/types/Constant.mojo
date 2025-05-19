@@ -105,3 +105,38 @@
 #             string.write(self.__float__())
 #         else:
 #             string.write(self.__int__())
+
+## TODO: Still a workaround not sure if this is the right way to do it.
+@value
+@register_passable("trivial")
+struct OptionalParamInt[dim_parametric: Int = -1342]:
+    """A class to represent an optionally parametric Int.
+    If dim_parametric is known, the get method can be evaluated at compile time.
+    Otherwise, the get method will be evaluated at runtime using the dynamic
+    value supplied to the constructor.
+
+    Parameters:
+        dim_parametric: The optional Int parameter.
+    """
+
+    var dim_dynamic: Int
+
+    @always_inline("nodebug")
+    fn __init__(out self, dim_dynamic: Int):
+        self.dim_dynamic = dim_dynamic
+
+    # @always_inline("nodebug")
+    # fn get(self) -> Int:
+    #     @parameter
+    #     if dim_parametric.has_value()-:
+    #         return dim_parametric.get()
+    #     else:
+    #         return self.dim_dynamic
+
+    # @always_inline("nodebug")
+    # fn __eq__(self, rhs: OptionalParamInt[dim_parametric]) -> Bool:
+    #     return self.get() == rhs.get()
+
+    # @always_inline("nodebug")
+    # fn __ne__(self, rhs: OptionalParamInt[dim_parametric]) -> Bool:
+    #     return self.get() != rhs.get()
