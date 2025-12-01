@@ -2,7 +2,7 @@ from mc10.hardware.device import Device
 from collections import OptionalReg
 from memory import UnsafePointer, OpaquePointer
 from mc10.utils.Function import Function
-from mc10.utils.unique_ptr import UniquePointer, DeleterFnType, default_delete
+from mc10.types.unique_ptr import UniquePointer, DeleterFnType, default_delete
 from mc10._memory.allocator import Allocator, AllocatorImpl
 
 
@@ -13,6 +13,7 @@ fn noop_free(mut`_`: OpaquePointer[MutOrigin.external]):
 
 # For now we have two diffrent ptr types (Unique , Data) Pointer, is it really required to have a seperation...??
 # TODO: clear the confusion and provide a clean and much more simpler and safer way....
+
 
 struct DataPointer(Boolable):
     """
