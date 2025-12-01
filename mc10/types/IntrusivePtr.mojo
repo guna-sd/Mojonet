@@ -12,7 +12,6 @@ trait RefCounted(AnyType, Movable):
     ```mojo
     from mc10.types.IntrusivePtr import RefCounted
 
-    @value
     struct MyObject(RefCounted):
         var refcount: UInt64
         var data: Int
@@ -31,7 +30,7 @@ trait RefCounted(AnyType, Movable):
         fn count_ref(self) -> UInt64:
             return self.refcount
 
-        fn Unsafe_set_ref(mut self, owned new: UInt64):
+        fn Unsafe_set_ref(mut self, var new: UInt64):
             self.refcount = new
     ```
 
@@ -54,12 +53,12 @@ trait RefCounted(AnyType, Movable):
     fn count_ref(self) -> UInt64:
         ...
 
-    fn Unsafe_set_ref(mut self, owned refCount: UInt64):
+    fn Unsafe_set_ref(mut self, var refCount: UInt64):
         ...
 
 
 @register_passable
-struct IntrusivePointer[T: RefCounted]:
+struct IntrusivePointer[T: RefCounted](ImplicitlyCopyable, Writable):
     """Intrusive reference-counted pointer.
 
     `IntrusivePointer` is a smart pointer that maintains a reference count for a type `T` that implements the
@@ -72,10 +71,9 @@ struct IntrusivePointer[T: RefCounted]:
     the object is destroyed and its memory is freed.
 
     Example:
-        ```mojo
+    ```mojo
         from mc10.types.IntrusivePtr import IntrusivePointer, RefCounted
 
-        @value
         struct MyObject(RefCounted):
             var refcount: UInt64
             var data: Int
@@ -94,7 +92,7 @@ struct IntrusivePointer[T: RefCounted]:
             fn count_ref(self) -> UInt64:
                 return self.refcount
 
-            fn Unsafe_set_ref(mut self, owned new: UInt64):
+            fn Unsafe_set_ref(mut self, var new: UInt64):
                 self.refcount = new
 
         var obj = MyObject(10)
@@ -105,16 +103,16 @@ struct IntrusivePointer[T: RefCounted]:
         ptr2[].data = 20
 
         print(ptr.count())  # Output: 2 (both ptr and ptr2 are referencing the same object)
-        ```
+    ```
 
     Parameters:
-        T: The type of the object being referenced.
+            T: The type of the object being referenced.
     """
 
-    var _inner: UnsafePointer[T]
+    var _inner: UnsafePointer[Self.T, MutOrigin.external]
 
     @implicit
-    fn __init__(out self, owned obj: T):
+    fn __init__(out self, var obj: Self.T):
         """Create a new `IntrusivePointer` for the given object.
 
         This constructor allocates memory for the pointer, initializes the reference count to 1, and stores the
@@ -123,7 +121,7 @@ struct IntrusivePointer[T: RefCounted]:
         Args:
             obj: The object to manage with the smart pointer.
         """
-        self._inner = UnsafePointer[T]().alloc(1)
+        self._inner = alloc[Self.T](1)
         obj.Unsafe_set_ref(1)
         self._inner.init_pointee_move(obj^)
 
@@ -135,7 +133,7 @@ struct IntrusivePointer[T: RefCounted]:
         Returns:
             A new `IntrusivePointer` pointing to the same object.
         """
-        return self
+        return self.__copyinit__(self)
 
     fn __copyinit__(out self, existing: Self):
         """Initialize a new pointer by copying from an existing one.
@@ -151,7 +149,7 @@ struct IntrusivePointer[T: RefCounted]:
             self[].add_ref()
 
     @no_inline
-    fn __del__(owned self):
+    fn __del__(deinit self):
         """Delete the smart pointer and clean up the managed object.
 
         This method is called when the `IntrusivePointer` is destroyed. It decrements the reference count for the
@@ -159,7 +157,7 @@ struct IntrusivePointer[T: RefCounted]:
         """
         self.reset()
 
-    fn __getitem__(ref self) -> ref [self] T:
+    fn __getitem__(ref self) -> ref [self] Self.T:
         """Get a mutable reference to the managed object.
 
         This method returns a mutable reference to the object managed by the `IntrusivePointer`, allowing
@@ -214,7 +212,7 @@ struct IntrusivePointer[T: RefCounted]:
 
     fn is_null(self) -> Bool:
         """Check if this is a null pointer."""
-        return self._inner == UnsafePointer[T]()
+        return self._inner == type_of(self._inner)()
 
     fn reset(mut self):
         """Reset this pointer to null."""
@@ -222,4 +220,4 @@ struct IntrusivePointer[T: RefCounted]:
             if self[].drop_ref():
                 self._inner.destroy_pointee()
                 self._inner.free()
-            self._inner = UnsafePointer[T]()
+            self._inner = type_of(self._inner)()
