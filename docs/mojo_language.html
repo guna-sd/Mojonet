@@ -1,0 +1,2840 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mojo Language: Core Features</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: white;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #0066cc;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #0066cc;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #003d7a;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-left: 10px;
+            border-left: 5px solid #0066cc;
+        }
+
+        h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #004080;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 14px;
+            color: #c7254e;
+        }
+
+        pre {
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            overflow-x: auto;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        ul,
+        ol {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .section {
+            page-break-inside: avoid;
+            margin-bottom: 25px;
+        }
+
+        .subsection {
+            margin-left: 15px;
+            margin-bottom: 20px;
+        }
+
+        .note {
+            background: #fff8dc;
+            border-left: 4px solid #ffa500;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .important {
+            background: #ffe6e6;
+            border-left: 4px solid #cc0000;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .info {
+            background: #e6f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background: #0066cc;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .toc {
+            background: #f0f8ff;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 2px solid #0066cc;
+        }
+
+        .toc h2 {
+            margin-top: 0;
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .toc ul {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .toc li {
+            padding: 5px 0;
+        }
+
+        .toc a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+            }
+
+            h2 {
+                page-break-after: avoid;
+            }
+
+            pre,
+            table {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Mojo Language: Core Features</h1>
+    <p style="text-align: center; font-style: italic; color: #666; margin-bottom: 30px;">
+        Comprehensive Technical Documentation
+    </p>
+
+    <div class="toc">
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#section1">1. Types and Type System</a></li>
+            <li><a href="#section2">2. Collections and Data Structures</a></li>
+            <li><a href="#section3">3. Memory Ownership and Lifetimes</a></li>
+            <li><a href="#section4">4. Attribute System</a></li>
+            <li><a href="#section5">5. Control Flow and Operators</a></li>
+            <li><a href="#section6">6. Functions and Argument Conventions</a></li>
+            <li><a href="#section7">7. Exception Handling</a></li>
+            <li><a href="#section8">8. Traits System</a></li>
+            <li><a href="#section9">9. Parametric Programming</a></li>
+            <li><a href="#section10">10. Struct Design</a></li>
+            <li><a href="#section11">11. Advanced Memory Management</a></li>
+            <li><a href="#section12">12. MLIR Interoperability</a></li>
+            <li><a href="#section13">13. Standard Library: Memory Module</a></li>
+            <li><a href="#section14">14. Standard Library: Sys Module</a></li>
+            <li><a href="#section15">15. Standard Library: Testing Module</a></li>
+            <li><a href="#section16">16. Standard Library: Compile Module</a></li>
+            <li><a href="#section17">17. Standard Library: Runtime Module</a></li>
+        </ul>
+    </div>
+
+    <div class="section" id="section1">
+        <h2>1. Types and Type System</h2>
+        <h3>Scalar Numeric Types</h3>
+        <ul>
+            <li><code>Int</code>: Signed integer, machine word size (typically 64-bit)</li>
+            <li><code>UInt</code>: Unsigned integer, machine word size</li>
+            <li>Fixed-precision integers: <code>Int8</code> to <code>Int256</code>, <code>UInt8</code> to
+                <code>UInt256</code>
+            </li>
+            <li>Floating-point types: <code>Float16</code>, <code>Float32</code>, <code>Float64</code></li>
+        </ul>
+    </div>
+
+    <div class="subsection">
+        <h3>Boolean Type</h3>
+        <p>The <code>Bool</code> type represents True or False values. It supports logical and bitwise NOT operations.
+        </p>
+    </div>
+
+    <div class="subsection">
+        <h3>SIMD and Scalars</h3>
+        <p>SIMD (Single Instruction, Multiple Data) types enable efficient, hardware-accelerated vectorized operations:
+        </p>
+        <ul>
+            <li><code>SIMD[DType, width]</code>: Vectorized operations supporting arithmetic, reductions, shuffles, and
+                mathematical functions</li>
+            <li><code>Scalar[dtype]</code>: 1-element SIMD types with aliases like <code>Float32</code> and
+                <code>Int64</code>
+            </li>
+            <li><code>Byte</code>: Alias for <code>SIMD[DType.uint8, 1]</code> (introduced in v24.4) for raw byte data
+                handling</li>
+        </ul>
+    </div>
+
+    <div class="subsection">
+        <h3>Compile-Time Literal Types</h3>
+        <p>These types represent compile-time constant values:</p>
+        <ul>
+            <li><code>IntLiteral</code>: Arbitrary-precision integers at compile time</li>
+            <li><code>FloatLiteral</code>: Arbitrary-precision floats at compile time</li>
+            <li><code>StringLiteral</code>: String literals that materialize into runtime <code>String</code> objects
+            </li>
+            <li><code>StringSlice</code> and <code>StaticString</code>: Immutable compile-time string data</li>
+        </ul>
+    </div>
+
+    <div class="subsection">
+        <h3>NoneType</h3>
+        <p>Has a single value, <code>None</code>, used to indicate the absence of a value (e.g., for functions without a
+            return value).</p>
+    </div>
+
+    <div class="subsection">
+        <h3>Pointer and Reference Types</h3>
+        <p>Mojo provides both safe and unsafe pointer types with origin tracking for lifetime safety:</p>
+        <ul>
+            <li><strong>Safe pointers:</strong> <code>Pointer[to=var]</code>, <code>OwnedPointer[AnyType]</code>,
+                <code>ArcPointer[AnyType]</code>
+            </li>
+            <li><strong>Unsafe pointer:</strong> <code>UnsafePointer[AnyType]</code></li>
+            <li><strong>Non-owning:</strong> <code>Pointer[T]</code> points to a T value without ownership</li>
+        </ul>
+
+        <p>All references and pointers use origin annotations for lifetime safety. The caret operator <code>^</code>
+            acts as a transfer operator (move-sigil) and disambiguates assignment from bitwise XOR.</p>
+    </div>
+
+    <div class="subsection">
+        <h3>Tuple Types</h3>
+        <p>Tuples group heterogeneous values with compile-time type safety:</p>
+
+        <pre>var tup = Tuple[Int, Float, String](42, 3.14, "hello")
+var value = tup[1]  # Index must be compile-time constant
+
+# Tuple destructuring
+var a, b = return_two_values()
+(a, b) = (b, a)  # Swap values
+_, y = get_pair()  # Discard unwanted elements</pre>
+    </div>
+    </div>
+
+    <div class="section" id="section2">
+        <h2>2. Collections and Data Structures</h2>
+
+        <div class="subsection">
+            <h3>List</h3>
+            <p>Dynamic, growable array similar to Python lists. Requirements: elements must be Copyable & Movable.</p>
+
+            <h4>Key Features:</h4>
+            <ul>
+                <li>Operations: <code>append()</code>, <code>insert()</code>, <code>pop()</code>, <code>extend()</code>
+                </li>
+                <li>Supports indexing, iteration, and comprehensions</li>
+                <li>Automatic memory management</li>
+                <li>V24.6+ requires explicit <code>.copy()</code> for deep copying</li>
+            </ul>
+
+            <pre>var numbers = List[Int](1, 2, 3, 4, 5)
+numbers.append(6)
+for item in numbers:
+    print(item)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Dict</h3>
+            <p>Hash map with <code>KeyElement</code> keys (hashable and equality-comparable) and Copyable & Movable
+                values.</p>
+
+            <h4>Characteristics:</h4>
+            <ul>
+                <li>Open addressing implementation</li>
+                <li>O(1) average-case operations</li>
+                <li>Supports literal creation, insertion, removal, updating, and iteration</li>
+                <li>Performance improvements in v24.4</li>
+            </ul>
+
+            <pre>var scores = Dict[String, Int]()
+scores["Alice"] = 95
+scores["Bob"] = 87</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Set</h3>
+            <p>Unordered collection of unique <code>KeyElement</code> elements. Introduced in v24.1.</p>
+
+            <h4>Operations:</h4>
+            <ul>
+                <li>Set operations: union (<code>|</code>), intersection (<code>&</code>), difference (<code>-</code>)
+                </li>
+                <li>Membership testing, adding, removing</li>
+                <li>Backed by <code>Dict</code> for O(1) average-case performance</li>
+                <li>Supports set comprehensions</li>
+            </ul>
+
+            <pre>var primes = Set[Int](2, 3, 5, 7, 11)
+var evens = Set[Int](2, 4, 6, 8, 10)
+var common = primes & evens  # {2}</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Optional</h3>
+            <p>Type-safe wrapper for values that may or may not exist (similar to Rust's <code>Option</code>).</p>
+
+            <pre>var opt = Optional(42)
+
+# Safe access patterns
+if opt:
+    print(opt.value())  # Returns reference, aborts if empty
+
+# Provide default value
+print(opt.or_else(0))
+
+# V24.4+: copied() for Optional[Pointer[T]]
+var ptr_copy = opt_ptr.copied()</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Variant (Tagged Union)</h3>
+            <p>Sum type holding one of several Copyable & Movable types at runtime.</p>
+
+            <pre>var v = Variant[Int, String](42)
+
+# Type checking and access
+if v.isa[Int]():
+    print(v[Int])
+
+# V24.4+: is_type_supported check
+if v.is_type_supported[Float64]():
+    v[Float64] = 3.14</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>String</h3>
+            <p>UTF-8 encoded string type with advanced optimizations:</p>
+
+            <h4>Optimizations:</h4>
+            <ul>
+                <li><strong>Small String Optimization (SSO):</strong> Stores up to 23 bytes inline on 64-bit systems
+                </li>
+                <li><strong>Copy-on-Write:</strong> Lazy copying for efficiency</li>
+                <li><strong>O(1) copying:</strong> For short strings that fit in SSO</li>
+            </ul>
+
+            <h4>String Types:</h4>
+            <ul>
+                <li><code>String</code>: Owning, mutable</li>
+                <li><code>StringSlice</code>: Non-owning, immutable view</li>
+                <li><code>StaticString</code>: Immutable compile-time strings</li>
+            </ul>
+
+            <div class="note">
+                <strong>Note:</strong> Converting a constant string literal or StaticString to a String is implicit and
+                avoids runtime allocation.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="section3">
+        <h2>3. Memory Ownership and Lifetimes</h2>
+
+        <div class="subsection">
+            <h3>Origins and Lifetime Tracking</h3>
+            <p>Mojo uses <em>origins</em> to track the validity and mutability of references and pointers, ensuring
+                memory safety through compile-time analysis.</p>
+
+            <h4>Built-in Origin Types:</h4>
+            <ul>
+                <li><code>ImmutOrigin</code>: Immutable references</li>
+                <li><code>MutOrigin</code>: Mutable references</li>
+                <li><code>Origin[is_mutable]</code>: Parametric mutability</li>
+            </ul>
+
+            <h4>Origin Categories:</h4>
+            <ol>
+                <li><strong>Static:</strong> <code>StaticConstantOrigin</code> for persistent values (e.g., string
+                    literals)</li>
+                <li><strong>Derived:</strong> Created using <code>origin_of(...)</code> at compile time</li>
+                <li><strong>Inferred:</strong> Automatically deduced by the compiler</li>
+                <li><strong>Wildcard:</strong> <code>ImmutAnyOrigin</code> and <code>MutAnyOrigin</code> for references
+                    that might access any live value</li>
+            </ol>
+
+            <pre># Derived origin example
+fn create_ref(ref value: Int) -> ref [value] Int:
+    return value
+
+# Origin union
+fn pick_one(cond: Bool, ref a: String, ref b: String) -> ref [a, b] String:
+    return a if cond else b</pre>
+
+            <div class="important">
+                <strong>Critical:</strong> The lifetime tracking system prevents destroying values while they're still
+                in use, ensuring memory safety without runtime overhead.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Value Semantics</h3>
+            <p>Mojo distinguishes between two categories of types based on how they're passed:</p>
+
+            <h4>Register-Passable Types</h4>
+            <ul>
+                <li>Passed directly in CPU registers (up to 256 bits)</li>
+                <li>Examples: scalars, SIMD types</li>
+                <li>Declared with <code>@register_passable</code> decorator</li>
+                <li>Zero-cost abstraction for small values</li>
+            </ul>
+
+            <h4>Memory-Only Types</h4>
+            <ul>
+                <li>Involve heap allocation</li>
+                <li>Examples: <code>String</code>, <code>List</code>, large structs</li>
+                <li>Passed by reference or moved</li>
+            </ul>
+        </div>
+
+        <div class="subsection">
+            <h3>Transfer Operator (^)</h3>
+            <p>The caret operator <code>^</code> explicitly transfers ownership, terminating a binding's lifetime:</p>
+
+            <pre>fn consume(var text: String):
+    print(text)
+
+var message = "Hello"
+consume(message^)  # Ownership transferred
+# message is now invalid - compile error if used</pre>
+
+            <h4>Dual Meaning:</h4>
+            <ul>
+                <li><strong>As transfer operator:</strong> Explicit ownership transfer in function calls and assignments
+                </li>
+                <li><strong>As binary operator:</strong> Bitwise XOR on integers</li>
+            </ul>
+
+            <div class="note">
+                <strong>Note:</strong> The compiler can elide the <code>^</code> operator when it can safely prove
+                ownership transfer is unnecessary (e.g., for temporary values).
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>ASAP Destruction</h3>
+            <p>Mojo employs As Soon As Possible (ASAP) destruction: values are destroyed immediately after their last
+                use, not at scope end.</p>
+
+            <pre>fn example():
+    var large_data = allocate_large_buffer()
+    process(large_data)
+    # large_data.__del__() called here immediately
+    
+    # Continue with other work...
+    do_something_else()</pre>
+
+            <h4>Explicit Destruction:</h4>
+            <pre>var temp = expensive_resource()
+use(temp)
+_ = temp  # Force immediate destruction</pre>
+
+            <div class="info">
+                <strong>Benefits:</strong> ASAP destruction enables precise resource management, reducing memory
+                pressure and ensuring timely cleanup of external resources like file handles.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="section4">
+        <h2>4. Attribute System</h2>
+
+        <p>Attributes provide compile-time metadata that influences compilation without affecting runtime semantics.
+            They use <code>@</code> syntax and precede declarations.</p>
+
+        <table>
+            <tr>
+                <th>Attribute</th>
+                <th>Description</th>
+                <th>Use Case</th>
+            </tr>
+            <tr>
+                <td><code>@always_inline</code></td>
+                <td>Forces function inlining</td>
+                <td>Performance-critical small functions</td>
+            </tr>
+            <tr>
+                <td><code>@__copy_capture</code></td>
+                <td>Forces closure to copy variables</td>
+                <td>When closure outlives captured values</td>
+            </tr>
+            <tr>
+                <td><code>@noncapturing</code></td>
+                <td>Indicates no context capture</td>
+                <td>Function pointers, optimization hints</td>
+            </tr>
+            <tr>
+                <td><code>@doc</code></td>
+                <td>Attaches documentation</td>
+                <td>Documentation generation, IDE tooltips</td>
+            </tr>
+            <tr>
+                <td><code>@deprecated</code></td>
+                <td>Marks deprecated declarations</td>
+                <td>API migration warnings</td>
+            </tr>
+            <tr>
+                <td><code>@parameter</code></td>
+                <td>Compile-time execution</td>
+                <td>Metaprogramming, generic functions</td>
+            </tr>
+            <tr>
+                <td><code>@register_passable</code></td>
+                <td>Enables register passing</td>
+                <td>Small, trivial types (≤256 bits)</td>
+            </tr>
+        </table>
+
+        <h3>Example Usage</h3>
+        <pre>@always_inline
+fn fast_add(a: Int, b: Int) -> Int:
+    return a + b
+
+@parameter
+fn compile_time_factorial[n: Int]() -> Int:
+    @parameter
+    if n <= 1:
+        return 1
+    return n * compile_time_factorial[n - 1]()</pre>
+    </div>
+
+    <div class="section" id="section5">
+        <h2>5. Control Flow and Operators</h2>
+
+        <div class="subsection">
+            <h3>Control Flow Constructs</h3>
+
+            <h4>Conditional Statements</h4>
+            <pre>if condition:
+    do_something()
+elif other_condition:
+    do_other()
+else:
+    do_default()
+
+# Ternary conditional
+result = value_if_true if condition else value_if_false</pre>
+
+            <h4>Loops</h4>
+            <pre># While loop
+while condition:
+    process()
+    if early_exit:
+        break
+    if skip:
+        continue
+
+# For loop with iteration
+for item in collection:
+    process(item)
+
+# For loop with mutable reference (v24.4+)
+for ref item in collection:
+    item.modify()  # In-place modification</pre>
+
+            <div class="note">
+                <strong>Note:</strong> <code>break</code> and <code>continue</code> support arrived in v24.2. For loops
+                iterate over types implementing the <code>Iterable</code> trait.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Compile-Time Loop Unrolling</h3>
+            <p>The <code>@parameter for</code> construct (v24.5+) enables compile-time loop unrolling:</p>
+
+            <pre>@parameter
+for i in range(4):
+    # Generates separate code for each iteration
+    simd_data[i] = process(simd_data[i])</pre>
+
+            <div class="important">
+                <strong>Requirement:</strong> The sequence and induction values must be parameter expressions
+                (compile-time constants).
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Walrus Operator (:=)</h3>
+            <p>Assignment expressions within conditions:</p>
+
+            <pre>if (n := expensive_computation()) > threshold:
+    print("Result:", n)
+
+while (line := read_line()):
+    process(line)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Operators</h3>
+
+            <h4>Arithmetic Operators</h4>
+            <p><code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>%</code>, <code>**</code> (power)
+            </p>
+
+            <h4>Comparison Operators</h4>
+            <p><code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>,
+                <code>&gt;=</code>
+            </p>
+
+            <h4>Bitwise Operators</h4>
+            <p><code>&</code>, <code>|</code>, <code>^</code> (XOR), <code>~</code> (NOT), <code>&lt;&lt;</code>,
+                <code>&gt;&gt;</code>
+            </p>
+
+            <h4>Logical Operators</h4>
+            <p><code>and</code>, <code>or</code>, <code>not</code></p>
+
+            <div class="important">
+                <strong>Precedence Note:</strong> The <code>^</code> operator has higher precedence than addition when
+                used as XOR.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="section6">
+        <h2>6. Functions and Argument Conventions</h2>
+
+        <div class="subsection">
+            <h3>Function Declaration Keywords</h3>
+            <ul>
+                <li><code>fn</code>: Non-raising functions (default)</li>
+                <li><code>def</code>: Raising functions (default)</li>
+            </ul>
+
+            <p>An <code>fn</code> function that might raise must explicitly declare <code>raises</code> in its
+                signature.</p>
+
+            <pre>fn safe_operation() -> Int:
+    return 42
+
+fn risky_operation() raises -> Int:
+    if error_condition:
+        raise Error("Something went wrong")
+    return 42</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Argument Conventions</h3>
+
+            <h4>1. read Convention (formerly borrowed)</h4>
+            <p>Passes an immutable reference to the callee. Similar to C++'s <code>const&</code> with Mojo's lifetime
+                safety.</p>
+
+            <ul>
+                <li>Efficient for large values (no copying)</li>
+                <li>Prevents accidental modification</li>
+                <li>Register-passable types pass directly in registers</li>
+            </ul>
+
+            <pre>fn calculate(read data: LargeStruct) -> Int:
+    return data.compute()  # Can read, cannot modify</pre>
+
+            <h4>2. mut Convention (formerly inout)</h4>
+            <p>Mutable reference allowing modification of the caller's value.</p>
+
+            <ul>
+                <li>Compiler enforces exclusivity (no aliasing)</li>
+                <li>Enables aggressive optimization</li>
+                <li>Changes are visible to caller</li>
+            </ul>
+
+            <pre>fn increment(mut value: Int):
+    value += 1
+
+var x = 5
+increment(x)
+print(x)  # Prints: 6</pre>
+
+            <h4>3. var Convention (Owned Value)</h4>
+            <p>Function takes exclusive ownership of the value.</p>
+
+            <ul>
+                <li>Caller gives ownership explicitly or a copy is made</li>
+                <li>Function can modify and consume the value</li>
+                <li>Essential for move-only types</li>
+            </ul>
+
+            <pre>fn consume(var text: String):
+    text += " (processed)"
+    print(text)
+    # text is destroyed here
+
+var message = "Hello"
+consume(message)  # Copy is made (String is Copyable)
+consume(message^)  # Ownership transferred</pre>
+
+            <h4>4. out Convention (v24.6+)</h4>
+            <p>Signals that a function initializes a previously uninitialized value.</p>
+
+            <ul>
+                <li>Used by constructors for <code>self</code> parameter</li>
+                <li>Used for named results/output parameters</li>
+                <li>Caller must not pass an initialized value</li>
+            </ul>
+
+            <pre>fn __init__(out self, value: Int):
+    self.data = value
+    self.initialized = True</pre>
+
+            <h4>5. owned Convention</h4>
+            <p>Transfers ownership to the callee, ending the value's lifetime at the call site.</p>
+
+            <ul>
+                <li>Function assumes responsibility for destruction</li>
+                <li>Essential for move-only types</li>
+                <li>Transfer operator <code>^</code> requests explicit transfer</li>
+            </ul>
+
+            <pre>fn take_ownership(owned resource: UniqueResource):
+    use(resource)
+    # resource is destroyed when function returns</pre>
+
+            <h4>6. ref Convention</h4>
+            <p>Flexible reference that adapts to the caller's reference type.</p>
+
+            <ul>
+                <li>Mutable caller → mutable access</li>
+                <li>Immutable caller → read-only access</li>
+                <li>Parametric mutability</li>
+            </ul>
+
+            <pre>fn access(ref value: Int) -> Int:
+    # Can read, might be able to write depending on caller
+    return value
+
+var mut_value = 10
+let immut_value = 20
+access(mut_value)  # ref is mutable
+access(immut_value)  # ref is immutable</pre>
+
+            <h4>7. deinit Convention</h4>
+            <p>Used for destructors and methods responsible for resource cleanup.</p>
+
+            <ul>
+                <li>Value starts initialized</li>
+                <li>Must be consumed or fully deinitialized by return</li>
+                <li>Prevents further destructor calls</li>
+            </ul>
+
+            <pre>fn __deinit__(deinit self):
+    release_resources(self.handle)
+    # self is in "being destroyed" state</pre>
+        </div>
+        <div class="subsection">
+            <h3>Variadic Arguments</h3>
+
+            <h4>Homogeneous Variadic Arguments</h4>
+            <p>Accept any number of arguments of the same type. Represented internally as <code>VariadicList</code> or
+                <code>VariadicListMem</code> (v24.2+).
+            </p>
+
+            <pre>fn sum(*args: Int) -> Int:
+    var total = 0
+    for arg in args:
+        total += arg
+    return total
+
+# Usage
+print(sum(1, 2, 3, 4, 5))  # 15
+
+# Accessing elements
+fn process(*values: Float64):
+    for i in range(len(values)):
+        print(values[i])
+    
+    # Apply closure to each element
+    values.each[fn()]()</pre>
+
+            <h4>Heterogeneous Variadic Arguments</h4>
+            <p>Accept arguments of different types using a type-list parameter, creating a <code>VariadicPack</code>.
+            </p>
+
+            <pre>fn print_all[*Ts: AnyType](*args: *Ts):
+    # Process each argument with its specific type
+    @parameter
+    for i in range(len(args)):
+        print(args[i])</pre>
+
+            <h4>Keyword Arguments (Unimplemented)</h4>
+            <p>Planned syntax: <code>**kwargs</code> will pass arbitrary keyword arguments as
+                <code>OwnedKwargsDict[T]</code>.
+            </p>
+
+            <div class="note">
+                <strong>Placement Rule:</strong> Variadic positional arguments must follow fixed arguments. Subsequent
+                arguments must be passed by keyword.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Other Argument Types</h3>
+
+            <h4>Default Arguments</h4>
+            <pre>fn greet(name: String, greeting: String = "Hello"):
+    print(greeting, name)</pre>
+
+            <h4>Keyword Arguments</h4>
+            <pre>fn configure(host: String, port: Int, secure: Bool):
+    pass
+
+configure(host="localhost", port=8080, secure=True)</pre>
+
+            <h4>Positional-Only Arguments</h4>
+            <p>Indicated by <code>/</code> separator - must be passed by position:</p>
+            <pre>fn compute(x: Int, y: Int, /):
+    return x + y
+
+compute(5, 10)  # OK
+# compute(x=5, y=10)  # Error</pre>
+
+            <h4>Keyword-Only Arguments (v24.1+)</h4>
+            <p>Achieved using <code>*</code> or variadic parameter - must be passed by name:</p>
+            <pre>fn config(*, debug: Bool, verbose: Bool):
+    pass
+
+config(debug=True, verbose=False)  # OK
+# config(True, False)  # Error</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Parameter System</h3>
+            <p>Mojo's parameter system enables compile-time computation and generic programming. Parameters are enclosed
+                in square brackets and must be compile-time known.</p>
+
+            <h4>Basic Parameters</h4>
+            <pre>fn repeat[count: Int](message: String):
+    @parameter
+    for i in range(count):
+        print(message)
+
+repeat[3]("Hello")  # Prints "Hello" three times</pre>
+
+            <h4>Default Parameter Values</h4>
+            <pre>fn foo[a: Int = 42, msg: StringLiteral = "hello"]():
+    print(msg, a)
+
+# All valid calls:
+foo()                    # Uses defaults
+foo[a=7]()              # Partial specification
+foo[a=7, msg="hi"]()    # Full specification
+foo[msg="test"]()       # Named parameters</pre>
+
+            <h4>Infer-Only Parameters</h4>
+            <p>Parameters declared before <code>//</code> are deduced from context:</p>
+
+            <pre>fn process[dt: DType, //, value: Scalar[dt]]():
+    # dt is inferred from value's type
+    print(value)
+
+process(Float32(3.14))  # dt inferred as DType.float32</pre>
+
+            <h4>Automatic Parameterization</h4>
+            <p>Unbound parameters from argument types become implicit compile-time parameters:</p>
+
+            <pre>fn generic_max[T: Comparable](a: T, b: T) -> T:
+    return a if a > b else b
+
+# T is automatically inferred
+var result = generic_max(5, 10)  # T = Int</pre>
+
+            <div class="info">
+                <strong>Compile-Time Execution:</strong> Functions marked with <code>@parameter</code> execute at
+                compile time, and their results become compile-time constants.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="section7">
+        <h2>7. Exception Handling</h2>
+
+        <p>Mojo uses <code>try/except/else/finally</code> for error handling. Functions that may raise must declare
+            <code>raises</code>.
+        </p>
+
+        <div class="subsection">
+            <h3>Basic Exception Handling</h3>
+
+            <pre>fn divide(a: Int, b: Int) raises -> Int:
+    if b == 0:
+        raise Error("Division by zero")
+    return a // b
+
+fn safe_divide(a: Int, b: Int) -> Int:
+    try:
+        return divide(a, b)
+    except e:
+        print("Error:", e)
+        return 0</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Exception Handling Components</h3>
+
+            <h4>try Block</h4>
+            <p>Defines sections where exceptions might occur.</p>
+
+            <h4>except Clause</h4>
+            <p>Catches and handles errors. The caught error object provides access to messages and stack traces.</p>
+
+            <pre>try:
+    risky_operation()
+except e:
+    print("Error message:", e)
+    print("Stack trace:", e.get_stack_trace())</pre>
+
+            <h4>else Clause</h4>
+            <p>Executes only if no exception was raised in the try block.</p>
+
+            <pre>try:
+    result = computation()
+except:
+    print("Failed")
+else:
+    print("Success:", result)</pre>
+
+            <h4>finally Clause</h4>
+            <p>Guarantees execution regardless of exceptions, ideal for cleanup.</p>
+
+            <pre>fn process_file(path: String) raises:
+    var file = open(path)
+    try:
+        data = file.read()
+        process(data)
+    finally:
+        file.close()  # Always executes</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Raising Exceptions</h3>
+
+            <pre># Raise with string message
+raise "Something went wrong"
+
+# Raise with Error object
+raise Error("Detailed error message")</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Context Managers</h3>
+            <p>Types implementing <code>__enter__()</code> and <code>__exit__()</code> methods work with
+                <code>with</code> statements.
+            </p>
+
+            <pre>struct FileHandle:
+    var path: String
+    
+    fn __enter__(self) -> Self:
+        # Setup logic
+        return self
+    
+    fn __exit__(self):
+        # Cleanup logic - guaranteed to run
+        self.close()
+
+# Usage
+with FileHandle("data.txt") as file:
+    file.process()
+    # __exit__ called automatically, even on error/break/continue/return</pre>
+
+            <div class="important">
+                <strong>Guarantee:</strong> The <code>__exit__()</code> method is guaranteed to run even if the block
+                terminates due to <code>break</code>, <code>continue</code>, <code>return</code>, or an exception.
+            </div>
+        </div>
+    </div>
+
+    <div class="section" id="section8">
+        <h2>8. Traits System</h2>
+
+        <p>Traits define interfaces through required method prototypes. Structures conform by implementing these
+            methods, enabling generic programming.</p>
+
+        <div class="subsection">
+            <h3>Defining and Using Traits</h3>
+
+            <pre>trait Drawable:
+    fn draw(self):
+        pass
+
+struct Circle(Drawable):
+    var radius: Float64
+    
+    fn draw(self):
+        print("Drawing circle with radius:", self.radius)
+
+fn render[T: Drawable](shape: T):
+    shape.draw()</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Trait Compositions</h3>
+            <p>Combine multiple traits using <code>&</code>:</p>
+
+            <pre>fn process[T: Copyable & Movable & Stringable](value: T):
+    var copy = value  # OK: Copyable
+    print(value)      # OK: Stringable</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Trait Inheritance</h3>
+            <p>Traits can extend other traits, creating hierarchies:</p>
+
+            <pre>trait Comparable(EqualityComparable):
+    fn __lt__(self, other: Self) -> Bool:
+        pass
+    fn __le__(self, other: Self) -> Bool:
+        pass
+    fn __gt__(self, other: Self) -> Bool:
+        pass
+    fn __ge__(self, other: Self) -> Bool:
+        pass
+
+# Implementers must satisfy both Comparable and EqualityComparable</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Default Method Implementations</h3>
+            <p>Traits can provide default implementations that conforming types can inherit:</p>
+
+            <pre>trait Iterator:
+    alias ElementType: AnyType
+    
+    fn __next__(mut self) -> Optional[Self.ElementType]:
+        pass
+    
+    fn __has_next__(self) -> Bool:
+        pass
+    
+    # Default implementation
+    fn count(self) -> Int:
+        var n = 0
+        while self.__has_next__():
+            _ = self.__next__()
+            n += 1
+        return n</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Associated Types and Aliases</h3>
+            <p>Traits can declare associated type aliases or default values:</p>
+
+            <pre>trait Container:
+    alias ElementType: AnyType
+    alias DefaultCapacity = 16
+    
+    fn __len__(self) -> Int:
+        pass
+    
+    fn __getitem__(self, index: Int) -> Self.ElementType:
+        pass</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Register-Passable Traits</h3>
+
+            <h4>Requirements:</h4>
+            <ul>
+                <li><code>@register_passable</code> traits: Conforming structs must be <code>@register_passable</code>
+                    or <code>@register_passable("trivial")</code></li>
+                <li><code>@register_passable("trivial")</code> traits: Conforming structs must be
+                    <code>@register_passable("trivial")</code>
+                </li>
+            </ul>
+
+            <h4>Automatic Conformance:</h4>
+            <ul>
+                <li><code>@register_passable</code> structs: Automatically conform to <code>Movable</code></li>
+                <li><code>@register_passable("trivial")</code> structs: Automatically conform to both
+                    <code>Copyable</code> and <code>Movable</code>
+                </li>
+            </ul>
+        </div>
+
+        <div class="subsection">
+            <h3>Built-in Traits</h3>
+
+            <h4>Lifecycle & Ownership</h4>
+            <table>
+                <tr>
+                    <th>Trait</th>
+                    <th>Method</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td><code>AnyType</code></td>
+                    <td><code>__del__()</code></td>
+                    <td>Base for types requiring lifecycle management</td>
+                </tr>
+                <tr>
+                    <td><code>Movable</code></td>
+                    <td><code>__moveinit__()</code></td>
+                    <td>Transfer ownership without copying</td>
+                </tr>
+                <tr>
+                    <td><code>Copyable</code></td>
+                    <td><code>copy()</code></td>
+                    <td>Explicit duplication (v24.6 revised)</td>
+                </tr>
+                <tr>
+                    <td><code>ImplicitlyCopyable</code></td>
+                    <td>Inherits <code>copy()</code></td>
+                    <td>Implicit copying via assignment</td>
+                </tr>
+            </table>
+
+            <h4>Representation & Conversion</h4>
+            <table>
+                <tr>
+                    <th>Trait</th>
+                    <th>Method</th>
+                    <th>Function</th>
+                </tr>
+                <tr>
+                    <td><code>Stringable</code></td>
+                    <td><code>__str__()</code></td>
+                    <td><code>str()</code>, <code>print()</code></td>
+                </tr>
+                <tr>
+                    <td><code>Representable</code></td>
+                    <td><code>__repr__()</code></td>
+                    <td><code>repr()</code> (v24.4)</td>
+                </tr>
+                <tr>
+                    <td><code>Writable</code></td>
+                    <td><code>write_to()</code></td>
+                    <td>Efficient stream output</td>
+                </tr>
+                <tr>
+                    <td><code>Intable</code></td>
+                    <td><code>__int__()</code></td>
+                    <td><code>int()</code> conversion</td>
+                </tr>
+                <tr>
+                    <td><code>Boolable</code></td>
+                    <td><code>__bool__()</code></td>
+                    <td><code>bool()</code>, conditionals</td>
+                </tr>
+                <tr>
+                    <td><code>Sized</code></td>
+                    <td><code>__len__()</code></td>
+                    <td><code>len()</code> function</td>
+                </tr>
+            </table>
+
+            <h4>Comparison & Ordering</h4>
+            <table>
+                <tr>
+                    <th>Trait</th>
+                    <th>Methods</th>
+                    <th>Operators</th>
+                </tr>
+                <tr>
+                    <td><code>EqualityComparable</code></td>
+                    <td><code>__eq__()</code>, <code>__ne__()</code></td>
+                    <td><code>==</code>, <code>!=</code></td>
+                </tr>
+                <tr>
+                    <td><code>Comparable</code></td>
+                    <td><code>__lt__()</code>, <code>__le__()</code>, <code>__gt__()</code>, <code>__ge__()</code></td>
+                    <td><code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code></td>
+                </tr>
+            </table>
+
+            <h4>Collection-Specific</h4>
+            <ul>
+                <li><code>KeyElement</code>: For Dict keys and Set elements (hashable + equality)</li>
+                <li><code>Iterator</code>: Types implementing <code>__iter__()</code> and <code>__next__()</code></li>
+                <li><code>Iterable</code>: Types that can be iterated over in for loops</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section" id="section9">
+        <h2>9. Parametric Programming</h2>
+
+        <div class="subsection">
+            <h3>Alias Declarations</h3>
+            <p>Defines compile-time values for type aliases and parameter values:</p>
+
+            <pre># Type aliases
+alias IntList = List[Int]
+alias FloatPair = Tuple[Float64, Float64]
+
+# Parameter values both alias and comptime can be used.. 
+# both are same but just the keyword differences
+alias SIMD_WIDTH = 8
+comptime MAX_SIZE = 1024
+
+# Local aliases in functions
+fn compute():
+    alias nelts = 4
+    var data = SIMD[DType.float32, nelts]()</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Parametric Aliases (v25.5+)</h3>
+            <p>Aliases with their own parameter lists:</p>
+
+            <pre>alias doubled[x: Int] = x * 2
+alias VectorOf[T: AnyType, n: Int] = SIMD[T, n]
+
+# Usage
+alias four = doubled[2]
+var vec: VectorOf[DType.int32, four]</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Parameter Expressions</h3>
+            <p>Execute at compile time, producing compile-time constants:</p>
+
+            <pre># Compile-time computation
+alias optimal_width = compute_simd_width()
+
+# Parametric function
+fn matrix_multiply[M: Int, N: Int, K: Int](
+    a: Matrix[M, K],
+    b: Matrix[K, N]
+) -> Matrix[M, N]:
+    # M, N, K are compile-time constants
+    pass</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>@parameter Decorator</h3>
+            <p>Marks functions and closures for compile-time execution:</p>
+
+            <pre>@parameter
+fn compile_time_factorial[n: Int]() -> Int:
+    @parameter
+    if n <= 1:
+        return 1
+    return n * compile_time_factorial[n - 1]()
+
+# Result is compile-time constant
+alias fact_5 = compile_time_factorial[5]()  # 120</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Generic Programming Patterns</h3>
+
+            <pre>fn swap[T: Movable](mut a: T, mut b: T):
+    var temp = a^
+    a = b^
+    b = temp^
+
+fn find_max[T: Comparable](values: List[T]) -> Optional[T]:
+    if len(values) == 0:
+        return None
+    
+    var max_val = values[0]
+    for item in values:
+        if item > max_val:
+            max_val = item
+    return max_val</pre>
+        </div>
+    </div>
+
+    <div class="section" id="section10">
+        <h2>10. Struct Design</h2>
+
+        <div class="subsection">
+            <h3>Field Declarations</h3>
+
+            <pre>struct Person:
+    var name: String
+    var age: Int
+    var email: String = ""  # Field initializer
+    
+    alias MAX_AGE = 150  # Static field (compile-time constant)</pre>
+
+            <div class="note">
+                <strong>Note:</strong> Field order affects memory layout. Static fields (aliases) consume no instance
+                storage.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Method Declarations</h3>
+
+            <h4>Instance Methods</h4>
+            <pre>struct Counter:
+    var value: Int
+    
+    fn increment(mut self):
+        self.value += 1
+    
+    fn get_value(self) -> Int:
+        return self.value
+    
+    fn consume(owned self):
+        # Takes ownership, self destroyed after</pre>
+
+            <h4>Static Methods</h4>
+            <pre>struct MathUtils:
+    @staticmethod
+    fn add(a: Int, b: Int) -> Int:
+        return a + b
+    
+    @staticmethod
+    fn create_default() -> Self:
+        return Self()</pre>
+
+            <h4>Generic Methods</h4>
+            <pre>struct Container[T: AnyType]:
+    var data: T
+    
+    fn transform[U: AnyType](self, func: fn(T) -> U) -> Container[U]:
+        return Container[U](func(self.data))</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Special Methods and Operator Overloading</h3>
+
+            <h4>Arithmetic Operators</h4>
+            <pre>struct Vector2:
+    var x: Float64
+    var y: Float64
+    
+    fn __add__(self, other: Self) -> Self:
+        return Self(self.x + other.x, self.y + other.y)
+    
+    fn __sub__(self, other: Self) -> Self:
+        return Self(self.x - other.x, self.y - other.y)
+    
+    fn __mul__(self, scalar: Float64) -> Self:
+        return Self(self.x * scalar, self.y * scalar)</pre>
+
+            <h4>Comparison Operators</h4>
+            <pre>fn __eq__(self, other: Self) -> Bool:
+    return self.x == other.x and self.y == other.y
+
+fn __ne__(self, other: Self) -> Bool:
+    return not (self == other)
+
+fn __lt__(self, other: Self) -> Bool:
+    return self.magnitude() < other.magnitude()</pre>
+
+            <h4>Container Operations</h4>
+            <pre>struct DynamicArray[T: AnyType]:
+    var data: UnsafePointer[T]
+    var size: Int
+    
+    fn __getitem__(self, index: Int) -> T:
+        return self.data[index]
+    
+    fn __setitem__(mut self, index: Int, value: T):
+        self.data[index] = value
+    
+    fn __len__(self) -> Int:
+        return self.size</pre>
+
+            <h4>Iteration Support</h4>
+            <pre>struct Range(Iterable):
+    var start: Int
+    var end: Int
+    
+    fn __iter__(self) -> RangeIterator:
+        return RangeIterator(self.start, self.end)
+
+struct RangeIterator:
+    var current: Int
+    var end: Int
+    
+    fn __next__(mut self) -> Optional[Int]:
+        if self.current < self.end:
+            var value = self.current
+            self.current += 1
+            return value
+        return None
+    
+    fn __has_next__(self) -> Bool:
+        return self.current < self.end</pre>
+
+            <h4>Callable Types</h4>
+            <pre>struct Accumulator:
+    var total: Int
+    
+    fn __call__(mut self, value: Int) -> Int:
+        self.total += value
+        return self.total
+
+# Usage
+var acc = Accumulator(0)
+print(acc(5))   # 5
+print(acc(10))  # 15</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Parameterized Structs</h3>
+
+            <pre>struct GenericArray[ElementType: Copyable & Movable]:
+    var data: UnsafePointer[ElementType, MutOrigin.external]
+    var size: Int
+    var capacity: Int
+
+    fn __init__(out self, capacity: Int = 16):
+        self.size = 0
+        self.capacity = capacity
+        self.data = UnsafePointer[ElementType].alloc(capacity)
+
+    fn __init__(out self, var *elements: ElementType):
+        self.size = len(elements)
+        self.capacity = self.size
+        self.data = UnsafePointer[ElementType].alloc(self.size)
+        
+        for i in range(self.size):
+            (self.data + i).init_pointee_move(elements[i])
+
+    fn __del__(deinit self):
+        for i in range(self.size):
+            (self.data + i).destroy_pointee()
+        self.data.free()
+
+    fn __getitem__(self, i: Int) raises -> ref [self] ElementType:
+        if i < self.size:
+            return self.data[i]
+        else:
+            raise Error("Index out of bounds")
+
+# Usage
+var int_array = GenericArray[Int](1, 2, 3, 4)
+var float_array = GenericArray[Float64](1.0, 2.0, 3.0)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Using the Self Type</h3>
+            <p>Within a parameterized struct, <code>Self</code> represents a concrete instance with all parameters
+                specified:</p>
+
+            <pre>struct Stack[T: Copyable & Movable]:
+    var items: List[T]
+    
+    @staticmethod
+    fn create_empty() -> Self:
+        return Self(List[T]())
+    
+    fn clone(self) -> Self:
+        return Self(self.items.copy())</pre>
+        </div>
+    </div>
+
+    <div class="section" id="section11">
+        <h2>11. Advanced Memory Management</h2>
+
+        <div class="subsection">
+            <h3>UnsafePointer: Low-Level Memory Access</h3>
+            <p>Provides direct, manual control over memory with no safety guarantees. Similar to raw pointers in C/C++.
+            </p>
+
+            <h4>Memory Lifecycle States</h4>
+            <ol>
+                <li><strong>Null:</strong> References no memory</li>
+                <li><strong>Allocated but Uninitialized:</strong> Memory reserved, dereferencing is undefined behavior
+                </li>
+                <li><strong>Initialized:</strong> Contains valid value, safe to access</li>
+                <li><strong>Dangling:</strong> Memory freed, dereferencing is undefined behavior</li>
+            </ol>
+
+            <h4>Manual Memory Management Operations</h4>
+            <pre># 1. Allocate memory
+var ptr = UnsafePointer[Int].alloc(10)
+
+# 2. Initialize values
+for i in range(10):
+    (ptr + i).init_pointee_copy(i * 2)
+
+# 3. Access data
+for i in range(10):
+    print(ptr[i])
+
+# 4. Destroy values
+for i in range(10):
+    (ptr + i).destroy_pointee()
+
+# 5. Deallocate memory
+ptr.free()</pre>
+
+            <h4>Advanced Operations</h4>
+            <pre># Move value from pointer
+var value = ptr.take_pointee()  # Leaves memory uninitialized
+
+# Transfer value to another location
+ptr.move_pointee_into(dst_ptr)  # dst_ptr must be uninitialized
+
+# Pointer arithmetic
+var next_ptr = ptr + 3
+next_ptr += 1</pre>
+
+            <div class="important">
+                <strong>Critical:</strong> Direct assignment (<code>ptr[] = x</code>) before initialization is undefined
+                behavior. Always use <code>init_pointee_copy()</code> or <code>init_pointee_move()</code> first.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>OwnedPointer: Exclusive Heap Ownership</h3>
+            <p>Smart pointer managing a single heap-allocated value with automatic lifecycle management.</p>
+
+            <h4>Characteristics:</h4>
+            <ul>
+                <li>Exclusive ownership (move-only semantics)</li>
+                <li>Automatic allocation and deallocation</li>
+                <li>Cannot be copied, only moved</li>
+            </ul>
+
+            <pre>struct LargeData:
+    var buffer: List[Float64]
+    # ... large data structure
+
+fn process():
+    # Allocates on heap, moves into pointer
+    var owned = OwnedPointer(LargeData())
+    
+    # Access value
+    owned[].compute()
+    
+    # Transfer ownership
+    var other = owned^  # owned is now invalid
+    
+    # Automatic cleanup when other goes out of scope</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>ArcPointer: Shared Reference Counting</h3>
+            <p>Thread-safe smart pointer with atomic reference counting for shared ownership.</p>
+
+            <h4>Key Features:</h4>
+            <ul>
+                <li>Multiple owners can share the same value</li>
+                <li>Automatic cleanup when last reference is dropped</li>
+                <li>Low-cost copying (only increments count)</li>
+                <li>Thread-safe reference count updates</li>
+            </ul>
+
+            <pre>struct SharedData:
+    var config: ArcPointer[Dict[String, String]]
+    
+    fn __init__(out self):
+        var cfg = Dict[String, String]()
+        cfg["version"] = "1.0"
+        self.config = ArcPointer(cfg)
+    
+    fn __copyinit__(out self, other: Self):
+        # Cheap copy: only increments reference count
+        self.config = other.config
+    
+    fn update(mut self, key: String, value: String):
+        # All copies share this modification
+        self.config[][key] = value
+
+# Usage
+var data1 = SharedData()
+var data2 = data1  # Shares the same Dict
+data1.update("status", "active")
+print(data2.config[]["status"])  # Prints: active</pre>
+
+            <div class="important">
+                <strong>Thread Safety Note:</strong> Only reference count updates are atomic. Concurrent modification of
+                the shared value requires additional synchronization.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Pointer: Safe Non-Owning References</h3>
+            <p>Safe pointer that references a value without taking ownership, with lifetime tracking.</p>
+
+            <pre>fn process_data(ptr: Pointer[Int, origin]):
+    # Can read/write through pointer safely
+    ptr[] += 10
+
+var value = 42
+var ptr = Pointer(to=value)
+process_data(ptr)
+print(value)  # 52</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Span: Safe Memory Views</h3>
+            <p>Type-safe view of contiguous memory without ownership, integrating with Mojo's lifetime system.</p>
+
+            <h4>Initialization</h4>
+            <pre># From collections (origin inferred)
+var list_data = List[Int](1, 2, 3, 4, 5)
+var span1 = Span(list_data)
+
+# From raw pointers (unsafe span)
+var ptr = UnsafePointer[Int].alloc(10)
+var span2 = Span(ptr, 10)</pre>
+
+            <h4>Access and Slicing</h4>
+            <pre># Element access (bounds-checked in debug builds)
+print(span1[2])  # 3
+
+# Slicing creates sub-spans
+var sub_span = span1[1:4]  # Elements at indices 1, 2, 3
+
+# Negative indices
+var last_two = span1[-2:]  # Last two elements</pre>
+
+            <h4>Iteration</h4>
+            <pre># Immutable iteration
+for element in span1:
+    print(element)
+
+# Mutable iteration
+for ref element in span1:
+    element *= 2  # Modifies original data</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Bitcasting and SIMD Operations</h3>
+
+            <h4>Pointer Bitcasting</h4>
+            <p>Reinterprets memory at the same address with a different type:</p>
+
+            <pre>fn read_binary_data(ptr: UnsafePointer[UInt8]) -> List[UInt32]:
+    var results = List[UInt32]()
+    var offset = 0
+    
+    # Read length byte
+    var length = Int(ptr[offset])
+    offset += 1
+    
+    # Bitcast to read UInt32 values
+    var uint32_ptr = (ptr + offset).bitcast[UInt32]()
+    
+    for i in range(length):
+        results.append(uint32_ptr[i])
+    
+    return results</pre>
+
+            <h4>Endianness Handling</h4>
+            <pre>from sys import byte_swap
+
+fn read_big_endian_int(ptr: UnsafePointer[UInt8]) -> UInt32:
+    var uint32_ptr = ptr.bitcast[UInt32]()
+    var value = uint32_ptr[]
+    
+    # Convert from big-endian if needed
+    @parameter
+    if sys.is_little_endian():
+        return byte_swap(value)
+    return value</pre>
+
+            <h4>Vectorized Memory Operations</h4>
+            <pre># Strided load/store - access non-contiguous elements
+fn process_rgb_channel(ptr: UnsafePointer[UInt8], pixel_count: Int):
+    alias simd_width = 8
+    var stride = 3  # RGB: 3 bytes per pixel
+    
+    for i in range(0, pixel_count * stride, simd_width * stride):
+        # Load red channel (every 3rd byte)
+        var red = ptr.offset(i).strided_load[width=simd_width](stride)
+        
+        # Process (e.g., invert)
+        var inverted = ~red
+        
+        # Store back
+        ptr.offset(i).strided_store[width=simd_width](inverted, stride)
+
+# Gather/scatter - irregular access patterns
+fn permute_data(src: UnsafePointer[Float32], dst: UnsafePointer[Float32]):
+    alias width = 8
+    var indices = SIMD[DType.int32, width](7, 3, 5, 1, 6, 2, 4, 0)
+    
+    # Gather from non-contiguous locations
+    var values = src.gather(indices)
+    
+    # Process
+    values *= 2.0
+    
+    # Scatter to non-contiguous locations
+    dst.scatter(values, indices)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Memory Management Best Practices</h3>
+
+            <div class="note">
+                <strong>Safety Hierarchy:</strong>
+                <ol>
+                    <li>Prefer stack allocation and automatic memory management</li>
+                    <li>Use <code>OwnedPointer</code> for single ownership</li>
+                    <li>Use <code>ArcPointer</code> for shared ownership</li>
+                    <li>Use <code>Pointer</code> for safe non-owning references</li>
+                    <li>Use <code>Span</code> for safe views of contiguous memory</li>
+                    <li>Use <code>UnsafePointer</code> only when necessary (FFI, custom allocators)</li>
+                </ol>
+            </div>
+
+            <h4>Common Patterns</h4>
+            <pre># Custom allocator using UnsafePointer
+struct Arena[T: AnyType]:
+    var memory: UnsafePointer[T]
+    var capacity: Int
+    var used: Int
+    
+    fn __init__(out self, capacity: Int):
+        self.capacity = capacity
+        self.used = 0
+        self.memory = UnsafePointer[T].alloc(capacity)
+    
+    fn allocate(mut self) raises -> Pointer[T]:
+        if self.used >= self.capacity:
+            raise Error("Arena full")
+        
+        var ptr = self.memory + self.used
+        self.used += 1
+        return Pointer(to=ptr[])
+    
+    fn reset(mut self):
+        # Destroy all allocated objects
+        for i in range(self.used):
+            (self.memory + i).destroy_pointee()
+        self.used = 0
+    
+    fn __del__(deinit self):
+        self.reset()
+        self.memory.free()</pre>
+        </div>
+    </div>
+
+    <div class="section" id="section12">
+        <h2>12. MLIR Interoperability</h2>
+
+        <p>Mojo provides direct access to MLIR (Multi-Level Intermediate Representation), enabling low-level control and
+            hardware-specific optimizations without modifying the compiler.</p>
+
+        <div class="subsection">
+            <h3>Understanding MLIR in Mojo</h3>
+            <p>Mojo uses ahead-of-time (AOT) compilation, first translating source code into MLIR intermediate
+                representation before generating machine code. Unlike custom IRs, MLIR is extensible and supports
+                multiple languages and processor types.</p>
+
+            <h4>MLIR Structure</h4>
+            <ul>
+                <li><strong>Dialects:</strong> Namespaces for related operations</li>
+                <li><strong>Operations:</strong> Represent computations or abstractions</li>
+                <li><strong>Operands:</strong> Operation inputs (like arguments)</li>
+                <li><strong>Results:</strong> Operation outputs</li>
+                <li><strong>Attributes:</strong> Compile-time constants and metadata</li>
+                <li><strong>Types:</strong> Associated with operands, results, and attributes</li>
+            </ul>
+        </div>
+
+        <div class="subsection">
+            <h3>MLIR Elements in Mojo</h3>
+            <p>Mojo exposes MLIR through three primary interfaces:</p>
+
+            <h4>1. __mlir_attr (Attributes)</h4>
+            <p>Define MLIR attributes (compile-time constants) with their types:</p>
+
+            <pre>alias _0 = __mlir_attr.`0:i1`  # Constant 0 of type i1
+alias _1 = __mlir_attr.`1:i1`  # Constant 1 of type i1
+alias default_val = __mlir_attr.`42`  # Defaults to i64 if type omitted
+
+# Complex attribute example
+alias false_attr = __mlir_attr.`false`</pre>
+
+            <h4>2. __mlir_type (Types)</h4>
+            <p>Reference MLIR types directly:</p>
+
+            <pre>struct BitList(Stringable):
+    var value: List[__mlir_type.i1]  # List of MLIR i1 (1-bit) values
+    
+    fn __init__(out self, *values: __mlir_type.i1):
+        self.value = List[__mlir_type.i1]()
+        for i in values:
+            self.value.append(i)
+    
+    fn __str__(self) -> String:
+        var s = String("0b")
+        for i in self.value:
+            # Cast i1 to index type for Int conversion
+            var int_val = __mlir_op.`index.castu`[
+                _type=__mlir_type.index
+            ](i)
+            s += String(Int(mlir_value=int_val))
+        return s
+
+# Usage
+var bits = BitList(_0, _1, _0, _1)
+print(bits)  # Output: 0b0101</pre>
+
+            <h4>3. __mlir_op (Operations)</h4>
+            <p>Invoke MLIR operations directly. Operations have the form <code>&lt;dialect&gt;.&lt;operation&gt;</code>:
+            </p>
+
+            <pre># Boolean constant operation
+@register_passable("trivial")
+struct CustomBool:
+    var value: __mlir_type.i1
+    
+    fn __init__(out self, val: Bool):
+        
+        if val:
+            self.value = __mlir_op.`index.bool.constant`[
+                value = __mlir_attr.`true`
+            ]()
+        else:
+            self.value = __mlir_op.`index.bool.constant`[
+                value = __mlir_attr.`false`
+            ]()
+    
+    fn __mlir_i1__(self) -> __mlir_type.i1:
+        return self.value
+
+# Usage in conditionals
+var flag = CustomBool(True)
+if flag:
+    print("Flag is true")</pre>
+
+            <div class="note">
+                <strong>Syntax Note:</strong> Use backticks when operation names contain characters not allowed in Mojo
+                identifiers (like <code>.</code>).
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>POP Dialect</h3>
+            <p>The POP (Parametric Operations) dialect provides hardware-aware, parametric operations on top of the LLVM
+                dialect.</p>
+
+            <h4>Core POP Types</h4>
+            <table>
+                <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Example</th>
+                </tr>
+                <tr>
+                    <td><code>pop.simd</code></td>
+                    <td>SIMD vector type</td>
+                    <td><code>!pop.simd&lt;4, si32&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>pop.scalar</code></td>
+                    <td>Scalar type (1-element SIMD)</td>
+                    <td><code>!pop.scalar&lt;f32&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>pop.array</code></td>
+                    <td>Fixed-size array</td>
+                    <td><code>!pop.array&lt;4, f32&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>pop.union</code></td>
+                    <td>Non-discriminated union</td>
+                    <td><code>!pop.union&lt;i32, i64&gt;</code></td>
+                </tr>
+                <tr>
+                    <td><code>pop.int_literal</code></td>
+                    <td>Arbitrary-precision integer</td>
+                    <td>Compile-time only</td>
+                </tr>
+                <tr>
+                    <td><code>pop.float_literal</code></td>
+                    <td>Arbitrary-precision float</td>
+                    <td>Compile-time only</td>
+                </tr>
+            </table>
+
+            <h4>Type Conversions</h4>
+            <pre>fn mixed_operations(arg: Float32) -> Float32:
+    # Convert POP type to builtin for LLVM operations
+    var builtin_val = __mlir_op.`pop.cast_to_builtin`[
+        _type=__mlir_type.f32
+    ](arg)
+    
+    # Use LLVM operation
+    var result = __mlir_op.`llvm.fadd`(builtin_val, builtin_val)
+    
+    # Convert back to POP type
+    var pop_result = __mlir_op.`pop.cast_from_builtin`[
+        _type=__mlir_type.`!pop.scalar<f32>`
+    ](result)
+    
+    return pop_result</pre>
+
+            <h4>Common POP Operations</h4>
+            <pre># Arithmetic
+var sum = __mlir_op.`pop.add`(a, b)
+var product = __mlir_op.`pop.mul`(a, b)
+var fused = __mlir_op.`pop.fma`(a, b, c)  # a * b + c
+
+# Comparison
+var is_greater = __mlir_op.`pop.cmp`[
+    predicate = __mlir_attr.`#pop<cmp_predicate sgt>`
+](a, b)
+
+# Memory operations
+var ptr = __mlir_op.`pop.aligned_alloc`[
+    alignment = 64._mlir_value
+](size._mlir_value)
+
+__mlir_op.`pop.store`(value, ptr)
+var loaded = __mlir_op.`pop.load`(ptr)
+
+# Array operations
+var arr = __mlir_op.`pop.array.create`(x, y, z)
+var element = __mlir_op.`pop.array.get`[index = 1._mlir_value](arr)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>KGEN (Kernel Generator)</h3>
+            <p>Mojo's compiler is built on KGEN, a metaprogramming framework layered on MLIR Core.</p>
+
+            <h4>Key Features:</h4>
+            <ul>
+                <li>Supports parametric computation before elaboration</li>
+                <li>Enables efficient compilation of parameterized kernels</li>
+                <li>Provides clearer compiler diagnostics</li>
+                <li>Generates device-specific code from high-level source</li>
+            </ul>
+
+            <h4>KGEN Operations</h4>
+            <pre># Compile-time constant
+var compile_const = __mlir_op.`kgen.param.constant`[
+    _type = __mlir_type.si32,
+    value = 42._mlir_value
+]()
+
+# Parametric generator
+@parameter
+fn create_buffer[size: Int]() -> UnsafePointer[Int]:
+    return __mlir_op.`pop.stack_allocation`[
+        count = size._mlir_value,
+        _type = UnsafePointer[Int]._mlir_type,
+        alignment = 16._mlir_value
+    ]()</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Practical MLIR Examples</h3>
+
+            <h4>Stack Allocation with Address Spaces</h4>
+            <pre>@always_inline
+fn stack_allocation[
+    count: Int,
+    type: AnyType,
+    alignment: Int = alignof[type]()
+]() -> UnsafePointer[type]:
+    return __mlir_op.`pop.stack_allocation`[
+        count = count._mlir_value,
+        _type = UnsafePointer[type]._mlir_type,
+        alignment = alignment._mlir_value
+    ]()</pre>
+
+            <h4>GPU Shared Memory Allocation</h4>
+            <pre>@parameter
+fn gpu_shared_alloc[T: AnyType, count: Int]() -> UnsafePointer[T]:
+    return __mlir_op.`pop.global_alloc`[
+        name = "_shared_memory",
+        count = count._mlir_value,
+        memoryType = __mlir_attr`#pop<global_alloc_addr_space gpu_shared>`,
+        _type = UnsafePointer[T]._mlir_type,
+        alignment = 16._mlir_value
+    ]()</pre>
+
+            <h4>Deferred Attribute Construction</h4>
+            <pre>fn build_shape_attr[m: Int, n: Int, k: Int]() -> __mlir_type`!kgen.deferred`:
+    return __mlir_deferred_attr[
+        `#nvvm.shape<m=`, +m._mlir_value,
+        `, n=`, +n._mlir_value,
+        `, k=`, +k._mlir_value, `>`
+    ]
+
+# Type conversion with deferred attributes
+fn dtype_to_mlir[dt: DType]() -> __mlir_type`!kgen.deferred`:
+    @parameter
+    if dt is DType.float16:
+        return __mlir_attr`f16`
+    elif dt is DType.float32:
+        return __mlir_attr`f32`
+    elif dt is DType.int32:
+        return __mlir_attr`si32`
+    else:
+        return dt.__mlir_type()</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Benefits of MLIR Integration</h3>
+
+            <div class="info">
+                <strong>Key Advantages:</strong>
+                <ul>
+                    <li><strong>Hardware Abstraction:</strong> Write high-level code that compiles to optimal
+                        hardware-specific instructions</li>
+                    <li><strong>Extensibility:</strong> Add custom operations without modifying the compiler</li>
+                    <li><strong>Zero-Cost Abstractions:</strong> High-level abstractions compile to efficient low-level
+                        code</li>
+                    <li><strong>Interoperability:</strong> Seamless integration with existing MLIR-based tools and
+                        frameworks</li>
+                    <li><strong>Future-Proof:</strong> Automatic support for new hardware through MLIR's extensible
+                        dialect system</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>When to Use MLIR Directly</h3>
+
+            <ul>
+                <li><strong>Hardware-Specific Optimizations:</strong> Access specialized instructions not exposed by
+                    standard library</li>
+                <li><strong>FFI Integration:</strong> Interface with external libraries at the LLVM level</li>
+                <li><strong>Custom Type Systems:</strong> Implement domain-specific types with specialized behavior</li>
+                <li><strong>Compiler Extensions:</strong> Experiment with new language features before they're
+                    standardized</li>
+                <li><strong>Performance Tuning:</strong> Fine-tune code generation for specific workloads</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section" id="section13">
+        <h2>13. Standard Library: Memory Module</h2>
+        <p>The <code>memory</code> module provides pointer types and utility functions for memory manipulation,
+            including safe views and low-level access.</p>
+
+        <div class="subsection">
+            <h3>Pointer Types</h3>
+            <p>Safe and unsafe pointers for memory access, with origin and mutability tracking.</p>
+
+            <h4>Key Types</h4>
+            <table>
+                <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>Pointer[T]</code></td>
+                    <td>Safe non-owning reference with lifetime tracking</td>
+                </tr>
+                <tr>
+                    <td><code>UnsafePointer[T, mut=Bool]</code></td>
+                    <td>Unsafe raw pointer for manual management</td>
+                </tr>
+                <tr>
+                    <td><code>OpaquePointer</code></td>
+                    <td>Void-like pointer for generic addresses</td>
+                </tr>
+                <tr>
+                    <td><code>ArcPointer[T]</code></td>
+                    <td>Reference-counted shared pointer</td>
+                </tr>
+            </table>
+
+            <pre>from memory import ArcPointer, Pointer
+
+var p = ArcPointer(4)
+var p2 = p  # Shared reference
+p2[] = 3
+print(p[] == 3)  # True
+
+var safe_ptr = Pointer(to=some_value)
+safe_ptr[] += 1  # Safe access</pre>
+
+            <div class="note">
+                <strong>Note:</strong> <code>UnsafePointer</code> infers mutability from context; use explicit
+                <code>mut=False</code> for immutable.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Span Views</h3>
+            <p><code>Span[T]</code>: Non-owning contiguous memory view with bounds checking (debug mode).</p>
+
+            <pre>from memory import Span
+
+var data = List[Int](1, 2, 3, 4)
+var span = Span(data)
+print(span[1])  # 2
+var sub = span[1:3]  # Span of 2,3
+for ref x in sub:
+    x *= 2  # Modifies original</pre>
+
+            <div class="important">
+                <strong>Unsafe Access:</strong> Use <code>unsafe_get()</code>, <code>unsafe_swap_elements()</code> for
+                performance-critical code.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Memory Utilities</h3>
+            <p>Functions for manipulation like <code>bitcast</code>, <code>memcpy</code>.</p>
+
+            <pre>from memory import bitcast, memcpy
+
+var simd_a = SIMD[DType.int32, 4](1, 2, 3, 4)
+var simd_b = bitcast[Float32](simd_a)  # Reinterpret as floats
+
+# Copy memory (keyword args required, v0.25.7)
+memcpy(dest_ptr, src_ptr, size=1024)</pre>
+        </div>
+    </div>
+
+    <div class="section" id="section14">
+        <h2>14. Standard Library: Sys Module</h2>
+        <p>The <code>sys</code> module provides OS-dependent functionality, FFI, and hardware introspection.</p>
+
+        <div class="subsection">
+            <h3>Global State Management</h3>
+            <p>Mojo provides thread-safe global state via <code>_Global</code>:</p>
+            <pre># Define a global with initialization function
+fn init_config() -> Dict[String, String]:
+    var config = Dict[String, String]()
+    config["version"] = "1.0"
+    return config^
+
+comptime AppConfig = _Global[
+    Dict[String, String],
+    name = "app.config",
+    init_fn = init_config,
+]
+
+fn use_config() raises:
+    var config = AppConfig.get_or_create_ptr()[]
+    print(config["version"])</pre>
+            <h4>Indexed Globals</h4>
+            <p>Well-known globals with fixed indices:</p>
+            <pre># Reserved indices:
+# 0: Python runtime context
+# 1: GPU comm P2P availability cache
+# 2: Reserved for future use
+
+fn get_python_context() raises:
+    var ctx = _Global.get_or_create_indexed_ptr(0)</pre>
+            <div class="note">
+                <strong>Thread Safety:</strong> Global access is thread-safe via atomic operations. Initialization
+                occurs exactly once.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Dynamic Library Loading</h3>
+            <h4>OwnedDLHandle (RAII)</h4>
+            <p>Automatic resource management for dynamic libraries (<code>DLHandle</code> deprecated):</p>
+            <pre>from sys.ffi import OwnedDLHandle, RTLD
+
+fn use_library() raises:
+    # Automatic cleanup when out of scope
+    var lib = OwnedDLHandle("libm.so.6")
+    # Get function pointer
+    var sqrt = lib.get_function[fn(Float64) -> Float64]("sqrt")
+    print(sqrt(16.0))  # 4.0
+
+    # Get global symbol
+    var errno_ptr = lib.get_symbol[Int]("errno")
+
+    # Call with variadic args
+    var result = lib.call["sprintf", Int](buffer, format, args)
+
+    # Load with custom flags
+    var lib = OwnedDLHandle(
+        "libfoo.so",
+        flags = RTLD.NOW | RTLD.LOCAL
+    )</pre>
+            <h4>RTLD Flags</h4>
+            <ul>
+                <li><code>RTLD.LAZY</code>: Defer symbol resolution until needed</li>
+                <li><code>RTLD.NOW</code>: Resolve all symbols immediately</li>
+                <li><code>RTLD.LOCAL</code>: Symbols not available for later loads</li>
+                <li><code>RTLD.GLOBAL</code>: Symbols available globally</li>
+                <li><code>RTLD.NODELETE</code>: Don't unload on exit</li>
+            </ul>
+            <h4>Finding Libraries</h4>
+            <pre># Try multiple paths
+var lib = _try_find_dylib[
+    name = "mylib"
+](
+    Path("./libmylib.so"),
+    Path("/usr/lib/libmylib.so"),
+    Path("libmylib.so")  # System search
+)
+
+# With abort on failure
+var lib2 = _find_dylib["mylib"](paths_list)</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>Hardware Introspection</h3>
+            <p>Query system capabilities via <code>sys.info</code> (snake_case renames v0.25.7).</p>
+
+            <pre>from sys.info import has_fma, size_of, CompilationTarget
+
+print(has_fma())  # True if FMA supported
+print(size_of[Int]())  # 8
+
+var target = CompilationTarget()
+print(target._is_amd_rdna3())  # Platform-specific checks</pre>
+
+            <div class="info">
+                <strong>New:</strong> <code>platform_map()</code> for platform-specific types.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>FFI Utilities</h3>
+            <p>Foreign function interface for external calls.</p>
+
+            <pre>from sys.ffi import external_call, c_int  # Renamed aliases (v0.25+)
+
+fn call_c_func(*args: c_int) -> c_int:
+    return external_call[
+        callee = "my_c_func",
+        return_type = c_int,
+        *types = c_int
+    ](*args)</pre>
+            <h4>Const External Calls</h4>
+            <p>Mark pure functions for optimization:</p>
+
+            <pre># Internal use - marks function as having no side effects
+# Allows compiler to optimize away duplicate calls
+var x = _external_call_const["pure_func", Int](42)
+var y = _external_call_const["pure_func", Int](42)  # May be optimized away</pre>
+        </div>
+    </div>
+    </div>
+
+    <div class="subsection">
+        <h3>C Library Bindings (sys._libc)</h3>
+
+        <h4>File Operations</h4>
+        <pre>from sys._libc import fopen, fclose, popen, pclose, setvbuf, BufferMode
+
+var file = fopen("data.txt".unsafe_cstr_ptr(), "r".unsafe_cstr_ptr())
+_ = setvbuf(file, buffer, BufferMode.buffered, 8192)
+_ = fclose(file)
+
+# Pipe operations
+var pipe_handle = popen("ls -la".unsafe_cstr_ptr(), "r".unsafe_cstr_ptr())
+# ... read output ...
+_ = pclose(pipe_handle)</pre>
+
+        <h4>Process Control</h4>
+        <pre>from sys._libc import vfork, execvp, kill, pipe, close, dup
+from sys._libc import SignalCodes, FcntlCommands, FcntlFDFlags, fcntl
+
+# Fork process
+var pid = vfork()
+if pid == 0:
+    # Child process
+    _ = execvp(program, args)
+else:
+    # Parent process
+    _ = kill(pid, SignalCodes.TERM)
+
+# Pipe creation
+var fds = UnsafePointer[Int32].alloc(2)
+_ = pipe(fds)
+var read_fd = fds[0]
+var write_fd = fds[1]
+
+# File descriptor operations
+var new_fd = dup(old_fd)
+_ = fcntl(fd, FcntlCommands.F_SETFD, FcntlFDFlags.FD_CLOEXEC)</pre>
+
+    </div>
+
+    <div class="subsection">
+        <h3>Error Handling (errno)</h3>
+
+        <pre>from sys.ffi import get_errno, set_errno, ErrNo
+
+# Check system errors
+try:
+    var fd = open_file("missing.txt")
+except:
+    var err = get_errno()
+    if err == ErrNo.ENOENT:
+        print("File not found")
+        set_errno(ErrNo.SUCCESS)  # Clear error
+    elif err == ErrNo.EACCES:
+        print("Permission denied")
+    else:
+        print(err)  # Human-readable via strerror</pre>
+
+        <h4>Common Error Codes</h4>
+        <table>
+            <tr>
+                <th>Code</th>
+                <th>Value (Linux/macOS)</th>
+                <th>Description</th>
+            </tr>
+            <tr>
+                <td><code>EPERM</code></td>
+                <td>1</td>
+                <td>Operation not permitted</td>
+            </tr>
+            <tr>
+                <td><code>ENOENT</code></td>
+                <td>2</td>
+                <td>No such file or directory</td>
+            </tr>
+            <tr>
+                <td><code>EINTR</code></td>
+                <td>4</td>
+                <td>Interrupted system call</td>
+            </tr>
+            <tr>
+                <td><code>EAGAIN</code></td>
+                <td>11/35</td>
+                <td>Try again</td>
+            </tr>
+            <tr>
+                <td><code>ENOMEM</code></td>
+                <td>12</td>
+                <td>Out of memory</td>
+            </tr>
+            <tr>
+                <td><code>EACCES</code></td>
+                <td>13</td>
+                <td>Permission denied</td>
+            </tr>
+        </table>
+
+        <h4>Platform-Specific Values</h4>
+        <pre># Helper for platform-specific constants
+comptime EDEADLK = platform_map["EDEADLK", linux=35, macos=11]()</pre>
+    </div>
+
+    <div class="subsection">
+        <h3>Inline Assembly</h3>
+        <p>Direct assembly code injection:</p>
+
+        <pre>from sys._assembly import inlined_assembly
+
+fn atomic_add(mut ptr: UnsafePointer[Int], value: Int) -> Int:
+    return inlined_assembly[
+        "lock xadd %0, %1",
+        Int,
+        Int, UnsafePointer[Int],
+        constraints="=r,=m,0,1",
+        has_side_effect=True
+    ](value, ptr)</pre>
+
+        <div class="important">
+            <strong>Safety:</strong> Inline assembly bypasses all safety checks. Incorrect usage causes undefined
+            behavior.
+        </div>
+    </div>
+
+    <div class="subsection">
+        <h3>LLVM Intrinsics</h3>
+        <p>Direct access to LLVM intrinsic functions:</p>
+
+        <pre>from sys.intrinsics import llvm_intrinsic
+
+# Memory operations
+llvm_intrinsic["llvm.memcpy", NoneType](dest, src, size)
+llvm_intrinsic["llvm.memset", NoneType](ptr, value, size)
+
+# Math operations
+var result = llvm_intrinsic["llvm.sqrt", Float64, has_side_effect=False](x)
+
+# Bit manipulation
+var count = llvm_intrinsic["llvm.ctpop", Int32](value)</pre>
+
+        <h4>Compiler Hints</h4>
+        <pre>from sys.intrinsics import expect, likely, unlikely, assume
+
+# Branch prediction hints
+if likely(common_case):
+    fast_path()
+
+if unlikely(error_condition):
+    handle_error()
+
+# Optimization hints
+var result = expect[100](random_value())  # Expect value 100
+
+# Assert invariants for optimization
+assume(x > 0)  # Compiler can optimize assuming x is positive</pre>
+
+        <h4>Prefetching</h4>
+        <pre>from sys.intrinsics import prefetch, PrefetchOptions
+
+# Default prefetch (high locality, read, data cache)
+prefetch[DType.float64](ptr)
+
+# Custom prefetch behavior
+var opts = PrefetchOptions().for_write().medium_locality()
+prefetch[DType.int32, params=opts](data_ptr)
+
+# Chain configuration
+prefetch[
+    DType.float64,
+    params=PrefetchOptions()
+        .for_read()
+        .high_locality()
+        .to_data_cache()
+](ptr)</pre>
+
+        <h4>Gather/Scatter Operations</h4>
+        <pre>from sys.intrinsics import gather, scatter
+
+# Gather from non-contiguous locations
+var offsets = SIMD[DType.int, 8](0, 8, 16, 24, 32, 40, 48, 56)
+var mask = SIMD[DType.bool, 8](True, True, False, True, True, False, True, True)
+var default_val = SIMD[DType.float32, 8](0.0)
+var gathered = gather[DType.float32, 8, alignment=4](
+    base_addr,
+    offsets,
+    mask,
+    default_val
+)
+
+# Scatter to non-contiguous locations
+scatter[DType.float32, 8, alignment=4](
+    values,
+    offsets,
+    mask
+)</pre>
+
+        <h4>Masked Load/Store</h4>
+        <pre>from sys.intrinsics import masked_load, masked_store, compressed_store
+
+# Load with mask
+var data = masked_load[DType.int32, 8, alignment=4](
+    ptr,
+    mask,
+    passthrough=SIMD[DType.int32, 8](0)
+)
+
+# Store with mask
+masked_store[8, alignment=4](
+    SIMD[DType.int32, 8](1, 2, 3, 4, 5, 6, 7, 8),
+    ptr,
+    mask
+)
+
+# Compressed store (skip masked lanes)
+compressed_store[DType.float64, 4](
+    values,
+    ptr,
+    mask
+)</pre>
+
+        <h4>Strided Access</h4>
+        <pre>from sys.intrinsics import strided_load, strided_store
+
+# Load every Nth element
+var data = strided_load[DType.float32, 8](
+    ptr,
+    stride=4,  # Skip 4 elements between loads
+    mask
+)
+
+# Store with stride
+strided_store[DType.int32, 8](
+    values,
+    ptr,
+    stride=2,
+    mask
+)</pre>
+
+        <h4>GPU-Specific Intrinsics (AMD)</h4>
+        <pre>from sys.intrinsics import (
+    implicitarg_ptr,
+    readfirstlane,
+    sendmsg,
+    ballot
+)
+
+# AMD implicit arguments (for kernel parameters)
+var implicit_args = implicitarg_ptr()
+
+# Read value from first active lane
+var broadcast = readfirstlane(Int32(lane_value))
+
+# Send message to hardware
+sendmsg(opcode=1, msg=0)
+
+# Get active lane mask
+var active_mask = ballot[DType.int64](True)</pre>
+    </div>
+
+    <div class="subsection">
+        <h3>Subprocess Execution</h3>
+
+        <pre>from subprocess import run
+
+fn execute_command() raises:
+    var output = run("ls -la")
+    print(output)
+    
+    # Captures stdout as string
+    # Raises on command failure</pre>
+    </div>
+    </div>
+
+
+    <div class="section" id="section15">
+        <h2>15. Standard Library: Testing Module</h2>
+        <p>The <code>testing</code> module provides assertions and <code>TestSuite</code> for unit testing. Use
+            <code>mojo run</code> ( <code>mojo test</code> removed v0.25.7).
+        </p>
+
+        <div class="subsection">
+            <h3>Assertions</h3>
+            <p>Functions for verifying conditions; raise <code>Error</code> on failure with messages/diffs.</p>
+
+            <h4>Key Functions</h4>
+            <table>
+                <tr>
+                    <th>Function</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>assert_true[T: Boolable](val: T, msg: String)</code></td>
+                    <td>Asserts value is truthy</td>
+                </tr>
+                <tr>
+                    <td><code>assert_equal[T: EqualityComparable](lhs: T, rhs: T, msg: String)</code></td>
+                    <td>Asserts equality (colored diffs for strings, v0.25.7)</td>
+                </tr>
+                <tr>
+                    <td><code>assert_not_equal[T: EqualityComparable](lhs: T, rhs: T)</code></td>
+                    <td>Asserts inequality</td>
+                </tr>
+                <tr>
+                    <td><code>assert_raises(contains: String)</code></td>
+                    <td>Context manager for expected exceptions</td>
+                </tr>
+            </table>
+
+            <pre>from testing import assert_equal, assert_raises, assert_true
+
+assert_true(5 > 3, "Basic truth check")
+assert_equal("hello", "hello", "String equality")
+
+with assert_raises(contains="Error"):
+    raise "Some Error"  # Passes if contains "Error"</pre>
+        </div>
+
+        <div class="subsection">
+            <h3>TestSuite</h3>
+            <p>Automatic test discovery and execution. Supports skipping, reporting (v0.25.7).</p>
+
+            <pre>from testing import TestSuite
+
+fn test_add() raises:
+    assert_equal(2 + 2, 4)
+
+fn test_fail() raises:
+    assert_equal(1 + 1, 3)  # Fails
+
+fn main() raises:
+    var suite = TestSuite()
+    suite.add_test(test_add)
+    suite.add_test(test_fail)
+    var report = suite.run()
+    suite.generate_report(report)  # New: detailed report
+
+# CLI: mojo run tests.mojo --skip test_fail</pre>
+
+            <div class="note">
+                <strong>CLI Control:</strong> <code>--skip test_name</code>, <code>--only test_name</code>,
+                <code>--skip-all</code>.
+            </div>
+
+            <h4>TestResult</h4>
+            <table>
+                <tr>
+                    <th>Value</th>
+                    <th>Meaning</th>
+                </tr>
+                <tr>
+                    <td><code>passed</code></td>
+                    <td>Test succeeded</td>
+                </tr>
+                <tr>
+                    <td><code>failed</code></td>
+                    <td>Test failed</td>
+                </tr>
+                <tr>
+                    <td><code>skipped</code></td>
+                    <td>Test skipped</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="section" id="section16">
+        <h2>16. Standard Library: Compile Module</h2>
+        <p>The <code>compile</code> module enables runtime compilation and inspection of Mojo code for metaprogramming.
+        </p>
+
+        <div class="subsection">
+            <h3>compile_info</h3>
+            <p>Retrieves low-level details for a function: ASM, LLVM IR, object code, etc. Supports file output and
+                targets.</p>
+
+            <pre>from compile import compile_info
+
+fn my_func():
+    print("Hello")
+
+# Get assembly
+var info = compile_info[my_func]()
+print(info.asm)
+
+# Write to file
+info.write_asm("output.s")
+info.write_llvm_ir("output.ll")</pre>
+
+            <div class="info">
+                <strong>Options:</strong> Control with <code>options</code> param for sanitizers, targets.
+            </div>
+        </div>
+
+        <div class="subsection">
+            <h3>Reflection Utilities</h3>
+            <p>Inspect types/functions at runtime/compile-time.</p>
+
+            <pre>from compile.reflection import get_type_name
+
+fn inspect_type[T: AnyType]():
+    print(get_type_name[T]())  # Replaces TypeIdentifiable</pre>
+        </div>
+    </div>
+
+    <div class="section" id="section17">
+        <h2>17. Standard Library: Runtime Module</h2>
+        <p>The <code>runtime</code> module handles concurrency and tracing.</p>
+
+        <div class="subsection">
+            <h3>AsyncRT: Asynchronous Runtime</h3>
+            <p>Low-level concurrency with tasks and groups. Device-aware scheduling (v0.25+).</p>
+
+            <h4>Key Types</h4>
+            <table>
+                <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>Task[T]</code></td>
+                    <td>Asynchronous task producing <code>T</code></td>
+                </tr>
+                <tr>
+                    <td><code>TaskGroup</code></td>
+                    <td>Group for concurrent tasks</td>
+                </tr>
+                <tr>
+                    <td><code>DeviceContextPtr</code></td>
+                    <td>Pointer to C++ device context for GPU</td>
+                </tr>
+            </table>
+
+            <pre>from runtime.asyncrt import create_task, TaskGroup
+
+fn async_work() -> Int:
+    return 42
+
+var task = create_task(async_work())
+print(task.await())  # 42
+
+var group = TaskGroup()
+group.add_task(create_task(async_work))
+group.wait()  # Wait for all</pre>
+
+
+            <div class="subsection">
+                <h3>Tracing Utilities</h3>
+                <p>Provides runtime tracing for debugging/performance.</p>
+
+                <pre>from runtime.tracing import trace_event
+
+fn traced_func():
+    with trace_event("my_event", "category"):
+        # Traced code
+        pass</pre>
+
+                <div class="info">
+                    <strong>Integration:</strong> Works with ASan for heap error detection (v0.25.7, uses system
+                    allocators).
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Best Practices and Design Guidelines</h2>
+
+            <div class="subsection">
+                <h3>Memory Safety</h3>
+                <ul>
+                    <li>Prefer safe pointers and automatic memory management</li>
+                    <li>Use <code>Span</code> for safe, bounds-checked memory views</li>
+                    <li>Always initialize memory before access</li>
+                    <li>Match allocations with deallocations</li>
+                    <li>Leverage ASAP destruction for timely resource cleanup</li>
+                    <li>Use origin tracking to ensure reference validity</li>
+                </ul>
+            </div>
+
+            <div class="subsection">
+                <h3>Performance Optimization</h3>
+                <ul>
+                    <li>Use SIMD types for data-parallel operations</li>
+                    <li>Leverage compile-time parameters for zero-cost abstractions</li>
+                    <li>Apply <code>@always_inline</code> to small, critical functions</li>
+                    <li>Use <code>@parameter for</code> for loop unrolling</li>
+                    <li>Prefer register-passable types for small values</li>
+                    <li>Minimize heap allocations in hot paths</li>
+                    <li>Use strided and gather/scatter operations for SIMD efficiency</li>
+                </ul>
+            </div>
+
+            <div class="subsection">
+                <h3>Code Organization</h3>
+                <ul>
+                    <li>Define clear interfaces using traits</li>
+                    <li>Implement appropriate lifecycle traits (<code>Copyable</code>, <code>Movable</code>)</li>
+                    <li>Use <code>@deprecated</code> for API migrations</li>
+                    <li>Group related functionality with static methods</li>
+                </ul>
+            </div>
+
+            <div class="subsection">
+                <h3>Error Handling</h3>
+                <ul>
+                    <li>Use <code>raises</code> for operations that can fail</li>
+                    <li>Implement context managers for resource management</li>
+                    <li>Use <code>Optional</code> for values that may be absent</li>
+                    <li>Use <code>Variant</code> for tagged unions and result types</li>
+                    <li>Always clean up resources in <code>finally</code> blocks</li>
+                    <li>Provide meaningful error messages with context</li>
+                </ul>
+            </div>
+
+            <div class="subsection">
+                <h3>Generic Programming</h3>
+                <ul>
+                    <li>Use trait bounds to constrain type parameters</li>
+                    <li>Leverage parametric aliases for type convenience</li>
+                    <li>Prefer compile-time dispatch over runtime polymorphism</li>
+                    <li>Use <code>@parameter</code> for compile-time computation</li>
+                    <li>Document type parameter requirements clearly</li>
+                </ul>
+            </div>
+        </div>
+
+        <div
+            style="margin-top: 50px; padding-top: 20px; border-top: 2px solid #0066cc; text-align: center; color: #666;">
+            <p><strong>Mojo Language: Core Features Documentation</strong></p>
+            <p style="font-size: 14px; margin-top: 10px;">Comprehensive technical reference covering types, memory
+                management, MLIR interoperability, and advanced features</p>
+            <p style="font-size: 12px; margin-top: 10px; font-style: italic;">For the latest updates and detailed
+                examples,
+                visit the official Mojo documentation at docs.modular.com</p>
+        </div>
+
+</body>
+
+</html>
