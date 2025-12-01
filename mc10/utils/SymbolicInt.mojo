@@ -1,12 +1,13 @@
-from memory import UnsafePointer, ArcPointer
-from collections import Optional
 
-from mc10.utils.Symbolic import SymNode, SymNodeImpl
-from mc10.utils.SymbolicBool import SymBool
-from mc10.utils.SymbolicFloat import SymFloat
-from mc10.types.traits import Symbolic
-from mc10.__mlir import _toi64
-from mc10.utils.debuggable import asserts, abort
+# from memory import UnsafePointer, ArcPointer
+# from collections import Optional
+
+# from mc10.utils.Symbolic import SymNode, SymNodeImpl
+# from mc10.utils.SymbolicBool import SymBool
+# from mc10.utils.SymbolicFloat import SymFloat
+# from mc10.types.traits import Symbolic
+# from mc10.__mlir import _toi64
+# from mc10.utils.debuggable import asserts, abort
 
 
 # @value
@@ -222,52 +223,52 @@ from mc10.utils.debuggable import asserts, abort
 #     return node
 
 
-@value
-@register_passable("trivial")
-struct SymInt:
-    alias __mlir_type = __mlir_type[
-        `!kgen.variant<`,
-        Int,
-        `, `,
-        UnsafePointer[SymNode],
-        `>`,
-    ]
+# @value
+# @register_passable("trivial")
+# struct SymInt:
+#     alias __mlir_type = __mlir_type[
+#         `!kgen.variant<`,
+#         Int,
+#         `, `,
+#         UnsafePointer[SymNode],
+#         `>`,
+#     ]
 
-    var value: Self.__mlir_type
+#     var value: Self.__mlir_type
 
-    fn __init__(out self):
-        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
+#     fn __init__(out self):
+#         __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(self))
 
-    fn __init__(out self, data: Int):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.__mlir_type, index = Int(0).value
-        ](data)
+#     fn __init__(out self, data: Int):
+#         self.value = __mlir_op.`kgen.variant.create`[
+#             _type = Self.__mlir_type, index = Int(0).value
+#         ](data)
 
-    fn __init__(out self, owned data: UnsafePointer[SymNode]):
-        self.value = __mlir_op.`kgen.variant.create`[
-            _type = Self.__mlir_type, index = Int(1).value
-        ](data)
+#     fn __init__(out self, owned data: UnsafePointer[SymNode]):
+#         self.value = __mlir_op.`kgen.variant.create`[
+#             _type = Self.__mlir_type, index = Int(1).value
+#         ](data)
 
-    fn is_symbolic(self) -> Bool:
-        return __mlir_op.`kgen.variant.is`[index = Int(1).value](self.value)
+#     fn is_symbolic(self) -> Bool:
+#         return __mlir_op.`kgen.variant.is`[index = Int(1).value](self.value)
 
-    fn __int__(self) -> Int:
-        asserts(
-            not self.is_symbolic(), "Expected non symbolic, but got symbolic"
-        )
-        return __mlir_op.`kgen.variant.get`[index = Int(0).value](self.value)
+#     fn __int__(self) -> Int:
+#         asserts(
+#             not self.is_symbolic(), "Expected non symbolic, but got symbolic"
+#         )
+#         return __mlir_op.`kgen.variant.get`[index = Int(0).value](self.value)
 
-    fn __float__(self) -> Float64:
-        asserts(False, "int not a float")
-        return Float64()
+#     fn __float__(self) -> Float64:
+#         asserts(False, "int not a float")
+#         return Float64()
 
-    fn __bool__(self) -> Bool:
-        asserts(
-            not self.is_symbolic(), "Expected non symbolic, but got symbolic"
-        )
-        return __mlir_op.`kgen.variant.get`[index = Int(0).value](
-            self.value
-        ).__bool__()
+#     fn __bool__(self) -> Bool:
+#         asserts(
+#             not self.is_symbolic(), "Expected non symbolic, but got symbolic"
+#         )
+#         return __mlir_op.`kgen.variant.get`[index = Int(0).value](
+#             self.value
+#         ).__bool__()
 
 
 # @value

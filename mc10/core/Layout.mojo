@@ -1,17 +1,27 @@
-alias kstrided = LayoutType.Strided
-alias ksparse = LayoutType.Sparse
-alias kSparseCsr = LayoutType.SparseCsr
-alias kMkldnn = LayoutType.Mkldnn
+from hashlib import Hasher
+
+
+# This is a small workaround for Layout Tag which tells the framwork to choose a way of memory representation for underlying data...
 
 
 @fieldwise_init
 @register_passable("trivial")
-struct LayoutType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, Representable, Stringable, Writable):
+struct LayoutType(
+    AnyType,
+    Copyable,
+    Equatable,
+    Hashable,
+    KeyElement,
+    Representable,
+    Stringable,
+    Writable,
+):
     alias Strided = LayoutType(0)
     alias Sparse = LayoutType(1)
-    alias SparseCsr = LayoutType(2)
-    alias Mkldnn = LayoutType(3)
     var value: Int8
+
+    fn __init__(out self):
+        self = Self.default()
 
     @no_inline
     fn __str__(self) -> String:
@@ -32,14 +42,8 @@ struct LayoutType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         """
         return "LayoutType." + String(self)
 
-    @always_inline("nodebug")
-    fn __hash__(self) -> UInt:
-        """Computes the hash value for the LayoutType.
-
-        Returns:
-            An integer hash value based on the LayoutType's value.
-        """
-        return hash(UInt8(self.value.cast[DType.uint8]()))
+    fn __hash__[H: Hasher](self, mut hasher: H):
+        hasher.update(self.value)
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
@@ -54,10 +58,6 @@ struct LayoutType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
             return writer.write("Strided")
         if self == LayoutType.Sparse:
             return writer.write("Sparse")
-        if self == LayoutType.SparseCsr:
-            return writer.write("SparseCsr")
-        if self == LayoutType.Mkldnn:
-            return writer.write("Mkldnn")
         return writer.write("Unknown layout")
 
     @always_inline("nodebug")
@@ -109,6 +109,13 @@ struct LayoutType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         return self != rhs
 
     @always_inline("nodebug")
+    fn is_strided(self) -> Bool:
+        return self == LayoutType.Strided
+
+    @always_inline("nodebug")
+    fn is_sparse(self) -> Bool:
+        return self == LayoutType.Sparse
+
     @staticmethod
-    fn is_valid(value: Int8) -> Bool:
-        return value >= 0 and value <= 3
+    fn default() -> LayoutType:
+        return LayoutType.Strided

@@ -1,12 +1,10 @@
-from collections.string.string import _calc_format_buffer_size
-
-# TODO: still under construction...
+# TODO: still under construction... Not really important for now...
 
 
-@value
+@fieldwise_init
 struct __PrinterOptions:
     var precision: Int
-    var threshold: FloatLiteral
+    var threshold: Float32
     var edgeitems: Int
     var linewidth: Int
     var max_width: Int
@@ -23,7 +21,6 @@ struct __PrinterOptions:
         )
 
 
-@value
 struct TensorFormatter(Writable):
     alias TensorStart = "Tensor("
     alias TensorEnd = ")"

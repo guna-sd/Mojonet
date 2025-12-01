@@ -3,12 +3,10 @@ A custom implementation of the stdlib List.
 """
 
 from mc10.utils.debuggable import abort
-from mc10.utils.index import indexable
+from mc10.types.Array import indexable
 from memory import UnsafePointer
 
 
-
-@value
 struct Node[
     ElementType: Copyable & Movable,
 ]:
@@ -18,9 +16,9 @@ struct Node[
         ElementType: The type of element stored in the node.
     """
 
-    alias _NodePointer = UnsafePointer[Self]
+    alias _NodePointer = UnsafePointer[Self, MutOrigin.external]
 
-    var value: ElementType
+    var value: Self.ElementType
     """The value stored in this node."""
     var prev: Self._NodePointer
     """The previous node in the list."""
@@ -29,7 +27,7 @@ struct Node[
 
     fn __init__(
         out self,
-        owned value: ElementType,
+        var value: Self.ElementType,
         prev: Optional[Self._NodePointer],
         next: Optional[Self._NodePointer],
     ):
@@ -46,12 +44,12 @@ struct Node[
         self.next = next.value() if next else Self._NodePointer()
 
     fn __str__[
-        ElementType: Writable & Copyable & Movable
-    ](self: Node[ElementType]) -> String:
+        Element: Writable & Copyable & Movable
+    ](self: Node[Element]) -> String:
         """Convert this node's value to a string representation.
 
         Parameters:
-            ElementType: Used to conditionally enable this function if
+            Element: Used to conditionally enable this function if
               `ElementType` is `Writable`.
 
         Returns:
@@ -61,12 +59,12 @@ struct Node[
 
     @no_inline
     fn write_to[
-        ElementType: Writable & Copyable & Movable, W: Writer
-    ](self: Node[ElementType], mut writer: W):
+        Element: Writable & Copyable & Movable, W: Writer
+    ](self: Node[Element], mut writer: W):
         """Write this node's value to the given writer.
 
         Parameters:
-            ElementType: Used to conditionally enable this function if
+            Element: Used to conditionally enable this function if
               `ElementType` is `Writable`.
             W: The type of writer to write the value to.
 
@@ -74,5 +72,6 @@ struct Node[
             writer: The writer to write the value to.
         """
         writer.write(self.value)
+
 
 ## TODO: Yet to Implement List Planned for next release

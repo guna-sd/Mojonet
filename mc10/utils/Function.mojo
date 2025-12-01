@@ -1,51 +1,109 @@
 from memory import UnsafePointer
-
-# @register_passable("trivial")
-# struct Function:
-#     alias fn0 = fn() -> object
-#     alias fn1 = fn(object) -> object
-#     alias fn2 = fn(object, object) -> object
-#     alias fn3 = fn(object, object, object) -> object
-#     var _inner: UnsafePointer[NoneType]
-
-#     fn __init__[FunctionType: AnyTrivialRegType](out self: Function, func: FunctionType):
-#         var function = UnsafePointer[NoneType]().alloc(1)
-#         UnsafePointer.address_of(function).bitcast[FunctionType]()[] = func
-#         self._inner = function
-    
-#     fn __call__(owned self: Function) -> object:
-#         return UnsafePointer.address_of(self._inner).bitcast[Self.fn0]()[]()
-    
-#     fn __call__(owned self: Function, arg1: object) -> object:
-#         return UnsafePointer.address_of(self._inner).bitcast[Self.fn1]()[](arg1)
-    
-#     fn __call__(owned self: Function, arg1: object, arg2: object) -> object:
-#         return UnsafePointer.address_of(self._inner).bitcast[Self.fn2]()[](arg1, arg2)
-    
-#     fn __call__(owned self: Function, arg1: object, arg2: object, arg3: object) -> object:
-#         return UnsafePointer.address_of(self._inner).bitcast[Self.fn3]()[](arg1, arg2, arg3)
+from collections import OptionalReg
 
 
-# @register_passable("trivial")
-# struct Function[FnType: AnyTrivialRegType]:
-#     var _inner: UnsafePointer[NoneType]
-
-#     fn __init__(out self, function: FnType):
-#         var func = UnsafePointer[NoneType]().alloc(1)
-#         UnsafePointer.address_of(func).bitcast[FnType]()[] = function
-#         self._inner = func
-    
-#     fn run(self) -> FnType:
-#         return UnsafePointer.address_of(self._inner).bitcast[FnType]()[]
+# I am really not sure about the safeness, but the logic is almost there and it seems working for now...
+# Plays an important Role in this framwork...
 
 @register_passable("trivial")
-struct Function[FnType: AnyTrivialRegType]:
-    alias funcs = List(fn(), fn[T: AnyType](ref data: T, out result: T))
-    alias func = UnsafePointer.address_of(FnType)
-    var _inner: FnType
+struct Function[FnType: AnyTrivialRegType](
+    ImplicitlyBoolable, Stringable, Writable
+):
+    var _fn: OptionalReg[Self.FnType]
+    var _addr: UnsafePointer[Int, ImmutAnyOrigin]
 
-    fn __init__(out self, function: FnType):
-        self._inner = function
-    
-    fn run(read self):
-        return UnsafePointer.address_of(self._inner).bitcast[fn()]()[]()
+    fn __init__(out self):
+        """Create a null Function."""
+        self._fn = None
+        self._addr = UnsafePointer[Int, ImmutAnyOrigin]()
+
+    @implicit
+    fn __init__(out self, value: NoneType._mlir_type):
+        self = Self()
+
+    @implicit
+    fn __init__(out self, function: Self.FnType):
+        self._fn = function
+
+        # Take the address of the symbol itself
+        var func: UnsafePointer[Int, ImmutAnyOrigin]
+        __mlir_op.`lit.ownership.mark_initialized`(__get_mvalue_as_litref(func))
+        UnsafePointer(to=func).bitcast[Self.FnType]()[] = function
+        self._addr = func
+
+    fn compare(read self, other: Function[Self.FnType]) -> Bool:
+        return self._addr == other._addr
+
+    fn compare_exchange(
+        mut self,
+        expected: Function[Self.FnType],
+        new: Self.FnType,
+    ) -> Bool:
+        if self._addr == expected._addr:
+            self._fn = new
+            var func: UnsafePointer[Int, ImmutAnyOrigin]
+            __mlir_op.`lit.ownership.mark_initialized`(
+                __get_mvalue_as_litref(func)
+            )
+            UnsafePointer(to=func).bitcast[Self.FnType]()[] = new
+            self._addr = func
+            return True
+        return False
+
+    fn compare_exchange(
+        mut self,
+        expected: Self.FnType,
+        new: Self.FnType,
+    ) -> Bool:
+        if self._fn is not None:
+            if self._addr != Function[Self.FnType](expected)._addr:
+                return False
+            self._fn = new
+            var func: UnsafePointer[Int, ImmutAnyOrigin]
+            __mlir_op.`lit.ownership.mark_initialized`(
+                __get_mvalue_as_litref(func)
+            )
+            UnsafePointer(to=func).bitcast[Self.FnType]()[] = new
+            self._addr = func
+            return True
+        return False
+
+    fn get(read self, /) -> Self.FnType:
+        debug_assert(
+            self._fn is not None,
+            "Attempted to get function from uninitialized Function object.",
+        )
+        return self._fn.value()
+
+    fn _get_address(read self, /) -> UnsafePointer[Int, ImmutAnyOrigin]:
+        return self._addr
+
+    fn __bool__(read self) -> Bool:
+        return self._fn is not None
+
+    fn __eq__(read self, other: Function[Self.FnType]) -> Bool:
+        return self._addr == other._addr
+
+    fn __ne__(read self, other: Function[Self.FnType]) -> Bool:
+        return self._addr != other._addr
+
+    fn __is__(read self, other: Function[Self.FnType]) -> Bool:
+        return self._addr == other._addr
+
+    fn __isnot__(read self, other: Function[Self.FnType]) -> Bool:
+        return self._addr != other._addr
+
+    fn __is__(self, other: NoneType._mlir_type) -> Bool:
+        return not self.__bool__()
+
+    fn __isnot__(self, other: NoneType._mlir_type) -> Bool:
+        return self.__bool__()
+
+    fn __int__(read self) -> Int:
+        return Int(self._addr)
+
+    fn __str__(read self) -> String:
+        return "Function at address: " + String(self._addr)
+
+    fn write_to[W: Writer](read self, mut writer: W):
+        writer.write(self._addr)

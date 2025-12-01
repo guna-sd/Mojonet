@@ -1,4 +1,4 @@
-##TODO: deprecated find a new way to store literals
+##TODO: deprecated find a new way to store constants
 
 # @value
 # @register_passable("trivial")
@@ -99,15 +99,15 @@
 #     @always_inline("nodebug")
 #     fn __repr__(self) -> String:
 #         return String("constant(", self, ")")
-    
+
 #     fn write_to[W: Writer](self, mut string: W):
 #         if self.__is_float__():
 #             string.write(self.__float__())
 #         else:
 #             string.write(self.__int__())
 
+
 ## TODO: Still a workaround not sure if this is the right way to do it.
-@value
 @register_passable("trivial")
 struct OptionalParamInt[dim_parametric: Int = -1342]:
     """A class to represent an optionally parametric Int.

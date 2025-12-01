@@ -11,7 +11,6 @@ trait TensorLike(
     Ceilable,
     Comparable,
     Defaultable,
-    ExplicitlyCopyable,
     Floatable,
     Floorable,
     Stringable,
@@ -40,11 +39,11 @@ trait TensorLike(
         """Returns the data type of the tensor elements."""
         ...
 
-    fn shape(self) -> VariadicList[Int]:
+    fn shape(self) -> List[Int]:
         """Returns the shape of the tensor."""
         ...
 
-    fn reshape(self, shape: VariadicList[Int]) -> Self:
+    fn reshape(self, shape: List[Int]) -> Self:
         """Returns a new tensor with the specified shape."""
         ...
 
@@ -53,6 +52,7 @@ trait TensorLike(
         ...
 
 
+# TODO: Not there yet...
 trait Symbolic(
     Absable,
     Boolable,
@@ -60,7 +60,7 @@ trait Symbolic(
     Ceilable,
     Copyable,
     Movable,
-    Comparable,    
+    Comparable,
     Floorable,
     Hashable,
     ImplicitlyBoolable,
@@ -93,10 +93,3 @@ trait Serializable:
     fn load(path: Path) -> Self:
         """Loads the object from the specified path."""
         ...
-
-
-trait Iterable(
-    AnyType,
-    Sized,
-):
-    ...

@@ -10,7 +10,7 @@ from memory import UnsafePointer
 
 
 struct randn:
-    var _seed: Int
+    var _seed: UInt
 
     @always_inline("nodebug")
     fn __init__(out self):
@@ -18,7 +18,7 @@ struct randn:
 
     @always_inline("nodebug")
     fn __init__(out self, seed: Int):
-        self._seed = seed
+        self._seed = UInt(seed)
 
     @always_inline("nodebug")
     fn seed(mut self):
@@ -26,7 +26,7 @@ struct randn:
 
     @always_inline("nodebug")
     fn seed(mut self, seed: Int):
-        self._seed = seed
+        self._seed = UInt(seed)
 
     @always_inline("nodebug")
     fn lcg(mut self) -> UInt64:
@@ -111,7 +111,7 @@ struct randn:
 
 
 @always_inline("nodebug")
-fn rand_n[type: DType](ptr: UnsafePointer[Scalar[type]], count: Int):
+fn rand_n[type: DType](mut ptr: List[Scalar[type]], count: Int):
     var rand = randn()
 
     @parameter
@@ -176,7 +176,7 @@ fn rand_n[type: DType](ptr: UnsafePointer[Scalar[type]], count: Int):
 
 
 @always_inline("nodebug")
-fn rand_n[type: DType](ptr: UnsafePointer[Scalar[type]], count: Int, seed: Int):
+fn rand_n[type: DType](mut ptr: List[Scalar[type]], count: Int, seed: Int):
     var rand = randn(seed)
 
     @parameter

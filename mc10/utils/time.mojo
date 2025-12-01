@@ -1,6 +1,9 @@
 from time.time import _monotonic_nanoseconds, _NSEC_PER_SEC
 
 
+# Considered as Utility required for Allocators and Kernals for storing metadata...
+# TODO: Refine for better Functionality...
+
 @fieldwise_init
 @register_passable("trivial")
 struct TimeStamp(Writable):
