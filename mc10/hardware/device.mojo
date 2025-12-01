@@ -1,25 +1,24 @@
+from hashlib import Hasher
+
+
 @fieldwise_init
 @register_passable("trivial")
-struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, Representable, Stringable, Writable):
+struct DeviceType(
+    AnyType,
+    Copyable,
+    Equatable,
+    KeyElement,
+    Representable,
+    Stringable,
+    Writable,
+):
     alias CPU = DeviceType(0)
     alias CUDA = DeviceType(1)
-    alias MKLDNN = DeviceType(2)
-    alias OPENGL = DeviceType(3)
-    alias OPENCL = DeviceType(4)
-    alias IDEEP = DeviceType(5)
-    alias HIP = DeviceType(6)
-    alias AMD = DeviceType(6)
-    alias FPGA = DeviceType(7)
-    alias MSNPU = DeviceType(8)
-    alias XLA = DeviceType(9)
-    alias Vulkan = DeviceType(10)
-    alias Metal = DeviceType(11)
-    alias XPU = DeviceType(12)
-    alias MLC = DeviceType(13)
-    alias Meta = DeviceType(14)
-    alias HPU = DeviceType(15)
-    alias COMPILE_TIME_MAX_DEVICEType_TYPES = 16
-    var value: Int8
+    alias AMD = DeviceType(2)
+    alias Metal = DeviceType(3)
+
+    alias COMPILE_TIME_MAX_DEVICEType_TYPES = 4
+    var value: Scalar[DType.uint8]
 
     @always_inline
     fn __init__(out self):
@@ -43,14 +42,16 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         """
         return "DeviceType." + String(self)
 
-    @always_inline("nodebug")
-    fn __hash__(self) -> UInt:
-        """Computes the hash value for the DeviceType.
+    fn __hash__[H: Hasher](self, mut hasher: H):
+        """Updates hasher with this `DType` value.
 
-        Returns:
-            An integer hash value based on the DeviceType's value.
+        Parameters:
+            H: The hasher type.
+
+        Args:
+            hasher: The hasher instance.
         """
-        return hash(UInt8(self.value.cast[DType.uint8]()))
+        hasher.update(self.value)
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):
@@ -64,34 +65,10 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
             return writer.write("cpu")
         if self == DeviceType.CUDA:
             return writer.write("cuda")
-        if self == DeviceType.MKLDNN:
-            return writer.write("MKLDNN")
-        if self == DeviceType.OPENGL:
-            return writer.write("OPENGL")
-        if self == DeviceType.OPENCL:
-            return writer.write("OPENCL")
-        if self == DeviceType.IDEEP:
-            return writer.write("IDEEP")
         if self == DeviceType.AMD:
-            return writer.write("AMD")
-        if self == DeviceType.FPGA:
-            return writer.write("FPGA")
-        if self == DeviceType.MSNPU:
-            return writer.write("MSNPU")
-        if self == DeviceType.XLA:
-            return writer.write("XLA")
-        if self == DeviceType.Vulkan:
-            return writer.write("Vulkan")
+            return writer.write("amd")
         if self == DeviceType.Metal:
-            return writer.write("Metal")
-        if self == DeviceType.XPU:
-            return writer.write("XPU")
-        if self == DeviceType.MLC:
-            return writer.write("MLC")
-        if self == DeviceType.Meta:
-            return writer.write("Meta")
-        if self == DeviceType.HPU:
-            return writer.write("HPU")
+            return writer.write("metal")
         return writer.write("Unknown deviceType")
 
     @staticmethod
@@ -102,37 +79,17 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
             deviceType_str: The name of the DeviceType.
         """
         if deviceType_str.startswith("DeviceType."):
-            return Self._from_str(deviceType_str.removeprefix("DeviceType."))
+            return Self._from_str(
+                deviceType_str.removeprefix("DeviceType.").__str__()
+            )
         elif deviceType_str == "cpu":
             return DeviceType.CPU
         elif deviceType_str == "cuda":
             return DeviceType.CUDA
-        elif deviceType_str == "xpu":
-            return DeviceType.XPU
-        elif deviceType_str == "mkldnn":
-            return DeviceType.MKLDNN
-        elif deviceType_str == "opengl":
-            return DeviceType.OPENGL
-        elif deviceType_str == "opencl":
-            return DeviceType.OPENCL
-        elif deviceType_str == "ideep":
-            return DeviceType.IDEEP
-        elif deviceType_str == "hip" or deviceType_str == "amd":
+        elif deviceType_str == "amd" or deviceType_str == "hip":
             return DeviceType.AMD
-        elif deviceType_str == "fpga":
-            return DeviceType.FPGA
-        elif deviceType_str == "msnpu":
-            return DeviceType.MSNPU
-        elif deviceType_str == "xla":
-            return DeviceType.XLA
-        elif deviceType_str == "vulkan":
-            return DeviceType.Vulkan
-        elif deviceType_str == "mlc":
-            return DeviceType.MLC
-        elif deviceType_str == "meta":
-            return DeviceType.Meta
-        elif deviceType_str == "hpu":
-            return DeviceType.HPU
+        elif deviceType_str == "metal":
+            return DeviceType.Metal
         else:
             return DeviceType.CPU
 
@@ -203,51 +160,6 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         return self == DeviceType.CUDA
 
     @always_inline("nodebug")
-    fn is_mkldnn(self) -> Bool:
-        """Checks if the DeviceType is an MKLDNN deviceType.
-
-        Returns:
-            True if the DeviceType is an MKLDNN deviceType, False otherwise.
-        """
-        return self == DeviceType.MKLDNN
-
-    @always_inline("nodebug")
-    fn is_opengl(self) -> Bool:
-        """Checks if the DeviceType is an OpenGL deviceType.
-
-        Returns:
-            True if the DeviceType is an OpenGL deviceType, False otherwise.
-        """
-        return self == DeviceType.OPENGL
-
-    @always_inline("nodebug")
-    fn is_opencl(self) -> Bool:
-        """Checks if the DeviceType is an OpenCL deviceType.
-
-        Returns:
-            True if the DeviceType is an OpenCL deviceType, False otherwise.
-        """
-        return self == DeviceType.OPENCL
-
-    @always_inline("nodebug")
-    fn is_ideep(self) -> Bool:
-        """Checks if the DeviceType is an IDEEP deviceType.
-
-        Returns:
-            True if the DeviceType is an IDEEP deviceType, False otherwise.
-        """
-        return self == DeviceType.IDEEP
-
-    @always_inline("nodebug")
-    fn is_hip(self) -> Bool:
-        """Checks if the DeviceType is a HIP deviceType.
-
-        Returns:
-            True if the DeviceType is a HIP deviceType, False otherwise.
-        """
-        return self == DeviceType.HIP
-
-    @always_inline("nodebug")
     fn is_amd(self) -> Bool:
         """Checks if the DeviceType is a AMD deviceType.
 
@@ -257,42 +169,6 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         return self == DeviceType.AMD
 
     @always_inline("nodebug")
-    fn is_fpga(self) -> Bool:
-        """Checks if the DeviceType is an FPGA deviceType.
-
-        Returns:
-            True if the DeviceType is an FPGA deviceType, False otherwise.
-        """
-        return self == DeviceType.FPGA
-
-    @always_inline("nodebug")
-    fn is_msnpu(self) -> Bool:
-        """Checks if the DeviceType is an MSNPU deviceType.
-
-        Returns:
-            True if the DeviceType is an MSNPU deviceType, False otherwise.
-        """
-        return self == DeviceType.MSNPU
-
-    @always_inline("nodebug")
-    fn is_xla(self) -> Bool:
-        """Checks if the DeviceType is an XLA deviceType.
-
-        Returns:
-            True if the DeviceType is an XLA deviceType, False otherwise.
-        """
-        return self == DeviceType.XLA
-
-    @always_inline("nodebug")
-    fn is_vulkan(self) -> Bool:
-        """Checks if the DeviceType is a Vulkan deviceType.
-
-        Returns:
-            True if the DeviceType is a Vulkan deviceType, False otherwise.
-        """
-        return self == DeviceType.Vulkan
-
-    @always_inline("nodebug")
     fn is_metal(self) -> Bool:
         """Checks if the DeviceType is a Metal deviceType.
 
@@ -300,42 +176,6 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
             True if the DeviceType is a Metal deviceType, False otherwise.
         """
         return self == DeviceType.Metal
-
-    @always_inline("nodebug")
-    fn is_xpu(self) -> Bool:
-        """Checks if the DeviceType is an XPU deviceType.
-
-        Returns:
-            True if the DeviceType is an XPU deviceType, False otherwise.
-        """
-        return self == DeviceType.XPU
-
-    @always_inline("nodebug")
-    fn is_mlc(self) -> Bool:
-        """Checks if the DeviceType is an MLC deviceType.
-
-        Returns:
-            True if the DeviceType is an MLC deviceType, False otherwise.
-        """
-        return self == DeviceType.MLC
-
-    @always_inline("nodebug")
-    fn is_meta(self) -> Bool:
-        """Checks if the DeviceType is a Meta deviceType.
-
-        Returns:
-            True if the DeviceType is a Meta deviceType, False otherwise.
-        """
-        return self == DeviceType.Meta
-
-    @always_inline("nodebug")
-    fn is_hpu(self) -> Bool:
-        """Checks if the DeviceType is an HPU deviceType.
-
-        Returns:
-            True if the DeviceType is an HPU deviceType, False otherwise.
-        """
-        return self == DeviceType.HPU
 
     @parameter
     @always_inline("nodebug")
@@ -353,16 +193,74 @@ struct DeviceType(AnyType, Copyable, EqualityComparable, Hashable, KeyElement, R
         """
         if self == DeviceType.CPU:
             return AddressSpace(0)
-        elif (
-            self == DeviceType.CUDA
-            or self == DeviceType.HIP
-            or self == DeviceType.AMD
-        ):
+        elif self == DeviceType.CUDA or self == DeviceType.AMD:
             return AddressSpace(1)
 
         else:
             return AddressSpace(0)
 
+
+@register_passable("trivial")
+struct Device(
+    Copyable,
+    Hashable,
+    Movable,
+    Equatable & Stringable & Representable & Writable,
+):
+    """
+    Represents a compute device (CPU, GPU, etc.) with an optional index.
+    Equivalent to c10::Device in PyTorch.
+    """
+
+    comptime CPU = Device(DeviceType.CPU, 0)
+
+    var type: DeviceType
+    var index: Int
+
+    fn __init__(out self):
+        """Create a CPU device with default index."""
+        self.type = DeviceType.CPU
+        self.index = 0
+
+    fn __init__(out self, type: DeviceType, index: Int = -1):
+        self.type = type
+        self.index = index
+
+    @staticmethod
+    fn cuda(index: Int = 0) -> Self:
+        return Device(DeviceType.CUDA, index)
+
+    fn __eq__(self, other: Self) -> Bool:
+        return self.type == other.type and self.index == other.index
+
+    fn __ne__(self, other: Device) -> Bool:
+        return not self == other
+
+    fn __hash__[H: Hasher](self, mut hasher: H):
+        hasher.update(self.type)
+        hasher.update(self.index)
+
+    fn __str__(self) -> String:
+        if self.index < 0:
+            return self.type.__str__()
+        return self.type.__str__() + ":" + String(self.index)
+
+    fn __repr__(self) -> String:
+        return (
+            "Device(" + self.type.__repr__() + ", " + String(self.index) + ")"
+        )
+
+    fn write_to[W: Writer](self, mut writer: W):
+        if self.index < 0:
+            return writer.write(self.type)
+        writer.write(self.type)
+        writer.write(":")
+        writer.write(self.index)
+
+
+
+# Not really sure why this is going to be a game changer for  cross platform compilation ...
+# Not there yet.. but still provided a small peek with some reference (stdlib)...
 
 struct Target:
     alias __mlir_type = __mlir_type.`!kgen.target`
@@ -588,7 +486,6 @@ fn _get_rtx5090_target() -> __mlir_type.`!kgen.target`:
     ]
 
 
-
 ## TODO: Test this target
 fn _get_rtx2050_target() -> __mlir_type.`!kgen.target`:
     """
@@ -607,5 +504,3 @@ fn _get_rtx2050_target() -> __mlir_type.`!kgen.target`:
         `simd_bit_width = 128`,
         `> : !kgen.target`,
     ]
-
-
