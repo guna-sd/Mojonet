@@ -1,4 +1,4 @@
-[project]
+[workspace]
 authors = ["guna-sd <sdgunaseker@gmail.com>"]
 channels = ["conda-forge", "https://conda.modular.com/max-nightly", "https://repo.prefix.dev/modular-community"]
 description = "A deep learning framework in mojo🔥"
@@ -9,8 +9,4 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
-lit = ">=20.1.5,<21"
-max = ">=25.4.0.dev2025051718,<26"
-python = ">=3.13.3,<3.14"
-tqdm = ">=4.67.1,<5"
-requests = ">=2.32.3,<3"
+mojo = "<1.0.0"
